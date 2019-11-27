@@ -2,13 +2,12 @@
 
 from traceback import print_exc
 import os, pygame
-from pygame.locals import RESIZABLE
 from sys import exit
 from GameDriver import GameDriver
 import World as w
 from HelpfulTools import complete_task
 from World.WorldSelector import run_selector
-from Databases.constants import load_fonts, resize
+from Databases.constants import load_fonts
 
 # Do any initialization of variables and such
 pygame.init()

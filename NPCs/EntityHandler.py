@@ -58,7 +58,7 @@ class EntityHandler:
         for x in range(max(0, player_pos[0] - 50), min(w.blocks.shape[1], player_pos[0] + 50)):
             if x in w.spawners.keys():
                 for y in range(max(0, player_pos[1] - 50, min(w.blocks.shape[0], player_pos[1] + 50))):
-                    if y in w.spawners[x].keys() and randint(1, 1000) == 1:
+                    if y in w.spawners[x].keys() and randint(1, 10000) == 1:
                         entity = items[w.spawners[x][y]].spawn((x, y), conditions)
                         if entity is not None:
                             self.entities.append(entity)
