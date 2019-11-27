@@ -5,4 +5,4 @@ text.py
 saves/worlds/*
 !saves/worlds/New World.wld
 saves/players/*
-!saves/worlds/New Player.plr
+!saves/players/New Player.plr
