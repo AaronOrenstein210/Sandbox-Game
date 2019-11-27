@@ -119,7 +119,7 @@ class Player:
 
     def touching_blocks_x(self, left):
         # Check if we are actually touching a new block (including non-solid)
-        touching = (self.rect.left if left else self.rect.right) % BLOCK_W == 0
+        touching = abs(self.pos[0] + (0 if left else self.rect.w)) % BLOCK_W <= .1
         if touching:
             # Get next x block
             next_x = int(self.rect.left / BLOCK_W) - 1 if left else ceil(self.rect.right / BLOCK_W)
@@ -135,7 +135,7 @@ class Player:
 
     def touching_blocks_y(self, top):
         # Check if we are actually touching a new block (including non-solid)
-        touching = (self.rect.top if top else self.rect.bottom) % BLOCK_W == 0
+        touching = abs(self.pos[1] + (0 if top else self.rect.h)) % BLOCK_W <= .1
         if touching:
             # Get next y block
             next_y = int(self.rect.top / BLOCK_W) - 1 if top else ceil(self.rect.bottom / BLOCK_W)
