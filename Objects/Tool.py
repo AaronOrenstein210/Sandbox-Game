@@ -7,8 +7,8 @@ from pygame.transform import rotate, scale
 from pygame.image import load
 from math import sqrt, asin, cos, sin, pi, radians
 from Objects.Item import Item
-from Databases.collision import Polygon
-from Databases.constants import BLOCK_W, ITEM_W
+from Tools.collision import Polygon
+from Tools.constants import BLOCK_W, ITEM_W
 
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 

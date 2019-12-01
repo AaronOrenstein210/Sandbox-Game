@@ -2,11 +2,11 @@
 # Handles all entities, including loose items
 
 from random import randint
+from pygame.display import get_surface
 from NPCs.SpawnConditions import SpawnConditions
-from Databases.constants import AIR_ID, BLOCK_W
-from Databases import constants as c
+from Tools.constants import AIR_ID, BLOCK_W
 import World as w
-from Databases.lists import items
+from Tools.lists import items
 
 
 class EntityHandler:
@@ -16,9 +16,9 @@ class EntityHandler:
 
     def move(self, dt, player_pos, pick_up):
         for entity in self.entities:
-            entity.move(w.blocks, player_pos, dt)
+            entity.move(player_pos, dt)
         for item in self.items:
-            item.move(dt, w.blocks)
+            item.move(dt)
             if item.pick_up_immunity <= 0 and pick_up(item):
                 self.items.remove(item)
 
@@ -38,12 +38,13 @@ class EntityHandler:
         return 0, 0
 
     def get_display(self, rect):
+        display = get_surface()
         for entity in self.entities:
             if rect.colliderect(entity.rect):
-                c.display.blit(entity.surface, (entity.pos[0] - rect.x, entity.pos[1] - rect.y))
+                display.blit(entity.surface, (entity.pos[0] - rect.x, entity.pos[1] - rect.y))
         for item in self.items:
             if rect.colliderect(item.rect):
-                c.display.blit(items[item.idx].get_dropped_display(), (item.pos[0] - rect.x, item.pos[1] - rect.y))
+                display.blit(items[item.idx].get_dropped_display(), (item.pos[0] - rect.x, item.pos[1] - rect.y))
 
     def collides_with_entity(self, rect):
         for entity in self.entities:
@@ -64,6 +65,7 @@ class EntityHandler:
                             self.entities.append(entity)
 
 
+# Maybe used in future
 def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
     # X range
     v1_min, v1_max = max(0, center[0] - r_outer), min(w.blocks.shape[1], center[0] + r_outer)

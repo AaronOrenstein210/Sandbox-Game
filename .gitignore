@@ -3,6 +3,6 @@
 venv/
 text.py
 saves/worlds/*
-!saves/worlds/New World.wld
+!saves/universes/New World.wld
 saves/players/*
 !saves/players/New Player.plr

@@ -5,7 +5,7 @@ from Objects.Items import MOB
 from NPCs.Entity import Entity
 from Player.Stats import Stats
 from NPCs.conditions import *
-from Databases.constants import FOLLOW, FLY
+from Tools.constants import FOLLOW, FLY
 
 
 class Cat(Entity):

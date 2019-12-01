@@ -7,9 +7,9 @@ from math import ceil
 from pygame import Surface
 from pygame.draw import rect as draw_rect
 from pygame.locals import *
-from Databases.lists import items
-from Databases.constants import INV_W
-from Databases import constants as c
+from Tools.lists import items
+from Tools.constants import INV_W
+from Tools import constants as c
 
 hotbar_controls = {
     K_1: 0, K_2: 1, K_3: 2, K_4: 3,

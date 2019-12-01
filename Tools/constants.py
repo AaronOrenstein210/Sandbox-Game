@@ -15,21 +15,21 @@ MAX_FALL_SPEED = 10
 AIR_ID = 0
 BACKGROUND = (0, 128, 128)
 
-# Fonts
-inv_font, load_font, ui_font = None, None, None
-# Display
-display = set_mode((MIN_W, MIN_H), RESIZABLE)
-display.fill(BACKGROUND)
 # Damage types
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 # Ai types
 RANDOM, FOLLOW, FLY = 0, 1, 2
+# Fonts
+inv_font, load_font, ui_font = None, None, None
+# Universe
+universe_name, world_name = "", ""
+# Game state
+PLAYING, CHANGE_WORLD, END_GAME = 0, 1, 2
+game_state = 0
 
 
 def resize(w, h):
-    global display
-    display = set_mode((max(w, MIN_W), max(h, MIN_H)), RESIZABLE)
-    display.fill(BACKGROUND)
+    set_mode((max(w, MIN_W), max(h, MIN_H)), RESIZABLE).fill(BACKGROUND)
 
 
 # Gets the biggest font that fits the text within max_w and max_h

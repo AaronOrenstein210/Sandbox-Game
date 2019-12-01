@@ -4,8 +4,8 @@
 from math import copysign, asin, sin, cos, sqrt, pi, radians
 from pygame import Surface, Rect, SRCALPHA
 from pygame.transform import scale, rotate
-from Databases.constants import ITEM_W, MAX_FALL_SPEED, BLOCK_W
-from Databases.ai import check_collisions
+from Tools.constants import ITEM_W, MAX_FALL_SPEED, BLOCK_W
+from NPCs.Entity import check_collisions
 
 X_SPEED = 15
 
@@ -20,6 +20,8 @@ class Item:
         self.consumable = consumable
         self.spawner = False
         self.placeable = False
+        self.clickable = False
+        self.usable = False
         # Create the item's icon, default filled black
         self.rect = Rect(0, 0, ITEM_W, ITEM_W)
         self.icon = Surface((BLOCK_W, BLOCK_W))
@@ -41,7 +43,7 @@ class Item:
         frac = ITEM_W / min(size)
         return scale(self.image, (int(frac * size[0]), int(frac * size[1])))
 
-    def move(self, dt, blocks):
+    def move(self, dt):
         if dt == 0:
             return
         self.pick_up_immunity = max(self.pick_up_immunity - dt, 0)
@@ -54,7 +56,7 @@ class Item:
             self.v[1] = min(self.v[1], MAX_FALL_SPEED / 2)
 
             ratio = ITEM_W / BLOCK_W
-            check_collisions(blocks, self.pos, (ratio, ratio), d)
+            check_collisions(self.pos, (ratio, ratio), d)
         else:
             self.pos = [self.pos[0] + d[0], self.pos[1] + d[1]]
         self.rect.topleft = self.pos

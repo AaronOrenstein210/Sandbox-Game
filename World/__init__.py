@@ -1,10 +1,10 @@
 from os.path import isfile
 from sys import byteorder
 from numpy import full, int16
-from Databases import constants as c
-from Databases.lists import items
+from Tools import constants as c
+from Tools.lists import items
 from World.WorldGenerator import generate_world
-from HelpfulTools import complete_task
+from Tools.UIOperations import complete_task
 
 # Defines world zones
 SURFACE, CAVE = 0, 0
@@ -29,16 +29,16 @@ world_spawn = [0, 0]
 
 
 # Create new world
-def create_new_world(name):
+def create_new_world(universe, name):
     data = full(world_dim[LARGE], c.AIR_ID, dtype=int16)
     spawn = generate_world(data)
-    file = "saves/worlds/" + name + ".wld"
-    complete_task(save_world_part, args=[file, data, spawn], msg="Creating new world",
+    file = "saves/universes/" + universe + "/" + name + ".wld"
+    complete_task(save_world_part, task_args=[file, data, spawn], message="Creating new world",
                   can_exit=False)
 
 
 # Load world
-def load_world_part(progress, file):
+def load_world_part(progress, file, num_rows=1):
     if isfile(file):
         # Open file
         with open(file, "rb") as world_data:
@@ -51,17 +51,18 @@ def load_world_part(progress, file):
                 global blocks
                 blocks = full((h, w), c.AIR_ID, dtype=int16)
             # Get current height and data for that row
-            y = int(progress * blocks.shape[0])
-            data = data[8 + (y * 2 * blocks.shape[1]):]
+            current_y = int(progress * blocks.shape[0])
+            data = data[8 + (current_y * 2 * blocks.shape[1]):]
             # Write data to array
-            for x in range(blocks.shape[1]):
-                val = int.from_bytes(data[:2], byteorder)
-                if val != c.AIR_ID:
-                    blocks[y][x] = val
-                    # Save it if it is a spawner
-                    if items[val].spawner:
-                        add_spawner(x, y, val)
-                data = data[2:]
+            for y in range(current_y, min(current_y + num_rows, blocks.shape[0])):
+                for x in range(blocks.shape[1]):
+                    val = int.from_bytes(data[:2], byteorder)
+                    if val != c.AIR_ID:
+                        blocks[y][x] = val
+                        # Save it if it is a spawner
+                        if items[val].spawner:
+                            add_spawner(x, y, val)
+                    data = data[2:]
             return float((y + 1) / blocks.shape[0])
 
 

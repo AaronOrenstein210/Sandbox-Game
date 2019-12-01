@@ -1,7 +1,7 @@
 from math import sqrt
 from random import randint
 from numpy import full, int16, vstack
-from Databases.constants import AIR_ID
+from Tools.constants import AIR_ID
 from Objects.Items.items import DIRT
 from Objects.Items.items import ZOMBIE
 
