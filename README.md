@@ -1,4 +1,4 @@
-# Sandbox-Games
+# Sandbox-Game
 
 ## Opening Screens:
 ### Play and existing character/universe with the play button
