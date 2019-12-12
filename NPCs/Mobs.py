@@ -1,11 +1,11 @@
 # Created on 23 November 2019
 # All mobs need to be defined here to create spawners for them
 
-from Objects.Items import MOB
+from Objects import MOB
 from NPCs.Entity import Entity
 from Player.Stats import Stats
 from NPCs.conditions import *
-from Tools.constants import FOLLOW, FLY
+from Tools.constants import FOLLOW
 
 
 class Cat(Entity):

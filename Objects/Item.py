@@ -1,101 +1,116 @@
 # Created on 31 October 2019
 # Defines functions and variables for placeable items
 
-from math import copysign, asin, sin, cos, sqrt, pi, radians
-from pygame import Surface, Rect, SRCALPHA
-from pygame.transform import scale, rotate
-from Tools.constants import ITEM_W, MAX_FALL_SPEED, BLOCK_W
-from NPCs.Entity import check_collisions
-
-X_SPEED = 15
+from os.path import isfile
+import math
+import pygame as pg
+from Tools.constants import ITEM_W, INV_IMG_W
+from Tools.collision import Polygon
+from Tools import objects as o
+from Objects.tile_ids import AIR
 
 
 class Item:
-    def __init__(self, idx, name, amnt, max_stack, use_time, consumable):
-        self.idx, self.name = idx, name
-        self.max_stack = max_stack
-        self.amnt = min(self.max_stack, amnt)
-        self.use_time = use_time
-        # Information booleans
-        self.consumable = consumable
-        self.spawner = False
+    def __init__(self, idx, use_img="", inv_img=""):
+        self.idx, self.name = idx, "No Name"
+        self.max_stack = 999
+        self.use_time = 300
+
+        # Item use booleans
+        # Is consumable (will decrease item amount)
+        self.consumable = False
+        # Will automatically start using again
+        self.auto_use = False
+        # Show a ui on interaction/usage
+        self.has_ui = False
+        # Can attack an enemy
+        self.is_weapon = False
+        # Should swing when used
+        self.swing = False
+        # Places a block on use
         self.placeable = False
-        self.clickable = False
-        self.usable = False
-        # Create the item's icon, default filled black
-        self.rect = Rect(0, 0, ITEM_W, ITEM_W)
-        self.icon = Surface((BLOCK_W, BLOCK_W))
-        self.image = Surface((BLOCK_W, BLOCK_W))
-        # Movement variables
-        self.pos = [0., 0.]
-        self.v = [0., 0.]
-        # Variables for picking up this item
-        self.pick_up_immunity = 0
-        self.pulled_in = False
+        # Breaks a block on use
+        self.breaks_blocks = False
+
+        # Used for inventories
+        self.inv_img = pg.Surface((INV_IMG_W, INV_IMG_W))
+        if isfile(inv_img):
+            self.inv_img = pg.transform.scale(pg.image.load(inv_img), (INV_IMG_W, INV_IMG_W))
+        # Used for item use animations and dropped items
+        if isfile(use_img):
+            self.image = pg.image.load(use_img)
+            size = self.image.get_size()
+            frac = ITEM_W / min(size)
+            self.image = pg.transform.scale(self.image, (int(frac * size[0]), int(frac * size[1])))
+        else:
+            self.image = pg.transform.scale(self.inv_img, (ITEM_W, ITEM_W))
+        # Used for blocks
+        self.block_id = AIR
         # Attack box, if applicable
         self.polygon = None
 
-    def get_icon_display(self, w):
-        return scale(self.icon, (int(w), int(w)))
-
-    def get_dropped_display(self):
-        size = self.image.get_size()
-        frac = ITEM_W / min(size)
-        return scale(self.image, (int(frac * size[0]), int(frac * size[1])))
-
-    def move(self, dt):
-        if dt == 0:
-            return
-        self.pick_up_immunity = max(self.pick_up_immunity - dt, 0)
-        dt /= 1000
-        d = [self.v[0] * dt * BLOCK_W, self.v[1] * dt * BLOCK_W]
-        if not self.pulled_in:
-            # Update vertical position and velocity
-            self.v[0] = copysign(max(abs(self.v[0]) - 1, 0), self.v[0])
-            self.v[1] += MAX_FALL_SPEED * dt / 2
-            self.v[1] = min(self.v[1], MAX_FALL_SPEED / 2)
-
-            ratio = ITEM_W / BLOCK_W
-            check_collisions(self.pos, (ratio, ratio), d)
+    def use_anim(self, time_used, arm, left, player_center, rect):
+        if self.swing:
+            theta = 120 - (time_used * 165 / self.use_time)
+            theta *= 1 if left else -1
         else:
-            self.pos = [self.pos[0] + d[0], self.pos[1] + d[1]]
-        self.rect.topleft = self.pos
+            theta = 45 if left else -45
+        # Calculate radius
+        r = arm.get_size()[1] / 2
+        # Arm bottom starts at 270 degrees, offset by theta
+        arm_theta = math.radians(270 + theta)
+        # Calculate difference from center to bottom of arm
+        delta = [r * math.cos(arm_theta), -r * math.sin(arm_theta)]
+        # Arm center of player center offset to the bottom of the arm
+        arm_c = [player_center[0] - delta[0], player_center[1] - delta[1]]
+        # Top of the arm is on the exact opposite side of the center
+        arm_top = [arm_c[0] - delta[0], arm_c[1] - delta[1]]
 
-    def drop(self, human_center, left):
-        global X_SPEED
-        self.pulled_in = False
-        self.rect.center = human_center
-        self.pos = [self.rect.left, self.rect.top]
-        self.v = [0 if left is None else -X_SPEED if left else X_SPEED, 0]
-        self.pick_up_immunity = 1500 if left is not None else 0
+        # Draw arm
+        arm = pg.transform.rotate(arm, theta)
+        pg.display.get_surface().blit(arm, arm.get_rect(center=arm_c))
 
-    def attract(self, point):
-        # Calculate velocities
-        delta = [point[0] - self.rect.centerx, point[1] - self.rect.centery]
-        self.v = [copysign(5, delta[0]), copysign(5, delta[1])]
-        self.pulled_in = True
+        if not self.swing:
+            # Draw item
+            pg.display.get_surface().blit(self.image, self.image.get_rect(center=arm_top))
+        else:
+            img_dim = self.image.get_size()
+            # Calculate center point and initial points of interest
+            half_w, half_h = img_dim[0] / 2, img_dim[1] / 2
+            # The tool center is the top of the arm offset by the bottom of the tool
+            tool_bot = [0, -half_h]
+            rotate_point(tool_bot, theta)
+            tool_c = [arm_top[0] - tool_bot[0], arm_top[1] - tool_bot[1]]
+            # Draw item
+            img = pg.transform.rotate(self.image, theta)
+            pg.display.get_surface().blit(img, img.get_rect(center=tool_c))
+            if self.is_weapon:
+                # A-D form the tool hit box
+                a, b, c, d = [-half_w, half_h], [half_w, half_h], [half_w, -half_h], [-half_w, -half_h]
+                for p in (a, b, c, d):
+                    # Rotate the points
+                    rotate_point(p, theta)
+                    # Offset them by the center
+                    p[0] += tool_c[0] + rect.x
+                    p[1] += tool_c[1] + rect.y
+                self.polygon = Polygon([a, b, c, d])
 
-    def use_anim(self, time_used, arm, left, player_center):
-        arm_dim = arm.get_size()
-        img_dim = self.image.get_size()
-        w, h = max(img_dim[0], arm_dim[0]), img_dim[1] + arm_dim[1]
-        s = Surface((w, h), SRCALPHA)
-        s.blit(arm, (int((w / 2) - (arm_dim[0] / 2)), img_dim[1]))
-        s.blit(self.image, (0, 0))
+    # Don't implement breaking/placing blocks here, just ui and other stuff
+    def on_left_click(self):
+        return
 
-        theta = 120 - (time_used * 165 / self.use_time)
-        theta *= 1 if left else -1
+    def on_right_click(self):
+        return
 
-        # calculate end of arm that attaches to player
-        c = [0, -int(h / 2)]
-        # Rotate the center point
-        r = sqrt(pow(c[0], 2) + pow(c[1], 2))
-        theta_i = asin(c[1] / r)
-        if c[0] < 0:
-            theta_i = pi - theta_i
-        theta_i += radians(theta)
-        c[0], c[1] = int(r * cos(theta_i)), int(-r * sin(theta_i))
-        # Calculate center of tool image (player center offset by end of arm)
-        c = [player_center[0] - c[0], player_center[1] - c[1]]
+    def on_tick(self):
+        o.player.use_time -= o.dt
 
-        return rotate(s, theta), c
+
+def rotate_point(p, d_theta):
+    r = math.sqrt(pow(p[0], 2) + pow(p[1], 2))
+    theta_i = math.asin(p[1] / r)
+    # Arcsin can't tell what the sign of the x is so we have to check
+    if p[0] < 0:
+        theta_i = math.pi - theta_i
+    theta_i += math.radians(d_theta)
+    p[0], p[1] = r * math.cos(theta_i), -r * math.sin(theta_i)

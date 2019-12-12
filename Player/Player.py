@@ -1,22 +1,19 @@
 # Created on 22 October 2019
 # Defines methods and variables for the player
 
-from sys import byteorder
 import pygame as pg
 from pygame.locals import *
 from math import copysign
-from Tools.constants import *
+from Tools.constants import BLOCK_W, resize
 from Tools import constants as c
-import World as W
-from Player.Inventory import Inventory
-from Objects.Tool import Tool
-from NPCs.Entity import check_collisions, touching_blocks_y
+from Tools import objects as o
+from Objects.tile_ids import AIR
+from Player.PlayerInventory import PlayerInventory
 from Player.Stats import Stats
-from Tools.lists import items
+from NPCs.Entity import check_collisions, touching_blocks_y
 from NPCs.EntityHandler import EntityHandler
 from GameDriver import GameDriver
-
-DIM = (1.5, 3)
+from Objects.DroppedItem import DroppedItem
 
 
 class Player:
@@ -24,13 +21,19 @@ class Player:
         # Drivers
         self.driver, self.handler = GameDriver(), EntityHandler()
         # Stats
-        self.stats = Stats(hp=100, max_speed=[15, 15])
+        self.stats = Stats(hp=100, max_speed=[15, 20])
         # Inventory
-        self.inventory = Inventory()
+        self.inventory = PlayerInventory()
         self.item_used, self.use_time = None, 0
         self.used_left = True
+        self.first_swing = True
+        # Sprite
+        self.surface = pg.image.load("res/player/player_pig.png")
+        dim = self.surface.get_size()
+        self.dim = [1.5, 1.5 * dim[1] / dim[0]]
         # Hit box
-        self.rect = Rect(0, 0, BLOCK_W * DIM[0], BLOCK_W * DIM[1])
+        self.rect = Rect(0, 0, BLOCK_W * self.dim[0], BLOCK_W * self.dim[1])
+        self.surface = pg.transform.scale(self.surface, self.rect.size)
         self.arm = pg.Surface((int(self.rect.w / 4), int(self.rect.h / 3)), SRCALPHA)
         pg.draw.rect(self.arm, (200, 128, 0), (0, 0, self.arm.get_size()[0], self.arm.get_size()[1]))
         # This determines the area in which items are collected
@@ -39,26 +42,20 @@ class Player:
         # This determines the area that you can place blocks
         self.placement_range = Rect(0, 0, 7 * BLOCK_W, 7 * BLOCK_W)
         self.placement_range.center = self.rect.center
-        # Sprite
-        self.surface = pg.transform.scale(pg.image.load("res/player/player_0.png"),
-                                          self.rect.size)
         # Physics variables
         self.pos = [0, 0]
-        self.rect.topleft = self.pos
         self.v = [0., 0.]
         self.a = [0, 1]
-        # # Holds all events that are on a timer
-        # self.events = {}
-        # self.add_timed_event(self.regen, 2)
         self.immunity = 0
-        # Stores a block whose UI is active
-        self.ui_block = None
+        self.can_move = True
+        # Stores an active ui
+        self.active_ui = None
+        # Position of block with ui
+        self.active_block = [0, 0]
 
     def load(self, file):
         with open(file, "rb+") as data_file:
             data = data_file.read()
-            # Bytes 1&2 are HP
-            # Everything else is inventory
             self.inventory.load(data)
 
     def write(self, file):
@@ -66,79 +63,93 @@ class Player:
         with open(file, "wb+") as file:
             file.write(self.inventory.write())
 
-    def run(self, events, dt):
+    def run(self, events):
+        mouse = list(pg.mouse.get_pressed())
+        keys = list(pg.key.get_pressed())
+
         self.handler.spawn(self.rect.center)
 
         rect = self.driver.get_view_rect(self.rect.center)
         pos = pg.mouse.get_pos()
         global_pos = (pos[0] + rect.x, pos[1] + rect.y)
 
+        if self.active_ui is not None:
+            self.active_ui.process_events(events, mouse, keys)
+
         for e in events:
-            if self.ui_block is None or self.ui_block.process_event(e, -1):
-                if e.type == QUIT:
-                    c.game_state = c.END_GAME
-                elif e.type == VIDEORESIZE:
-                    c.resize(e.w, e.h)
-                    if self.ui_block is not None:
-                        self.ui_block.resize()
-                elif e.type == MOUSEBUTTONUP and \
-                        (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
-                    self.inventory.scroll(e.button == BUTTON_WHEELUP)
-                elif e.type == KEYUP or e.type == KEYDOWN:
-                    up = e.type == KEYUP
-                    # Try to jump
-                    if e.key == K_SPACE:
-                        if up:
-                            self.a[1] = 1
-                        else:
-                            if touching_blocks_y(self.pos, self.rect, False):
-                                self.v[1] = -15
-                    elif self.use_item == -1 or True:
-                        self.inventory.key_pressed(e.key, up)
+            if e.type == QUIT:
+                return False
+            elif e.type == VIDEORESIZE:
+                resize(e.w, e.h)
+                if self.active_ui is not None:
+                    self.active_ui.on_resize()
+            elif self.use_time <= 0 and e.type == MOUSEBUTTONUP and \
+                    (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
+                self.inventory.scroll(e.button == BUTTON_WHEELUP)
+            elif e.type == KEYUP or e.type == KEYDOWN:
+                up = e.type == KEYUP
+                # Try to jump
+                if e.key == K_SPACE and self.can_move:
+                    if up:
+                        self.a[1] = 1
+                    else:
+                        if touching_blocks_y(self.pos, self.rect, False):
+                            self.v[1] = -15
+                elif self.use_time <= 0 or e.key in [K_ESCAPE]:
+                    self.inventory.key_pressed(e.key, up)
 
-        mouse = pg.mouse.get_pressed()
-        keys = pg.key.get_pressed()
-        if self.ui_block is not None:
-            self.ui_block.process_pressed(mouse, keys)
-
-        # Mouse click events
-        if mouse[BUTTON_LEFT - 1]:
-            self.left_click(pos, global_pos)
-        elif mouse[BUTTON_RIGHT - 1]:
-            self.right_click(pos, global_pos, dt)
-        if not mouse[BUTTON_RIGHT - 1]:
-            self.inventory.holding_r = 0
+        # Item not in use and not touching tile ui
+        if self.use_time <= 0 and \
+                (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
+            # Mouse click events
+            if mouse[BUTTON_LEFT - 1]:
+                self.left_click(pos, global_pos)
+            else:
+                self.first_swing = True
+                if mouse[BUTTON_RIGHT - 1]:
+                    self.right_click(pos, global_pos)
+                else:
+                    self.inventory.holding_r = 0
 
         # Key pressed events
-        self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
-            else 1
+        if self.can_move:
+            self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
+                else 1
+
+        # If we are using an item, let it handle the use time
+        if self.item_used is not None:
+            self.item_used.on_tick()
+            # Check if we are done using the item
+            if self.use_time <= 0:
+                self.item_used = None
+        # Otherwise decrement the use time
+        elif self.use_time >= 0:
+            self.use_time -= o.dt
 
         # Update player and all entities/items/projectiles
-        self.move(dt)
-        self.handler.move(dt, self.rect.center, self.pick_up)
+        if self.can_move:
+            self.move()
+        self.handler.move(self.rect.center)
         # Check if anything hit the player
         if self.immunity <= 0:
             dmg, entity_x = self.handler.check_hit_player(self.rect)
             if dmg > 0:
                 self.hit(dmg, entity_x)
-        # Check if the player hit anything
-        if self.item_used is not None and self.item_used.polygon is not None:
-            self.handler.check_hit_entities(self.rect.centerx, self.item_used)
 
         # Redraw the screen
         self.draw_ui()
+        return True
 
     def spawn(self):
-        self.pos = [W.world_spawn[0] * BLOCK_W, (W.world_spawn[1] - DIM[1]) * BLOCK_W]
-        self.rect.topleft = self.pos
+        self.set_pos((o.world_spawn[0] * BLOCK_W, o.world_spawn[1] * BLOCK_W))
 
-    def move(self, dt):
-        if dt == 0:
+    def move(self):
+        if o.dt == 0:
             return
 
-        self.immunity -= dt
+        self.immunity -= o.dt
 
-        dt /= 1000
+        dt = o.dt / 1000
 
         # Do movement
         d = [0., 0.]
@@ -153,80 +164,104 @@ class Player:
                 self.v[i] += copysign(dt * 20, self.a[i])
                 self.v[i] = copysign(min(abs(self.v[i]), self.stats.spd[i]), self.v[i])
 
-        check_collisions(self.pos, DIM, d)
-        self.rect.topleft = self.pos
-        self.collection_range.center = self.rect.center
+        check_collisions(self.pos, self.dim, d)
+        self.set_pos(self.pos)
+
+        #if touching_blocks_y(self.pos, self.rect, True):
+        #    self.v[1] = 1
+
+    def set_pos(self, topleft):
+        self.pos = list(topleft)
+        self.rect.topleft = topleft
         self.placement_range.center = self.rect.center
-
-        if touching_blocks_y(self.pos, self.rect, True):
-            self.v[1] = 1
-
-        # Use an item
-        if self.use_time > 0:
-            self.use_time -= dt
-            if self.use_time <= 0:
-                self.item_used = None
-
-        # # Do anything on a timer
-        # delete = []
-        # for key in self.events.keys():
-        #     self.events[key][0] -= dt
-        #     t_left, t_max, iter_left = self.events[key]
-        #     if t_left <= 0:
-        #         key()
-        #         if iter_left != -1:
-        #             self.events[key][2] -= 1
-        #         if iter_left - 1 == 0:
-        #             delete.append(key)
-        #         else:
-        #             self.events[key][0] = t_max
-        # for key in delete:
-        #     self.events.pop(key)
+        self.collection_range.center = self.rect.center
 
     def left_click(self, pos, global_pos):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
             self.use_time = self.inventory.left_click(pos)
-        elif self.use_time <= 0:
+        else:
             idx = self.inventory.get_held_item()
             if idx != -1:
-                item = items[idx]
+                item = o.items[idx]
                 self.used_left = global_pos[0] < self.rect.centerx
-                in_range = self.placement_range.collidepoint(global_pos[0], global_pos[1])
-                block_rect = Rect(int(global_pos[0] / BLOCK_W) * BLOCK_W, int(global_pos[1] / BLOCK_W) * BLOCK_W,
-                                  BLOCK_W, BLOCK_W)
-                if in_range and item.placeable:
-                    if not self.rect.colliderect(block_rect) and \
-                            not self.handler.collides_with_entity(block_rect) and \
-                            self.driver.place_block(global_pos, idx):
-                        self.use_item()
-                else:
-                    self.use_item()
-                    if in_range and item.break_blocks:
-                        broken = self.driver.destroy_block(global_pos)
-                        if broken != AIR_ID:
-                            dropped = items[broken].clone(1)
-                            dropped.drop(block_rect.center, None)
-                            self.handler.items.append(dropped)
+                if self.first_swing or item.auto_use:
+                    self.first_swing = False
+                    # Use item
+                    item.on_left_click()
+                    self.item_used = item
+                    self.use_time = item.use_time
+                    # Check if the item places a block or breaks a block and then
+                    # Check if that item can place or break the block
+                    if (item.placeable and o.player.place_block(item.block_id)) or (
+                            item.breaks_blocks and o.player.break_block()) and item.consumable:
+                        self.inventory.use_item()
+                    if item.has_ui:
+                        self.active_ui = item.UI()
 
-    def right_click(self, pos, global_pos, dt):
+    def right_click(self, pos, global_pos):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
-            self.use_time = self.inventory.right_click(pos, dt)
-        elif self.use_time <= 0:
+            self.use_time = self.inventory.right_click(pos)
+        else:
             block_x, block_y = global_pos[0] // BLOCK_W, global_pos[1] // BLOCK_W
-            block = items[W.blocks[block_y][block_x]]
-            if block.clickable:
-                block.activate()
-                self.ui_block = block
+            block = o.tiles[o.blocks[block_y][block_x]]
+            # Make sure we didn't click the same block more than once
+            if block.clickable and self.placement_range.collidepoint(*global_pos) and \
+                    (self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
+                block.activate((block_x, block_y))
             else:
                 # Check if we dropped an item
                 drop = self.inventory.drop_item()
                 if drop is not None:
-                    val, amnt = drop
+                    item, amnt = drop
                     # This determines if we clicked to the left or right of the player
                     left = global_pos[0] < self.rect.centerx
-                    obj = items[val].clone(amnt)
-                    obj.drop(self.rect.center, left)
-                    self.handler.items.append(drop)
+                    self.drop_item(item, amnt, self.rect.center, left)
+
+    def break_block(self):
+        # Get mouse pos and viewing rectangle to calculate global mouse pos
+        pos = pg.mouse.get_pos()
+        rect = self.driver.get_view_rect(self.rect.center)
+        pos = (pos[0] + rect.x, pos[1] + rect.y)
+        # Calculate block rectangle
+        block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
+        # Make sure this block does not have a ui open
+        if self.active_ui is not None and self.active_ui.block_pos == [block_x, block_y]:
+            return
+        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W, BLOCK_W)
+        # Check if we can break the block
+        if self.placement_range.collidepoint(pos[0], pos[1]) and \
+                o.tiles[o.blocks[block_y][block_x]].on_break((block_x, block_y)):
+            block = self.driver.destroy_block(pos)
+            if block != AIR:
+                drops = o.tiles[block].get_drops()
+                for drop in drops:
+                    item, amnt = drop
+                    # Drop an item
+                    self.drop_item(item, amnt, block_rect.center, None)
+                return True
+        return False
+
+    def place_block(self, idx):
+        # Get mouse pos and viewing rectangle to calculate global mouse pos
+        pos = pg.mouse.get_pos()
+        rect = self.driver.get_view_rect(self.rect.center)
+        pos = (pos[0] + rect.x, pos[1] + rect.y)
+        # Calculate block rectangle
+        block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
+        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W, BLOCK_W)
+        # Check if we can place the block
+        if self.placement_range.collidepoint(pos[0], pos[1]):
+            if not self.rect.colliderect(block_rect) and \
+                    not self.handler.collides_with_entity(block_rect) and \
+                    self.driver.place_block(pos, idx):
+                o.tiles[o.blocks[block_y][block_x]].on_place((block_x, block_y))
+                return True
+        return False
+
+    def drop_item(self, item, amnt, pos, left):
+        dropped = DroppedItem(item, amnt)
+        dropped.drop(pos, left)
+        self.handler.items.append(dropped)
 
     def pick_up(self, item):
         if self.collection_range.colliderect(item.rect):
@@ -243,7 +278,7 @@ class Player:
     def draw_ui(self):
         rect = self.driver.get_view_rect(self.rect.center)
         display = pg.display.get_surface()
-        display.fill(W.get_day_color())
+        display.fill(o.get_sky_color())
         # Draw blocks
         display.blit(self.driver.blocks_surface, (0, 0), area=rect)
         # Draw all entities/projectiles/items, in that order
@@ -255,19 +290,12 @@ class Player:
 
         # Draw item being used
         if self.item_used is not None:
-            # Get use animation state
-            s, center = self.item_used.use_anim(self.use_time, self.arm, self.used_left, self.rect.center)
-            s_rect = s.get_rect()
-            s_rect.center = [center[0] - rect.x,
-                             center[1] - rect.y]
-            display.blit(s, s_rect)
+            center = [self.rect.centerx - rect.x, self.rect.centery - rect.y]
+            self.item_used.use_anim(self.use_time, self.arm, self.used_left, center, rect)
 
         # Draw block ui
-        if self.ui_block is not None:
-            if self.ui_block.ui is not None:
-                display.blit(self.ui_block.ui, self.ui_block.ui_rect)
-            else:
-                self.ui_block = None
+        if self.active_ui is not None:
+            display.blit(self.active_ui.ui, self.active_ui.rect)
 
         # Draw other UI
         life_text = str(self.stats.hp) + " / " + str(self.stats.max_hp) + " HP"
@@ -282,17 +310,6 @@ class Player:
         if cursor is not None:
             display.blit(cursor, pg.mouse.get_pos())
 
-    def use_item(self):
-        self.item_used = items[self.inventory.get_held_item()]
-        self.use_time = self.item_used.use_time
-        if self.item_used.consumable:
-            self.inventory.use_item()
-
-    def get_damage(self):
-        if isinstance(self.item_used, Tool):
-            return (self.item_used.damage + self.stats.dmg) * self.stats.dmg_mult
-        return 0
-
     def hit(self, dmg, centerx):
         self.stats.hp -= dmg
         if self.stats.hp <= 0:
@@ -301,27 +318,16 @@ class Player:
             self.immunity = 1000
             self.v = [copysign(3, self.rect.centerx - centerx), -3]
 
+    def attack(self, damage, polygon):
+        # Change damage based on stats
+        self.handler.check_hit_entities(self.rect.centerx, polygon, damage)
+
     def respawn(self):
         self.stats.hp = self.stats.max_hp
         self.immunity = 5000
-        self.pos = [0., 0.]
-        self.rect.topleft = self.pos
-
-    # def add_timed_event(self, func, max_time, iterations=-1):
-    #     self.events[func] = [max_time, max_time, iterations]
-    #
-    # def regen(self):
-    #     if self.stats.hp < self.stats.max_hp:
-    #         self.stats.hp += 1
+        self.spawn()
 
 
 def create_new_player(file_name):
     with open("saves/players/" + file_name + ".plr", "wb+") as file:
-        file.write((1).to_bytes(2, byteorder))
-        file.write((3).to_bytes(2, byteorder))
-        file.write((1).to_bytes(2, byteorder))
-        file.write((4).to_bytes(2, byteorder))
-        file.write((5).to_bytes(2, byteorder))
-        file.write((7).to_bytes(2, byteorder))
-        nothing = (0).to_bytes(2, byteorder)
-        file.write(nothing * 92)
+        file.write(PlayerInventory().new_inventory())

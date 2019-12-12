@@ -6,26 +6,45 @@ from pygame.font import SysFont
 from pygame.display import set_mode
 from pygame.locals import RESIZABLE
 
+# Dimension Constants
 MIN_W, MIN_H = 800, 600
+# Width of a block
 BLOCK_W = 16
+# Width of an item on the ground
 ITEM_W = BLOCK_W * 3 // 4
-INV_W = MIN_W // 20
+# Width of an inventory slot
+INV_W = min(MIN_W // 20, MIN_H // 10)
+# Width of an image in the inventory
+INV_IMG_W = INV_W * 4 // 5
 
+# Misc. Constants
 MAX_FALL_SPEED = 10
-AIR_ID = 0
 BACKGROUND = (0, 128, 128)
+
+# Time Constants
+# 1000 ms/s * 60 s/min
+MS_PER_MIN = 60000
+# 1000 ms/s * 60 s/min * 24 min/day
+MS_PER_DAY = MS_PER_MIN * 24
+NOON = MS_PER_DAY // 2
+# 1000 ms/s * 60 s/min * 18 min
+DAY_START = MS_PER_DAY // 4
+NIGHT_START = MS_PER_DAY * 3
 
 # Damage types
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 # Ai types
 RANDOM, FOLLOW, FLY = 0, 1, 2
+
 # Fonts
 inv_font, load_font, ui_font = None, None, None
-# Universe
-universe_name, world_name = "", ""
-# Game state
-PLAYING, CHANGE_WORLD, END_GAME = 0, 1, 2
-game_state = 0
+
+
+def load_fonts():
+    global inv_font, load_font, ui_font
+    inv_font = get_scaled_font(INV_W, INV_W // 3, "_" * 3, "Times New Roman")
+    load_font = get_scaled_font(MIN_W // 2, MIN_H // 10, "_" * 25, "Times New Roman")
+    ui_font = get_scaled_font(MIN_W // 3, MIN_H // 20, "_" * 30, "Times New Roman")
 
 
 def resize(w, h):
@@ -86,8 +105,19 @@ def wrap_string(string, font, w):
     return strs
 
 
-def load_fonts():
-    global inv_font, load_font, ui_font
-    inv_font = get_scaled_font(INV_W, INV_W // 3, "_" * 3, "Times New Roman")
-    load_font = get_scaled_font(MIN_W // 2, MIN_H // 10, "_" * 25, "Times New Roman")
-    ui_font = get_scaled_font(MIN_W // 3, MIN_H // 20, "_" * 30, "Times New Roman")
+def remove_from_dict(x, y, dictionary):
+    if x in dictionary.keys() and y in dictionary[x].keys():
+        dictionary[x].pop(y)
+        if len(dictionary[x]) == 0:
+            dictionary.pop(x)
+
+
+def update_dict(x, y, val, dictionary):
+    if x not in dictionary.keys():
+        dictionary[x] = {}
+    dictionary[x][y] = val
+
+
+def get_from_dict(x, y, dictionary):
+    if x in dictionary.keys() and y in dictionary[x].keys():
+        return dictionary[x][y]

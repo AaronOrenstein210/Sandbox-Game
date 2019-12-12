@@ -7,8 +7,9 @@ from random import randint
 from pygame import Rect, Surface
 from pygame.image import load
 from pygame.transform import scale
-from Tools.constants import RANDOM, FOLLOW, BLOCK_W, AIR_ID
-import World as W
+from Tools.constants import RANDOM, FOLLOW, BLOCK_W
+from Objects.tile_ids import AIR
+from Tools import objects as o
 from Player.Stats import Stats
 
 
@@ -43,11 +44,11 @@ class Entity:
         self.pos = [x, y]
         self.rect.topleft = self.pos
 
-    def move(self, player_pos, dt):
-        self.time -= dt
+    def move(self, player_pos):
+        self.time -= o.dt
         if self.immunity > 0:
-            self.immunity -= dt
-        dt /= 1000
+            self.immunity -= o.dt
+        dt = o.dt / 1000
 
         # Figure out change in position
         d = [0, 0]
@@ -112,8 +113,8 @@ def check_collisions(pos, block_dim, d):
         if pos[i] + d[i] < 0:
             pos[i] = 0
             d[i] = 0
-        elif next_block[i + 2] >= W.blocks.shape[1 - i]:
-            pos[i] = (W.blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
+        elif next_block[i + 2] >= o.blocks.shape[1 - i]:
+            pos[i] = (o.blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
             d[i] = 0
         elif current_block[i if d[i] < 0 else i + 2] == next_block[i if d[i] < 0 else i + 2]:
             pos[i] += d[i]
@@ -127,13 +128,13 @@ def check_collisions(pos, block_dim, d):
         idx = 1 - d.index(0)
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = W.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = o.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = W.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
+            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
-        if collide.count(AIR_ID) == len(collide):
+        if collide.count(AIR) == len(collide):
             pos[idx] += d[idx]
         # >= 1 block is solid, truncate movement
         else:
@@ -148,13 +149,13 @@ def check_collisions(pos, block_dim, d):
         # When the idx direction hits the next block, idx2 has not changed blocks
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = W.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = o.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = W.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
+            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
-        if collide.count(AIR_ID) == len(collide):
+        if collide.count(AIR) == len(collide):
             pos[idx] += d[idx]
         else:
             # Just move to next block and cuttoff delta
@@ -166,13 +167,13 @@ def check_collisions(pos, block_dim, d):
                        ceil((pos[idx] + px_dim[idx] + delta) / BLOCK_W) - 1]
         if idx2 == 0:
             # From lowest row to highest row, at the next column over
-            collide = W.blocks[current_val[0]:current_val[1] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = o.blocks[current_val[0]:current_val[1] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = W.blocks[next_block[1 if d[1] < 0 else 3], current_val[0]:current_val[1] + 1]
+            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_val[0]:current_val[1] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
-        if collide.count(AIR_ID) == len(collide):
+        if collide.count(AIR) == len(collide):
             pos[idx2] += d[idx2]
         else:
             pos[idx2] += to_next[idx2]
@@ -185,30 +186,31 @@ def touching_blocks_x(pos, rect, left):
         # Get next x block
         next_x = int(rect.left / BLOCK_W) - 1 if left else ceil(rect.right / BLOCK_W)
         # Check if we are going to the world edge
-        if next_x < 0 if left else next_x >= W.blocks.shape[1]:
+        if next_x < 0 if left else next_x >= o.blocks.shape[1]:
             return True
         # Otherwise check if there is a solid block
         else:
             y_range = (int(rect.top / BLOCK_W), ceil(rect.bottom / BLOCK_W))
-            collide = W.blocks[y_range[0]:y_range[1], next_x].tolist()
-            return collide.count(AIR_ID) < len(collide)
+            collide = o.blocks[y_range[0]:y_range[1], next_x].tolist()
+            return collide.count(AIR) < len(collide)
     return False
 
 
 def touching_blocks_y(pos, rect, top):
     # Check if we are actually touching a new block (including non-solid)
-    touching = abs(pos[1] + (0 if top else rect.h)) % BLOCK_W <= .1
+    diff = abs(pos[1] + (0 if top else rect.h)) % BLOCK_W
+    touching = diff <= .5 or diff >= BLOCK_W - .5
     if touching:
         # Get next y block
         next_y = int(pos[1] / BLOCK_W) - 1 if top else ceil(rect.bottom / BLOCK_W)
         # Check if we are going to the world edge
-        if next_y < 0 if top else next_y >= W.blocks.shape[0]:
+        if next_y < 0 if top else next_y >= o.blocks.shape[0]:
             return True
         # Otherwise check if there is a solid block
         else:
             x_range = (int(rect.left / BLOCK_W), ceil(rect.right / BLOCK_W))
-            collide = W.blocks[next_y, x_range[0]:x_range[1]].tolist()
-            return collide.count(AIR_ID) < len(collide)
+            collide = o.blocks[next_y, x_range[0]:x_range[1]].tolist()
+            return collide.count(AIR) < len(collide)
     return False
 
 

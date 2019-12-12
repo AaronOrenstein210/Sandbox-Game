@@ -53,6 +53,9 @@ class Polygon:
                 return False
         return True
 
+    def to_string(self):
+        print(self.points)
+
 
 # This performs a dot product
 def dot_product(v1, v2):

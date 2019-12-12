@@ -2,19 +2,22 @@
 # SpawnBlocks are blocks that spawn enemies
 
 from random import random
-from Objects.Items import INV
-from Objects.Block import Block
-from Tools.constants import AIR_ID, BLOCK_W
-import World as w
+from Objects import INV
+from Objects.Tile import Tile
+from Tools.constants import BLOCK_W
+from Tools import objects as o
+from Objects.tile_ids import AIR
 
 
-class SpawnBlock(Block):
+# TODO: Move to tiles
+class SpawnTile(Tile):
     def __init__(self, idx, entity):
         self.entity = entity
         self.test_entity = entity()
         self.rarity = self.test_entity.rarity
-        Block.__init__(self, idx, name=self.test_entity.name + " Spawner", hardness=self.rarity,
-                       inv_img=INV + "spawner_" + str(self.rarity) + ".png")
+        Tile.__init__(self, idx, self.rarity,
+                      img=INV + "spawner_" + str(self.rarity) + ".png")
+        self.name = self.test_entity.name + " Spawner"
         self.spawner = True
 
     def spawn(self, pos, conditions):
@@ -42,7 +45,7 @@ class SpawnBlock(Block):
 
 def get_spawn_spaces(center, r, walking):
     # X range
-    v1_min, v1_max = max(0, center[0] - r), min(w.blocks.shape[1], center[0] + r)
+    v1_min, v1_max = max(0, center[0] - r), min(o.blocks.shape[1], center[0] + r)
     # Y bounds
     v2_min, v2_max = max(0, center[1] - r), max(0, center[1] + r)
     air = {}
@@ -56,8 +59,8 @@ def get_spawn_spaces(center, r, walking):
         air_count = 0
         v2 = 0
         for v2 in reversed(range(v2_min, v2_max)):
-            block = w.blocks[v2][v1] if walking else w.blocks[v1][v2]
-            if block != AIR_ID:
+            block = o.blocks[v2][v1] if walking else w.blocks[v1][v2]
+            if block != AIR:
                 if air_count > 0:
                     add_val(v1, v2 + air_count, air_count)
                 air_count = 0

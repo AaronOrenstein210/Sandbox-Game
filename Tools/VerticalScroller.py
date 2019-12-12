@@ -1,6 +1,6 @@
 # Created on 28 November 2019
 
-from pygame import Surface, Rect
+from pygame import Surface
 
 
 class VerticalScroller:

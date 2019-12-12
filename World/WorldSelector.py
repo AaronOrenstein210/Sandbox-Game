@@ -9,16 +9,16 @@ import pygame as pg
 from pygame.locals import *
 from Tools.constants import MIN_W, MIN_H
 from Tools import constants as c
-from World import create_new_world
-from Tools.UIOperations import get_input, ask_yes_no
+from UI.Operations import TextInput, YesNo
+from World.WorldGenerator import generate_world
 from Player.Player import create_new_player
 
 IMG = "res/images/"
 SCROLL_BKGROUND = (0, 0, 128)
 ITEM_W, ITEM_H = MIN_W // 2, MIN_H // 10
 SCROLL_AMNT = ITEM_H // 3
-PLAYER, UNIVERSE, WORLD = 0, 1, 2
-path, ext = "saves/", ""
+PLAYER, UNIVERSE = 0, 1
+path = "saves/"
 
 
 # Load all saved players and worlds
@@ -26,10 +26,12 @@ path, ext = "saves/", ""
 def load_files(what):
     data = []
     for name in listdir(path):
-        if what != UNIVERSE and name.endswith(ext):
-            data.append(trim_file_name(name))
-        elif isdir(path + name) and isfile(path + name + "/" + name + ".wld"):
-            data.append(name)
+        if what == PLAYER:
+            if name.endswith(".plr"):
+                data.append(trim_file_name(name))
+        else:
+            if isdir(path + name) and isfile(path + name + "/" + name + ".wld"):
+                data.append(name)
     return data
 
 
@@ -51,18 +53,11 @@ def draw_surface(data, item_rects):
 
 
 # Selection screen
-def run_selector(what, universe=""):
+def run_selector(what):
     display = pg.display.get_surface()
 
-    global path, ext
-    if what == PLAYER:
-        path = "saves/players/"
-        ext = ".plr"
-    elif what == UNIVERSE:
-        path = "saves/universes/"
-    elif what == WORLD:
-        path = "saves/universes/" + universe + "/"
-        ext = ".wld"
+    global path
+    path = "saves/players/" if what == PLAYER else "saves/universes/"
 
     # Stores each item's rect
     item_rects = []
@@ -81,10 +76,9 @@ def run_selector(what, universe=""):
         rect.h = h - (3 * ITEM_H)
         rect.centerx = w // 2
         draw_scroll()
-        if what != WORLD:
-            new_rect.y = rect.bottom
-            new_rect.centerx = w // 2
-            display.blit(pg.transform.scale(pg.image.load(IMG + "add.png"), new_rect.size), new_rect)
+        new_rect.y = rect.bottom
+        new_rect.centerx = w // 2
+        display.blit(pg.transform.scale(pg.image.load(IMG + "add.png"), new_rect.size), new_rect)
         return min(0, rect.h - surface.get_size()[1])
 
     def draw_scroll():
@@ -98,7 +92,7 @@ def run_selector(what, universe=""):
         for e in pg.event.get():
             # Quit
             if e.type == QUIT:
-                quit()
+                pg.quit()
                 exit(0)
             # Resize
             elif e.type == VIDEORESIZE:
@@ -126,24 +120,22 @@ def run_selector(what, universe=""):
                         if item_rects[idx][0].collidepoint(*pos):
                             return data[idx]
                         elif item_rects[idx][1].collidepoint(*pos):
-                            if ask_yes_no("Delete " + data[idx] + "?", redraw_background=redraw):
-                                if what != UNIVERSE:
-                                    remove(path + data[idx] + ext)
+                            if YesNo("Delete " + data[idx] + "?", redraw_back=redraw).run_now():
+                                if what == PLAYER:
+                                    remove(path + data[idx] + ".plr")
                                 else:
                                     rmtree(path + data[idx])
                                 data = load_files(what)
                                 surface = draw_surface(data, item_rects)
                             off_max = redraw()
-                elif what != WORLD and new_rect.collidepoint(*pos):
-                    result = get_input("Input Name", char_limit=10, redraw_background=redraw)
-                    if result is not None:
+                elif new_rect.collidepoint(*pos):
+                    result = TextInput("Input Name", char_limit=10, redraw_back=redraw).run_now()
+                    if result is not None and result != "":
                         if what == PLAYER:
                             create_new_player(result)
-                        elif what == WORLD:
-                            create_new_world(universe, result)
                         else:
                             mkdir(path + result)
-                            create_new_world(result, result)
+                            generate_world(result, result)
                         data = load_files(what)
                         surface = draw_surface(data, item_rects)
                     off_max = redraw()
