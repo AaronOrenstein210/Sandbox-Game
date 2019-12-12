@@ -1,9 +1,10 @@
 # Created on 22 November 2019
 # Used to determine the various spawn conditions around a specific block
 
-from NPCs.conditions import *
+from NPCs import conditions as con
 from Tools.constants import DAY_START, NIGHT_START
 from Tools import objects as o
+from World.world_zones import *
 
 
 class SpawnConditions:
@@ -11,9 +12,9 @@ class SpawnConditions:
         self.conditions = {}
 
     def check_world(self):
-        self.conditions[DAY] = DAY_START <= o.world_time < NIGHT_START
-        self.conditions[NIGHT] = not self.conditions[DAY]
+        self.conditions[con.DAY] = DAY_START <= o.world_time < NIGHT_START
+        self.conditions[con.NIGHT] = not self.conditions[con.DAY]
 
     def check_area(self, pos, r):
-        self.conditions[SURFACE] = pos[1] >= SURFACE
-        self.conditions[UNDERGROUND] = pos[1] >= CAVE
+        self.conditions[con.SURFACE] = pos[1] >= surface
+        self.conditions[con.UNDERGROUND] = pos[1] >= underground

@@ -32,7 +32,7 @@ def generate_world(universe, name, dim=(500, 1000)):
         valley(blocks, 0, dim[1] // 3)
     # Save file
     centerx = dim[1] // 2
-    spawn = (centerx, min(surface_heights[centerx], surface_heights[centerx + 1]) - o.player.dim[1])
+    spawn = (centerx, min(surface_heights[centerx], surface_heights[centerx + 1]) - math.ceil(o.player.dim[1]))
     file = "saves/universes/" + universe + "/" + name + ".wld"
     CompleteTask(o.save_world_part, task_args=[file, 1, blocks, spawn, block_data], draw_args=("Saving New World",),
                  can_exit=False).run_now()
@@ -121,6 +121,8 @@ def forest(blocks, x1, x2):
         fill_chunk(x1 + dx, 1, border, surface - border, DIRT, blocks)
         surface_heights[x1 + dx] = surface
         fill_chunk(x1 + dx, 1, blocks.shape[0], border - blocks.shape[0], STONE, blocks)
+        if randint(1, 150) == 1:
+            blocks[surface + randint(1, 3)][x1 + dx] = CAT
 
     smooth_s_curve(x1, True, blocks)
     smooth_s_curve(x2 - 1, False, blocks)
@@ -157,6 +159,8 @@ def valley(blocks, x1, x2):
         fill_chunk(x1 + dx, 1, border, surface - border, DIRT, blocks)
         surface_heights[x1 + dx] = surface
         fill_chunk(x1 + dx, 1, blocks.shape[0], border - blocks.shape[0], STONE, blocks)
+        if randint(1, 200) <= math.sqrt(abs(zones.surface - surface)):
+            blocks[surface + randint(1, 5)][x1 + dx] = ZOMBIE
 
     smooth_s_curve(x1, True, blocks)
     smooth_s_curve(x2 - 1, False, blocks)
