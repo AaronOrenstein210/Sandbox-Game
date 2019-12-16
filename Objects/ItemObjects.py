@@ -1,6 +1,7 @@
 # Created on 3 December 2019
 
 import pygame as pg
+from pygame.locals import *
 from Objects import INV, USE, item_ids as items, tile_ids as tiles
 from Objects.ItemTypes import *
 from Tools.constants import *
@@ -97,6 +98,21 @@ class Dematerializer(Item):
             # Get distance from spawn (distance left to go) and move player to that point
             pos = [s + progress * -d for s, d in zip(spawn, delta)]
             o.player.set_pos(pos)
+
+
+class TimeWarp(Item):
+    def __init__(self):
+        Item.__init__(self, items.TIME_WARP, inv_img=INV + "time_warp.png")
+        self.name = "Time Warp"
+
+    def on_tick(self):
+        mouse = pg.mouse.get_pressed()
+        if mouse[BUTTON_LEFT - 1]:
+            o.world_time = (o.world_time + (40 * o.dt)) % MS_PER_DAY
+        elif mouse[BUTTON_RIGHT - 1]:
+            o.world_time = (o.world_time - (60 * o.dt)) % MS_PER_DAY
+        else:
+            o.player.use_time = 0
 
 
 class TestSword(Weapon):

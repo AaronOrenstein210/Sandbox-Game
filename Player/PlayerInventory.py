@@ -133,8 +133,8 @@ class PlayerInventory(Inventory):
     def new_inventory(self):
         data = bytearray(4 * self.dim[0] * self.dim[1])
         items = [TEST_SWORD, TEST_PICKAXE, DIMENSION_HOPPER, DIMENSION_CREATOR,
-                 CHEST, DEMATERIALIZER]
-        amnts = [1, 1, 10, 10, 10, 1]
+                 CHEST, DEMATERIALIZER, TIME_WARP]
+        amnts = [1, 1, 10, 10, 10, 1, 1]
         i = 0
         for item, amnt in zip(items, amnts):
             data[i: i + 2] = amnt.to_bytes(2, byteorder)

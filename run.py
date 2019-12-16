@@ -81,7 +81,7 @@ while True:
 
     if dt != 0:
         fps = 1000 // dt
-        print("\r" + str(fps), end="")
+        print("\r" + str(fps), end=" ")
         text = fps_font.render(str(fps) + " FPS", 1, (0, 0, 0))
         text_rect = text.get_rect(bottom=pg.display.get_surface().get_size()[1])
         pg.display.get_surface().blit(text, text_rect)
