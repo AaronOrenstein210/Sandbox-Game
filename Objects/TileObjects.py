@@ -20,18 +20,21 @@ class Dirt(Tile):
     def __init__(self):
         Tile.__init__(self, tiles.DIRT, hardness=1, img=INV + "dirt.png")
         self.add_drop(items.DIRT, 1)
+        self.map_color = (150, 75, 0)
 
 
 class Stone(Tile):
     def __init__(self):
         Tile.__init__(self, tiles.STONE, hardness=2, img=INV + "stone.png")
         self.add_drop(items.STONE, 1)
+        self.map_color = (200, 200, 200)
 
 
 class Snow(Tile):
     def __init__(self):
         Tile.__init__(self, tiles.SNOW, hardness=1, img=INV + "snow.png")
         self.add_drop(items.SNOW, 1)
+        self.map_color = (255, 255, 255)
 
 
 class CatSpawner(SpawnTile):
@@ -53,6 +56,7 @@ class DimensionHopper(Tile):
         self.clickable = True
         self.scroller = None
         self.add_drop(items.DIMENSION_HOPPER, 1)
+        self.map_color = (0, 0, 0)
 
     def activate(self, pos):
         o.player.active_ui = self.UI(pos)
@@ -112,6 +116,7 @@ class Chest(Tile):
         self.clickable = True
         self.data_bytes = 200
         self.add_drop(items.CHEST, 1)
+        self.map_color = (200, 200, 0)
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory

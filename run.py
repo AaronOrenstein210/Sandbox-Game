@@ -7,7 +7,7 @@ import os
 from sys import exit
 from Player.Player import Player
 from Tools import objects as o
-from Tools.constants import load_fonts, resize, MIN_W, MIN_H
+from Tools.constants import load_fonts, resize, MIN_W, MIN_H, get_scaled_font
 from World.WorldSelector import run_selector, PLAYER, UNIVERSE
 from Objects import ItemObjects, TileObjects
 
@@ -21,6 +21,7 @@ for folder in folders:
 # Do any initialization of variables and such
 pg.init()
 load_fonts()
+fps_font = get_scaled_font(50, 20, "000 FPS", "Times New Roman")
 resize(MIN_W, MIN_H)
 
 # Initialize player so that blocks/items can use it
@@ -57,7 +58,7 @@ while True:
     o.tick(dt)
 
     if saving:
-        save_progress = o.save_world_part(save_progress, o.world_file, 10)
+        save_progress = o.save_world_part(save_progress, o.world_file, 1)
         if save_progress >= 1:
             saving = False
             save_progress = 0
@@ -77,5 +78,12 @@ while True:
         o.close_world()
         pg.quit()
         exit(0)
+
+    if dt != 0:
+        fps = 1000 // dt
+        print("\r" + str(fps), end="")
+        text = fps_font.render(str(fps) + " FPS", 1, (0, 0, 0))
+        text_rect = text.get_rect(bottom=pg.display.get_surface().get_size()[1])
+        pg.display.get_surface().blit(text, text_rect)
 
     pg.display.flip()

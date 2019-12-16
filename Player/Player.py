@@ -52,6 +52,7 @@ class Player:
         self.active_ui = None
         # Position of block with ui
         self.active_block = [0, 0]
+        self.map_open = False
 
     def load(self, file):
         with open(file, "rb+") as data_file:
@@ -67,14 +68,9 @@ class Player:
         mouse = list(pg.mouse.get_pressed())
         keys = list(pg.key.get_pressed())
 
-        self.handler.spawn(self.rect.center)
-
         rect = self.driver.get_view_rect(self.rect.center)
         pos = pg.mouse.get_pos()
         global_pos = (pos[0] + rect.x, pos[1] + rect.y)
-
-        if self.active_ui is not None:
-            self.active_ui.process_events(events, mouse, keys)
 
         for e in events:
             if e.type == QUIT:
@@ -83,38 +79,66 @@ class Player:
                 resize(e.w, e.h)
                 if self.active_ui is not None:
                     self.active_ui.on_resize()
-            elif self.use_time <= 0 and e.type == MOUSEBUTTONUP and \
-                    (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
-                self.inventory.scroll(e.button == BUTTON_WHEELUP)
-            elif e.type == KEYUP or e.type == KEYDOWN:
-                up = e.type == KEYUP
-                # Try to jump
-                if e.key == K_SPACE and self.can_move:
-                    if up:
-                        self.a[1] = 1
-                    else:
-                        if touching_blocks_y(self.pos, self.rect, False):
-                            self.v[1] = -15
-                elif self.use_time <= 0 or e.key in [K_ESCAPE]:
-                    self.inventory.key_pressed(e.key, up)
+                events.remove(e)
 
-        # Item not in use and not touching tile ui
-        if self.use_time <= 0 and \
-                (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
-            # Mouse click events
-            if mouse[BUTTON_LEFT - 1]:
-                self.left_click(pos, global_pos)
-            else:
-                self.first_swing = True
-                if mouse[BUTTON_RIGHT - 1]:
-                    self.right_click(pos, global_pos)
+        if self.map_open:
+            for e in events:
+                if e.type == MOUSEBUTTONUP and \
+                        (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
+                    up = e.button == BUTTON_WHEELUP
+                    if up and self.driver.map_zoom < 10:
+                        self.driver.map_zoom += .5
+                    elif not up and self.driver.map_zoom > 1:
+                        self.driver.map_zoom -= .5
+                elif e.type == KEYUP:
+                    if e.key == K_ESCAPE:
+                        self.map_open = False
+            self.driver.move_map(keys)
+        else:
+            if self.active_ui is not None:
+                self.active_ui.process_events(events, mouse, keys)
+
+            for e in events:
+                if self.use_time <= 0 and e.type == MOUSEBUTTONUP and \
+                        (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
+                    up = e.button == BUTTON_WHEELUP
+                    self.inventory.scroll(up)
+                    if up and self.driver.minimap_zoom < 5:
+                        self.driver.minimap_zoom += .5
+                    elif not up and self.driver.minimap_zoom > 1:
+                        self.driver.minimap_zoom -= .5
+                elif e.type == KEYUP or e.type == KEYDOWN:
+                    up = e.type == KEYUP
+                    # Try to jump
+                    if e.key == K_SPACE and self.can_move:
+                        if up:
+                            self.a[1] = 1
+                        else:
+                            if touching_blocks_y(self.pos, self.rect, False):
+                                self.v[1] = -15
+                    elif up and e.key == K_m:
+                        self.map_open = True
+                        self.driver.map_off = [p / BLOCK_W for p in self.rect.center]
+                    elif self.use_time <= 0 or e.key in [K_ESCAPE]:
+                        self.inventory.key_pressed(e.key, up)
+
+            # Item not in use and not touching tile ui
+            if self.use_time <= 0 and \
+                    (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
+                # Mouse click events
+                if mouse[BUTTON_LEFT - 1]:
+                    self.left_click(pos, global_pos)
                 else:
-                    self.inventory.holding_r = 0
+                    self.first_swing = True
+                    if mouse[BUTTON_RIGHT - 1]:
+                        self.right_click(pos, global_pos)
+                    else:
+                        self.inventory.holding_r = 0
 
-        # Key pressed events
-        if self.can_move:
-            self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
-                else 1
+            # Key pressed events
+            if self.can_move:
+                self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
+                    else 1
 
         # If we are using an item, let it handle the use time
         if self.item_used is not None:
@@ -126,6 +150,7 @@ class Player:
         elif self.use_time >= 0:
             self.use_time -= o.dt
 
+        self.handler.spawn(self.rect.center)
         # Update player and all entities/items/projectiles
         if self.can_move:
             self.move()
@@ -137,7 +162,14 @@ class Player:
                 self.hit(dmg, entity_x)
 
         # Redraw the screen
-        self.draw_ui()
+        if self.map_open:
+            display = pg.display.get_surface()
+            display.fill(c.BACKGROUND)
+            map_ = self.driver.get_map(display.get_size())
+            map_rect = map_.get_rect(center=display.get_rect().center)
+            display.blit(map_, map_rect)
+        else:
+            self.draw_ui()
         return True
 
     def spawn(self):
@@ -167,7 +199,7 @@ class Player:
         check_collisions(self.pos, self.dim, d)
         self.set_pos(self.pos)
 
-        #if touching_blocks_y(self.pos, self.rect, True):
+        # if touching_blocks_y(self.pos, self.rect, True):
         #    self.v[1] = 1
 
     def set_pos(self, topleft):
@@ -233,7 +265,9 @@ class Player:
                 o.tiles[o.blocks[block_y][block_x]].on_break((block_x, block_y)):
             block = self.driver.destroy_block(pos)
             if block != AIR:
-                drops = o.tiles[block].get_drops()
+                tile = o.tiles[block]
+                self.driver.map.set_at((block_x, block_y), (64, 64, 255))
+                drops = tile.get_drops()
                 for drop in drops:
                     item, amnt = drop
                     # Drop an item
@@ -254,7 +288,9 @@ class Player:
             if not self.rect.colliderect(block_rect) and \
                     not self.handler.collides_with_entity(block_rect) and \
                     self.driver.place_block(pos, idx):
-                o.tiles[o.blocks[block_y][block_x]].on_place((block_x, block_y))
+                tile = o.tiles[o.blocks[block_y][block_x]]
+                self.driver.map.set_at((block_x, block_y), tile.map_color)
+                tile.on_place((block_x, block_y))
                 return True
         return False
 
@@ -279,6 +315,7 @@ class Player:
         rect = self.driver.get_view_rect(self.rect.center)
         display = pg.display.get_surface()
         display.fill(o.get_sky_color())
+        dim = display.get_size()
         # Draw blocks
         display.blit(self.driver.blocks_surface, (0, 0), area=rect)
         # Draw all entities/projectiles/items, in that order
@@ -304,6 +341,16 @@ class Player:
         text_rect = text.get_rect()
         text_rect.right = rect.w
         display.blit(text, text_rect)
+
+        # Get minimap
+        minimap = self.driver.get_minimap([i / BLOCK_W for i in self.rect.center])
+        # Figure out where to place the player
+        x_frac = (self.rect.left - rect.left) / rect.w
+        y_frac = (self.rect.top - rect.top) / rect.h
+        img = pg.transform.scale(self.surface, (c.MAP_W // 15, c.MAP_W // 15))
+        # Draw everything
+        minimap.blit(img, (int(c.MAP_W * x_frac), int(c.MAP_W * y_frac)))
+        display.blit(minimap, (dim[0] - c.MAP_W, text_rect.h))
 
         # Draw selected item under cursor if there is one
         cursor = self.inventory.get_cursor_display()

@@ -160,7 +160,7 @@ def valley(blocks, x1, x2):
         surface_heights[x1 + dx] = surface
         fill_chunk(x1 + dx, 1, blocks.shape[0], border - blocks.shape[0], STONE, blocks)
         if randint(1, 200) <= math.sqrt(abs(zones.surface - surface)):
-            blocks[surface + randint(1, 5)][x1 + dx] = ZOMBIE
+            blocks[surface + randint(1, 3)][x1 + dx] = ZOMBIE
 
     smooth_s_curve(x1, True, blocks)
     smooth_s_curve(x2 - 1, False, blocks)

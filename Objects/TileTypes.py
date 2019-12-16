@@ -19,6 +19,7 @@ class SpawnTile(Tile):
                       img=INV + "spawner_" + str(self.rarity) + ".png")
         self.name = self.test_entity.name + " Spawner"
         self.spawner = True
+        self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
 
     def spawn(self, pos, conditions):
         conditions.check_area(pos, 5 * self.rarity)

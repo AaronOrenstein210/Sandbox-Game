@@ -22,6 +22,8 @@ class Tile:
         # Tile brings up a ui when clicked
         self.has_ui = False
 
+        # Minimap color, does not need to be unique
+        self.map_color = (64,64,255)
         # Load image if given
         self.image = pg.Surface((BLOCK_W, BLOCK_W))
         if isfile(img):

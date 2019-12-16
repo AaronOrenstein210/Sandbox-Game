@@ -99,15 +99,28 @@ def save_world_part(progress, file, num_rows, data=None, spawn=None, extra_data=
                 file.write(spawn[1].to_bytes(2, byteorder))
             # Save the requested rows
             y = int(progress * h)
-            for dy, row in enumerate(data[y: min(y + num_rows, h), :]):
+            for dy, row in enumerate(data[y: min(y + num_rows, h)]):
                 for x, val in enumerate(row):
+                    # Save the tile id
                     val = int(val)
-                    if val > 7:
-                        print(val)
                     file.write(val.to_bytes(2, byteorder))
                     # Write any extra data
-                    bytes_ = get_from_dict(x, y + dy, extra_data)
-                    if bytes_ is not None:
+                    num_extra = tiles[val].data_bytes
+                    if num_extra > 0:
+                        # We have to write the correct number of bytes no matter what
+                        # Bad block data is better than bad world data
+                        bytes_ = get_from_dict(x, y + dy, extra_data)
+                        # Create a new bytearray
+                        if bytes_ is None:
+                            bytes_ = bytearray(num_extra)
+                        else:
+                            length = len(bytes_)
+                            # Cut off extra bytes
+                            if length > num_extra:
+                                bytes_ = bytes_[:num_extra]
+                            # Add extra bytes
+                            elif length < num_extra:
+                                bytes_ += (0).to_bytes(num_extra - length, byteorder)
                         file.write(bytes_)
             return (y + num_rows) / h
     return 1
@@ -138,7 +151,10 @@ def load_world_part(progress, file, num_rows=1):
             # Write data to array
             for y in range(current_y, min(current_y + num_rows, blocks.shape[0])):
                 for x in range(blocks.shape[1]):
+                    # Extract tile id
                     val = int.from_bytes(data[:2], byteorder)
+                    data = data[2:]
+                    current_byte += 2
                     if val != AIR:
                         blocks[y][x] = val
                         # Save it if it is a spawner
@@ -147,10 +163,7 @@ def load_world_part(progress, file, num_rows=1):
                         # Check if we should be loading extra data
                         num_bytes = tiles[val].data_bytes
                         if num_bytes > 0:
-                            update_dict(x, y, data[2:num_bytes], block_data)
+                            update_dict(x, y, data[:num_bytes], block_data)
                             data = data[num_bytes:]
                             current_byte += num_bytes
-                    data = data[2:]
-            # Increment our current byte by the number of bytes in each row
-            current_byte += num_rows * blocks.shape[1] * 2
             return float((y + 1) / blocks.shape[0])

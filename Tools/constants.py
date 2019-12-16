@@ -10,6 +10,8 @@ from pygame.locals import RESIZABLE
 MIN_W, MIN_H = 800, 600
 # Width of a block
 BLOCK_W = 16
+# Width of the minimap
+MAP_W = min(MIN_W // 4, MIN_H // 3)
 # Width of an item on the ground
 ITEM_W = BLOCK_W * 3 // 4
 # Width of an inventory slot
@@ -28,8 +30,8 @@ MS_PER_MIN = 60000
 MS_PER_DAY = MS_PER_MIN * 24
 NOON = MS_PER_DAY // 2
 # 1000 ms/s * 60 s/min * 18 min
-DAY_START = MS_PER_DAY // 4
-NIGHT_START = MS_PER_DAY * 3
+DAY_START = MS_PER_MIN * 6
+NIGHT_START = MS_PER_MIN * 18
 
 # Damage types
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
