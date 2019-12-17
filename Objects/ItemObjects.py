@@ -104,6 +104,7 @@ class TimeWarp(Item):
     def __init__(self):
         Item.__init__(self, items.TIME_WARP, inv_img=INV + "time_warp.png")
         self.name = "Time Warp"
+        self.right_click = True
 
     def on_tick(self):
         mouse = pg.mouse.get_pressed()

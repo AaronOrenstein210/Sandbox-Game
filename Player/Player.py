@@ -83,13 +83,28 @@ class Player:
 
         if self.map_open:
             for e in events:
-                if e.type == MOUSEBUTTONUP and \
-                        (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
-                    up = e.button == BUTTON_WHEELUP
-                    if up and self.driver.map_zoom < 10:
-                        self.driver.map_zoom += .5
-                    elif not up and self.driver.map_zoom > 1:
-                        self.driver.map_zoom -= .5
+                if e.type == MOUSEBUTTONUP:
+                    if e.button == BUTTON_RIGHT:
+                        dim = pg.display.get_surface().get_size()
+                        b_dim = (o.blocks.shape[1], o.blocks.shape[0])
+                        center = (dim[0] / 2, dim[1] / 2)
+                        mouse = pg.mouse.get_pos()
+                        delta = [(mouse[i] - center[i]) / self.driver.map_zoom for i in (0, 1)]
+                        new_pos = [self.driver.map_off[i] + delta[i] for i in (0, 1)]
+                        for i in (0, 1):
+                            if new_pos[i] < 0:
+                                new_pos[i] = 0
+                            elif new_pos[i] >= b_dim[i]:
+                                new_pos[i] = b_dim[i] - 1
+                            new_pos[i] *= BLOCK_W
+                        self.set_pos(new_pos)
+                        self.map_open = False
+                    elif e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN:
+                        up = e.button == BUTTON_WHEELUP
+                        if up and self.driver.map_zoom < 10:
+                            self.driver.map_zoom += .5
+                        elif not up and self.driver.map_zoom > 1:
+                            self.driver.map_zoom -= .5
                 elif e.type == KEYUP:
                     if e.key == K_ESCAPE:
                         self.map_open = False
@@ -216,7 +231,7 @@ class Player:
             if idx != -1:
                 item = o.items[idx]
                 self.used_left = global_pos[0] < self.rect.centerx
-                if self.first_swing or item.auto_use:
+                if item.left_click and (self.first_swing or item.auto_use):
                     self.first_swing = False
                     # Use item
                     item.on_left_click()
@@ -240,7 +255,7 @@ class Player:
             if block.clickable and self.placement_range.collidepoint(*global_pos) and \
                     (self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
                 block.activate((block_x, block_y))
-            else:
+            elif self.inventory.selected_item != -1:
                 # Check if we dropped an item
                 drop = self.inventory.drop_item()
                 if drop is not None:
@@ -248,6 +263,16 @@ class Player:
                     # This determines if we clicked to the left or right of the player
                     left = global_pos[0] < self.rect.centerx
                     self.drop_item(item, amnt, self.rect.center, left)
+            else:
+                item = self.inventory.get_held_item()
+                if item != -1:
+                    item = o.items[item]
+                    if item.right_click and (self.first_swing or item.auto_use):
+                        self.first_swing = False
+                        # Use item
+                        item.on_right_click()
+                        self.item_used = item
+                        self.use_time = item.use_time
 
     def break_block(self):
         # Get mouse pos and viewing rectangle to calculate global mouse pos

@@ -128,13 +128,13 @@ class GameDriver:
 
     def move_map(self, keys):
         if keys[K_a]:
-            self.map_off[0] -= 1
+            self.map_off[0] -= o.dt / 10
         elif keys[K_d]:
-            self.map_off[0] += 1
+            self.map_off[0] += o.dt / 10
         elif keys[K_w]:
-            self.map_off[1] -= 1
+            self.map_off[1] -= o.dt / 10
         elif keys[K_s]:
-            self.map_off[1] += 1
+            self.map_off[1] += o.dt / 10
 
 
 def get_adjacent(x, y):

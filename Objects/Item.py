@@ -31,6 +31,8 @@ class Item:
         self.placeable = False
         # Breaks a block on use
         self.breaks_blocks = False
+        # Left or right click
+        self.left_click, self.right_click = True, False
 
         # Used for inventories
         self.inv_img = pg.Surface((INV_IMG_W, INV_IMG_W))
