@@ -10,7 +10,8 @@ from pygame.locals import *
 from Tools.constants import MIN_W, MIN_H
 from Tools import constants as c
 from UI.Operations import TextInput, YesNo
-from World.WorldGenerator import generate_world
+from World.World import World
+from World.WorldGenerator import FOREST, MOUNTAIN, VALLEY
 from Player.Player import create_new_player
 
 IMG = "res/images/"
@@ -135,7 +136,9 @@ def run_selector(what):
                             create_new_player(result)
                         else:
                             mkdir(path + result)
-                            generate_world(result, result)
+                            new = World(result, result)
+                            new.generator.generate([1000, 500], [FOREST, MOUNTAIN, VALLEY])
+                            del new
                         data = load_files(what)
                         surface = draw_surface(data, item_rects)
                     off_max = redraw()

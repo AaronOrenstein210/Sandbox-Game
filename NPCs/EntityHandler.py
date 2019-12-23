@@ -56,11 +56,12 @@ class EntityHandler:
         conditions = SpawnConditions()
         conditions.check_world()
         player_pos = [i // BLOCK_W for i in player_pos]
-        for x in range(max(0, player_pos[0] - 50), min(o.blocks.shape[1], player_pos[0] + 50)):
-            if x in o.spawners.keys():
-                for y in range(max(0, player_pos[1] - 50, min(o.blocks.shape[0], player_pos[1] + 50))):
-                    if y in o.spawners[x].keys() and randint(1, 10000) == 1:
-                        entity = o.tiles[o.spawners[x][y]].spawn((x, y), conditions)
+        spawners = o.world.spawners
+        for x in range(max(0, player_pos[0] - 50), min(o.world.dim[0], player_pos[0] + 50)):
+            if x in spawners.keys():
+                for y in range(max(0, player_pos[1] - 50, min(o.world.dim[1], player_pos[1] + 50))):
+                    if y in spawners[x].keys() and randint(1, 10000) == 1:
+                        entity = o.tiles[spawners[x][y]].spawn((x, y), conditions)
                         if entity is not None:
                             self.entities.append(entity)
 
@@ -68,11 +69,11 @@ class EntityHandler:
 # Maybe used in future
 def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
     # X range
-    v1_min, v1_max = max(0, center[0] - r_outer), min(o.blocks.shape[1], center[0] + r_outer)
+    v1_min, v1_max = max(0, center[0] - r_outer), min(o.world.dim[0], center[0] + r_outer)
     # Y bounds
     v2_min1, v2_max1 = max(0, center[1] - r_outer), max(0, center[1] - r_inner)
-    v2_min2, v2_max2 = min(o.blocks.shape[0], center[1] + r_inner), min(o.blocks.shape[0],
-                                                                        center[1] + r_outer)
+    v2_min2, v2_max2 = min(o.world.dim[1], center[1] + r_inner), min(o.world.dim[1],
+                                                                     center[1] + r_outer)
     v2_range_full = (range(v2_min1, v2_max2))
     v2_range_parts = (range(v2_min1, v2_max1), range(v2_min2, v2_max2))
     air = {}
@@ -82,6 +83,7 @@ def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
             air[v1_] = {}
         air[v1_][v2_] = val
 
+    blocks = o.world.blocks
     for v1 in range(v1_min, v1_max):
         for v2_range in v2_range_full if abs(v1 - center[1]) <= r_inner else \
                 v2_range_parts:
@@ -89,7 +91,7 @@ def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
             hit_block = False
             v2 = 0
             for v2 in v2_range:
-                block = o.blocks[v2][v1] if walking else o.blocks[v1][v2]
+                block = blocks[v2][v1] if walking else blocks[v1][v2]
                 if block != AIR:
                     hit_block = True
                     if air_count > 0:

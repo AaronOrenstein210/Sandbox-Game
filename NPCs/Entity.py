@@ -103,6 +103,7 @@ def check_collisions(pos, block_dim, d):
     current_block = [0, 0, 0, 0]
     next_block = [0, 0, 0, 0]
     to_next = [0, 0]
+    blocks = o.world.blocks
     for i in range(2):
         # Get current anc next block
         current_block[i] = int(pos[i] / BLOCK_W)
@@ -113,8 +114,8 @@ def check_collisions(pos, block_dim, d):
         if pos[i] + d[i] < 0:
             pos[i] = 0
             d[i] = 0
-        elif next_block[i + 2] >= o.blocks.shape[1 - i]:
-            pos[i] = (o.blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
+        elif next_block[i + 2] >= blocks.shape[1 - i]:
+            pos[i] = (blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
             d[i] = 0
         elif current_block[i if d[i] < 0 else i + 2] == next_block[i if d[i] < 0 else i + 2]:
             pos[i] += d[i]
@@ -128,10 +129,10 @@ def check_collisions(pos, block_dim, d):
         idx = 1 - d.index(0)
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = o.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
+            collide = blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
         if collide.count(AIR) == len(collide):
@@ -149,10 +150,10 @@ def check_collisions(pos, block_dim, d):
         # When the idx direction hits the next block, idx2 has not changed blocks
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = o.blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
+            collide = blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
         if collide.count(AIR) == len(collide):
@@ -167,10 +168,10 @@ def check_collisions(pos, block_dim, d):
                        ceil((pos[idx] + px_dim[idx] + delta) / BLOCK_W) - 1]
         if idx2 == 0:
             # From lowest row to highest row, at the next column over
-            collide = o.blocks[current_val[0]:current_val[1] + 1, next_block[0 if d[0] < 0 else 2]]
+            collide = blocks[current_val[0]:current_val[1] + 1, next_block[0 if d[0] < 0 else 2]]
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = o.blocks[next_block[1 if d[1] < 0 else 3], current_val[0]:current_val[1] + 1]
+            collide = blocks[next_block[1 if d[1] < 0 else 3], current_val[0]:current_val[1] + 1]
         collide = collide.tolist()
         # All blocks are air, just do the move
         if collide.count(AIR) == len(collide):
@@ -186,12 +187,12 @@ def touching_blocks_x(pos, rect, left):
         # Get next x block
         next_x = int(rect.left / BLOCK_W) - 1 if left else ceil(rect.right / BLOCK_W)
         # Check if we are going to the world edge
-        if next_x < 0 if left else next_x >= o.blocks.shape[1]:
+        if next_x < 0 if left else next_x >= o.world.dim[0]:
             return True
         # Otherwise check if there is a solid block
         else:
             y_range = (int(rect.top / BLOCK_W), ceil(rect.bottom / BLOCK_W))
-            collide = o.blocks[y_range[0]:y_range[1], next_x].tolist()
+            collide = o.world.blocks[y_range[0]:y_range[1], next_x].tolist()
             return collide.count(AIR) < len(collide)
     return False
 
@@ -204,12 +205,12 @@ def touching_blocks_y(pos, rect, top):
         # Get next y block
         next_y = int(pos[1] / BLOCK_W) - 1 if top else ceil(rect.bottom / BLOCK_W)
         # Check if we are going to the world edge
-        if next_y < 0 if top else next_y >= o.blocks.shape[0]:
+        if next_y < 0 if top else next_y >= o.world.dim[1]:
             return True
         # Otherwise check if there is a solid block
         else:
             x_range = (int(rect.left / BLOCK_W), ceil(rect.right / BLOCK_W))
-            collide = o.blocks[next_y, x_range[0]:x_range[1]].tolist()
+            collide = o.world.blocks[next_y, x_range[0]:x_range[1]].tolist()
             return collide.count(AIR) < len(collide)
     return False
 

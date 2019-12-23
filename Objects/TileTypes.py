@@ -46,7 +46,7 @@ class SpawnTile(Tile):
 
 def get_spawn_spaces(center, r, walking):
     # X range
-    v1_min, v1_max = max(0, center[0] - r), min(o.blocks.shape[1], center[0] + r)
+    v1_min, v1_max = max(0, center[0] - r), min(o.world.dim[0], center[0] + r)
     # Y bounds
     v2_min, v2_max = max(0, center[1] - r), max(0, center[1] + r)
     air = {}
@@ -56,11 +56,12 @@ def get_spawn_spaces(center, r, walking):
             air[v1_] = {}
         air[v1_][v2_] = val
 
+    blocks = o.world.blocks
     for v1 in range(v1_min, v1_max):
         air_count = 0
         v2 = 0
         for v2 in reversed(range(v2_min, v2_max)):
-            block = o.blocks[v2][v1] if walking else w.blocks[v1][v2]
+            block = blocks[v2][v1] if walking else blocks[v1][v2]
             if block != AIR:
                 if air_count > 0:
                     add_val(v1, v2 + air_count, air_count)

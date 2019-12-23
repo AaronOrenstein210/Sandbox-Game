@@ -73,7 +73,7 @@ class DimensionHopper(Tile):
             self.scroller = VerticalScroller(self.rect.size, background=(0, 200, 128))
 
             font = c.get_scaled_font(self.rect.w, int(self.rect.h / 8), "_" * 25, "Times New Roman")
-            for file in listdir("saves/universes/" + o.universe_name):
+            for file in listdir("saves/universes/" + o.world.universe):
                 if file.endswith(".wld"):
                     name = file[:-4]
                     text = font.render(name, 1, (255, 255, 255))
@@ -120,10 +120,10 @@ class Chest(Tile):
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
-        c.update_dict(*pos, new_inventory((5, 10)), o.block_data)
+        c.update_dict(*pos, new_inventory((5, 10)), o.world.block_data)
 
     def on_break(self, pos):
-        data = c.get_from_dict(*pos, o.block_data)
+        data = c.get_from_dict(*pos, o.world.block_data)
         if data is not None:
             # Check if we have any items
             while len(data) > 0:
@@ -131,11 +131,11 @@ class Chest(Tile):
                     return False
                 data = data[4:]
             # If not, remove our data
-            c.remove_from_dict(*pos, o.block_data)
+            c.remove_from_dict(*pos, o.world.block_data)
         return True
 
     def activate(self, pos):
-        data = c.get_from_dict(*pos, o.block_data)
+        data = c.get_from_dict(*pos, o.world.block_data)
         if data is not None:
             o.player.active_ui = self.UI(pos, data)
 
@@ -159,7 +159,7 @@ class Chest(Tile):
                         o.player.use_time = self.inventory.left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
                         o.player.use_time = self.inventory.right_click(pos)
-                    c.update_dict(*self.block_pos, self.inventory.write(), o.block_data)
+                    c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
             if keys[K_ESCAPE]:
                 o.player.active_ui = None
                 keys[K_ESCAPE] = False

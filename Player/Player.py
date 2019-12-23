@@ -12,14 +12,14 @@ from Player.PlayerInventory import PlayerInventory
 from Player.Stats import Stats
 from NPCs.Entity import check_collisions, touching_blocks_y
 from NPCs.EntityHandler import EntityHandler
-from GameDriver import GameDriver
 from Objects.DroppedItem import DroppedItem
 
 
 class Player:
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         # Drivers
-        self.driver, self.handler = GameDriver(), EntityHandler()
+        self.handler = EntityHandler()
         # Stats
         self.stats = Stats(hp=100, max_speed=[15, 20])
         # Inventory
@@ -54,21 +54,23 @@ class Player:
         self.active_block = [0, 0]
         self.map_open = False
 
-    def load(self, file):
-        with open(file, "rb+") as data_file:
+    def load(self):
+        with open("saves/players/" + self.name + ".plr", "rb+") as data_file:
             data = data_file.read()
             self.inventory.load(data)
 
-    def write(self, file):
+    def write(self):
         # See load() for info order
-        with open(file, "wb+") as file:
+        with open("saves/players/" + self.name + ".plr", "wb+") as file:
             file.write(self.inventory.write())
 
     def run(self, events):
+        world = o.world
+
         mouse = list(pg.mouse.get_pressed())
         keys = list(pg.key.get_pressed())
 
-        rect = self.driver.get_view_rect(self.rect.center)
+        rect = o.world.get_view_rect(self.rect.center)
         pos = pg.mouse.get_pos()
         global_pos = (pos[0] + rect.x, pos[1] + rect.y)
 
@@ -86,29 +88,28 @@ class Player:
                 if e.type == MOUSEBUTTONUP:
                     if e.button == BUTTON_RIGHT:
                         dim = pg.display.get_surface().get_size()
-                        b_dim = (o.blocks.shape[1], o.blocks.shape[0])
                         center = (dim[0] / 2, dim[1] / 2)
                         mouse = pg.mouse.get_pos()
-                        delta = [(mouse[i] - center[i]) / self.driver.map_zoom for i in (0, 1)]
-                        new_pos = [self.driver.map_off[i] + delta[i] for i in (0, 1)]
+                        delta = [(mouse[i] - center[i]) / world.map_zoom for i in (0, 1)]
+                        new_pos = [world.map_off[i] + delta[i] for i in (0, 1)]
                         for i in (0, 1):
                             if new_pos[i] < 0:
                                 new_pos[i] = 0
-                            elif new_pos[i] >= b_dim[i]:
-                                new_pos[i] = b_dim[i] - 1
+                            elif new_pos[i] >= world.dim[i]:
+                                new_pos[i] = world.dim[i] - 1
                             new_pos[i] *= BLOCK_W
                         self.set_pos(new_pos)
                         self.map_open = False
                     elif e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN:
                         up = e.button == BUTTON_WHEELUP
-                        if up and self.driver.map_zoom < 10:
-                            self.driver.map_zoom += .5
-                        elif not up and self.driver.map_zoom > 1:
-                            self.driver.map_zoom -= .5
+                        if up and world.map_zoom < 10:
+                            world.map_zoom += .5
+                        elif not up and world.map_zoom > 1:
+                            world.map_zoom -= .5
                 elif e.type == KEYUP:
                     if e.key == K_ESCAPE:
                         self.map_open = False
-            self.driver.move_map(keys)
+            world.move_map(keys)
         else:
             if self.active_ui is not None:
                 self.active_ui.process_events(events, mouse, keys)
@@ -118,10 +119,10 @@ class Player:
                         (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
                     up = e.button == BUTTON_WHEELUP
                     self.inventory.scroll(up)
-                    if up and self.driver.minimap_zoom < 5:
-                        self.driver.minimap_zoom += .5
-                    elif not up and self.driver.minimap_zoom > 1:
-                        self.driver.minimap_zoom -= .5
+                    if up and world.minimap_zoom < 5:
+                        world.minimap_zoom += .5
+                    elif not up and world.minimap_zoom > 1:
+                        world.minimap_zoom -= .5
                 elif e.type == KEYUP or e.type == KEYDOWN:
                     up = e.type == KEYUP
                     # Try to jump
@@ -133,7 +134,7 @@ class Player:
                                 self.v[1] = -15
                     elif up and e.key == K_m:
                         self.map_open = True
-                        self.driver.map_off = [p / BLOCK_W for p in self.rect.center]
+                        world.map_off = [p / BLOCK_W for p in self.rect.center]
                     elif self.use_time <= 0 or e.key in [K_ESCAPE]:
                         self.inventory.key_pressed(e.key, up)
 
@@ -180,7 +181,7 @@ class Player:
         if self.map_open:
             display = pg.display.get_surface()
             display.fill(c.BACKGROUND)
-            map_ = self.driver.get_map(display.get_size())
+            map_ = world.get_map(display.get_size())
             map_rect = map_.get_rect(center=display.get_rect().center)
             display.blit(map_, map_rect)
         else:
@@ -188,7 +189,7 @@ class Player:
         return True
 
     def spawn(self):
-        self.set_pos((o.world_spawn[0] * BLOCK_W, o.world_spawn[1] * BLOCK_W))
+        self.set_pos((o.world.spawn[0] * BLOCK_W, o.world.spawn[1] * BLOCK_W))
 
     def move(self):
         if o.dt == 0:
@@ -250,7 +251,7 @@ class Player:
             self.use_time = self.inventory.right_click(pos)
         else:
             block_x, block_y = global_pos[0] // BLOCK_W, global_pos[1] // BLOCK_W
-            block = o.tiles[o.blocks[block_y][block_x]]
+            block = o.tiles[o.world.blocks[block_y][block_x]]
             # Make sure we didn't click the same block more than once
             if block.clickable and self.placement_range.collidepoint(*global_pos) and \
                     (self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
@@ -277,7 +278,7 @@ class Player:
     def break_block(self):
         # Get mouse pos and viewing rectangle to calculate global mouse pos
         pos = pg.mouse.get_pos()
-        rect = self.driver.get_view_rect(self.rect.center)
+        rect = o.world.get_view_rect(self.rect.center)
         pos = (pos[0] + rect.x, pos[1] + rect.y)
         # Calculate block rectangle
         block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
@@ -287,11 +288,11 @@ class Player:
         block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W, BLOCK_W)
         # Check if we can break the block
         if self.placement_range.collidepoint(pos[0], pos[1]) and \
-                o.tiles[o.blocks[block_y][block_x]].on_break((block_x, block_y)):
-            block = self.driver.destroy_block(pos)
+                o.tiles[o.world.blocks[block_y][block_x]].on_break((block_x, block_y)):
+            block = o.world.destroy_block(pos)
             if block != AIR:
                 tile = o.tiles[block]
-                self.driver.map.set_at((block_x, block_y), (64, 64, 255))
+                o.world.map.set_at((block_x, block_y), (64, 64, 255))
                 drops = tile.get_drops()
                 for drop in drops:
                     item, amnt = drop
@@ -303,7 +304,7 @@ class Player:
     def place_block(self, idx):
         # Get mouse pos and viewing rectangle to calculate global mouse pos
         pos = pg.mouse.get_pos()
-        rect = self.driver.get_view_rect(self.rect.center)
+        rect = o.world.get_view_rect(self.rect.center)
         pos = (pos[0] + rect.x, pos[1] + rect.y)
         # Calculate block rectangle
         block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
@@ -312,9 +313,9 @@ class Player:
         if self.placement_range.collidepoint(pos[0], pos[1]):
             if not self.rect.colliderect(block_rect) and \
                     not self.handler.collides_with_entity(block_rect) and \
-                    self.driver.place_block(pos, idx):
-                tile = o.tiles[o.blocks[block_y][block_x]]
-                self.driver.map.set_at((block_x, block_y), tile.map_color)
+                    o.world.place_block(pos, idx):
+                tile = o.tiles[o.world.blocks[block_y][block_x]]
+                o.world.map.set_at((block_x, block_y), tile.map_color)
                 tile.on_place((block_x, block_y))
                 return True
         return False
@@ -337,12 +338,12 @@ class Player:
         return False
 
     def draw_ui(self):
-        rect = self.driver.get_view_rect(self.rect.center)
+        rect = o.world.get_view_rect(self.rect.center)
         display = pg.display.get_surface()
         display.fill(o.get_sky_color())
         dim = display.get_size()
         # Draw blocks
-        display.blit(self.driver.blocks_surface, (0, 0), area=rect)
+        display.blit(o.world.surface, (0, 0), area=rect)
         # Draw all entities/projectiles/items, in that order
         self.handler.get_display(rect)
 
@@ -368,7 +369,7 @@ class Player:
         display.blit(text, text_rect)
 
         # Get minimap
-        minimap = self.driver.get_minimap([i / BLOCK_W for i in self.rect.center])
+        minimap = o.world.get_minimap([i / BLOCK_W for i in self.rect.center])
         # Figure out where to place the player
         x_frac = (self.rect.left - rect.left) / rect.w
         y_frac = (self.rect.top - rect.top) / rect.h

@@ -5,7 +5,8 @@ from pygame.locals import *
 from Objects import INV, USE, item_ids as items, tile_ids as tiles
 from Objects.ItemTypes import *
 from Tools.constants import *
-from World.WorldGenerator import generate_world
+from World.World import World
+from World.WorldGenerator import get_random_biome
 from Player.ActiveUI import ActiveUI
 
 
@@ -70,7 +71,9 @@ class DimensionCreator(Item):
             world_name = self.get_input.check_events(events)
             if world_name is not None:
                 if world_name != "":
-                    generate_world(o.universe_name, world_name)
+                    new = World(o.world.universe, world_name)
+                    new.generator.generate([1000, 500], [get_random_biome() for i in range(5)])
+                    del new
                     o.player.inventory.use_item()
                 o.player.use_time = 0
                 o.player.active_ui = None
@@ -89,7 +92,7 @@ class Dematerializer(Item):
         time_i = o.player.use_time
         Item.on_tick(self)
         progress = o.player.use_time / time_i
-        spawn = [s * BLOCK_W for s in o.world_spawn]
+        spawn = [s * BLOCK_W for s in o.world.spawn]
         delta = [s - p for p, s in zip(o.player.pos, spawn)]
         if progress <= 0 or delta.count(0) == 2:
             o.player.can_move = True
