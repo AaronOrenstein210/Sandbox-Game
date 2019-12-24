@@ -6,7 +6,7 @@ from random import randint, choice
 import random, math
 import pygame as pg
 from Objects.tile_ids import *
-from UI.Operations import CompleteTask
+from UI.Operations import CompleteTask, loading_bar
 from Tools import objects as o
 from World import world_zones as zones
 
@@ -24,12 +24,12 @@ class WorldGenerator:
         self.world.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
         zones.set_world_heights(dim[1])
         # Generate biomes
-        avg_size = dim[0] / 10
-        min_size, max_size = avg_size * 9 // 10, avg_size * 11 // 10
         x = 0
-        for i in range(10):
-            if i != 9:
-                dx = randint(min_size, max_size)
+        section_w = 100
+        min_w, max_w = section_w * 9 // 10, section_w * 11 / 10
+        while x < dim[0]:
+            if dim[0] - x >= section_w * 3 // 2:
+                dx = randint(min_w, max_w)
             else:
                 dx = dim[0] - x
             biome = choice(biomes)
@@ -45,7 +45,7 @@ class WorldGenerator:
         self.world.spawn = [centerx,
                             min(self.surface[centerx], self.surface[centerx + 1]) - math.ceil(o.player.dim[1])]
         self.surface.clear()
-        CompleteTask(self.world.save_part, task_args=[1], draw_args=("Saving New World",),
+        CompleteTask(self.world.save_part, [2], loading_bar, ["Saving New World"],
                      can_exit=False).run_now()
 
     def smooth(self, x, left):

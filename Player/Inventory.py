@@ -15,8 +15,8 @@ BKGROUND = (0, 255, 0, 64)
 
 
 class Inventory:
-    def __init__(self):
-        self.dim = (10, 5)
+    def __init__(self, dim):
+        self.dim = dim
         self.rect = Rect(0, 0, INV_W * self.dim[0], INV_W * self.dim[1])
         self.surface = Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
         self.surface.fill(BKGROUND)
@@ -106,8 +106,8 @@ class Inventory:
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
         item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
         # Make sure we clicked on an item
-        if amnt > 0:
-            inv = o.player.inventory
+        inv = o.player.inventory
+        if amnt > 0 and inv.selected_item in [-1, item]:
             ideal_grab = ceil(o.dt / self.calc_wait_time())
             max_grab = o.items[item].max_stack - inv.selected_amnt
             grab_amnt = min(ideal_grab, max_grab, amnt)

@@ -9,13 +9,12 @@ from Tools import objects as o
 from Objects.tile_ids import AIR
 
 
-# TODO: Move to tiles
 class SpawnTile(Tile):
-    def __init__(self, idx, entity):
+    def __init__(self, idx, entity, dim=(1, 1)):
         self.entity = entity
         self.test_entity = entity()
         self.rarity = self.test_entity.rarity
-        Tile.__init__(self, idx, self.rarity,
+        Tile.__init__(self, idx, self.rarity, dim=dim,
                       img=INV + "spawner_" + str(self.rarity) + ".png")
         self.name = self.test_entity.name + " Spawner"
         self.spawner = True

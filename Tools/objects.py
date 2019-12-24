@@ -3,9 +3,10 @@
 
 # BE WARY OF IMPORT LOOPS!!!
 from sys import exit
+from math import ceil
 import pygame as pg
 from Tools.constants import MS_PER_DAY, NOON
-from UI.Operations import CompleteTask
+from UI.Operations import CompleteTask, loading_bar, percent
 
 items, tiles = {}, {}
 player, world = None, None
@@ -58,16 +59,20 @@ def tick(delta_time):
 
 # Closes current world
 def close_world():
-    CompleteTask(world.save_part, task_args=[2], draw_args=("Saving World",), can_exit=False).run_now()
+    CompleteTask(world.save_part, [3], loading_bar, ["Saving World"], can_exit=False).run_now()
     player.write()
 
 
 # Loads a new world
 def load_world():
-    if not CompleteTask(world.load_part, task_args=[3], draw_args=("Loading World Blocks",)).run_now():
+    # Reset world variables
+    global world_time
+    world_time = MS_PER_DAY * .4
+    if not CompleteTask(world.load_part, [], percent, ["Loading World Blocks"]).run_now():
         pg.quit()
         exit(0)
     world.draw_blocks()
+    player.handler.reset()
     player.spawn()
 
 
@@ -81,8 +86,7 @@ def change_world(new_world):
         overlay.set_alpha(255 * progress)
         display.blit(overlay, (0, 0))
 
-    CompleteTask(world.save_part, task_args=[10], can_exit=False,
-                 draw_ui=screen_goes_white, draw_args=()).run_now()
+    CompleteTask(world.save_part, [10], screen_goes_white, [], can_exit=False).run_now()
     player.write()
     world.name = new_world
     load_world()

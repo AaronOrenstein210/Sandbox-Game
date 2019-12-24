@@ -4,11 +4,15 @@ from sys import byteorder
 import pygame as pg
 from pygame.locals import *
 from Objects.TileTypes import *
+from Objects.Animation import Animation
 from Objects import item_ids as items, tile_ids as tiles
 from NPCs import Mobs as mobs
 from Player.ActiveUI import ActiveUI
 from Tools import constants as c
 from Tools import objects as o
+from World import WorldGenerator as wg
+from World.World import World
+from UI.Operations import TextInput
 
 
 class Air(Tile):
@@ -109,27 +113,137 @@ class DimensionHopper(Tile):
             self.rect.center = pg.display.get_surface().get_rect().center
 
 
-class Chest(Tile):
+class WorldBuilder(Tile):
+    INV_DIM = (4, 2)
+
     def __init__(self):
-        Tile.__init__(self, tiles.CHEST, hardness=1, img=INV + "chest.png")
+        Tile.__init__(self, tiles.WORLD_BUILDER, img=INV + "world_builder_0.png")
+        self.animation = True
         self.has_ui = True
         self.clickable = True
-        self.data_bytes = 200
-        self.add_drop(items.CHEST, 1)
-        self.map_color = (200, 200, 0)
+        self.on_surface = True
+        self.data_bytes = 4 * self.INV_DIM[0] * self.INV_DIM[1]
+        self.add_drop(items.WORLD_BUILDER, 1)
+        self.map_color = (0, 0, 0)
+
+    def get_animation(self):
+        return Animation([INV + "world_builder_{}.png".format(i) for i in range(6)],
+                         [BLOCK_W, BLOCK_W], delay=250)
+
+    def activate(self, pos):
+        data = c.get_from_dict(*pos, o.world.block_data)
+        if data is not None:
+            o.player.active_ui = self.UI(pos, data)
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
-        c.update_dict(*pos, new_inventory((5, 10)), o.world.block_data)
+        c.update_dict(*pos, new_inventory(self.INV_DIM), o.world.block_data)
 
     def on_break(self, pos):
         data = c.get_from_dict(*pos, o.world.block_data)
         if data is not None:
             # Check if we have any items
-            while len(data) > 0:
-                if int.from_bytes(data[:2], byteorder) > 0:
+            for byte in data:
+                if byte != 0:
                     return False
-                data = data[4:]
+            # If not, remove our data
+            c.remove_from_dict(*pos, o.world.block_data)
+        return True
+
+    class UI(ActiveUI):
+        biomes = {items.FOREST: wg.FOREST,
+                  items.MOUNTAIN: wg.MOUNTAIN,
+                  items.VALLEY: wg.VALLEY}
+
+        def __init__(self, pos, data):
+            from Player.Inventory import Inventory
+            self.text_input = None
+            self.inventory = Inventory(WorldBuilder.INV_DIM)
+            self.inventory.load(data)
+            inv_dim = self.inventory.surface.get_size()
+            self.inv_w = inv_dim[0]
+            # Draw create text
+            font = c.get_scaled_font(-1, inv_dim[1] // 2, "Create!", "Times New Roman")
+            text = font.render("Create!", -1, (255, 255, 255))
+            text_rect = text.get_rect(centery=inv_dim[1] // 2, left=inv_dim[0])
+            # Create surface
+            s = pg.Surface((inv_dim[0] + text_rect.w, inv_dim[1]))
+            s.blit(self.inventory.surface, (0, 0))
+            s.blit(text, text_rect)
+            ActiveUI.__init__(self, s, s.get_rect(), pos=pos)
+            self.on_resize()
+
+            if not o.player.inventory.open:
+                o.player.inventory.toggle()
+
+        def process_events(self, events, mouse, keys):
+            pos = pg.mouse.get_pos()
+            if self.text_input is not None:
+                world_name = self.text_input.check_events(events)
+                if world_name is not None:
+                    if world_name != "":
+                        new = World(o.world.universe, world_name)
+                        biomes = []
+                        for y, row in enumerate(self.inventory.inv_items):
+                            for x, item in enumerate(row):
+                                if item in self.biomes.keys():
+                                    biomes += [self.biomes[item]] * self.inventory.inv_amnts[y][x]
+                        new.generator.generate((1000, 500), biomes)
+                        del new
+                        from Player.Inventory import new_inventory
+                        c.update_dict(*self.block_pos, new_inventory(WorldBuilder.INV_DIM), o.world.block_data)
+                    o.player.active_ui = None
+            elif self.rect.collidepoint(*pos):
+                pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                if pos[0] > self.inv_w:
+                    for e in events:
+                        if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
+                            events.remove(e)
+                            self.text_input = TextInput("Input World Name", char_limit=10)
+                            self.ui = self.text_input.surface
+                            self.rect = self.ui.get_rect()
+                            self.on_resize()
+                elif o.player.use_time <= 0:
+                    p_item = o.player.inventory.selected_item
+                    if p_item == -1 or p_item in self.biomes.keys():
+                        if mouse[BUTTON_LEFT - 1]:
+                            o.player.use_time = self.inventory.left_click(pos)
+                        elif mouse[BUTTON_RIGHT - 1]:
+                            o.player.use_time = self.inventory.right_click(pos)
+                        c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
+                        self.ui.fill((0, 0, 0), self.inventory.rect)
+                        self.ui.blit(self.inventory.surface, (0, 0))
+            if keys[K_ESCAPE]:
+                o.player.active_ui = None
+                keys[K_ESCAPE] = False
+
+        def on_resize(self):
+            self.rect.center = pg.display.get_surface().get_rect().center
+
+
+class Chest(Tile):
+    INV_DIM = (10, 5)
+
+    def __init__(self):
+        Tile.__init__(self, tiles.CHEST, hardness=1, img=INV + "chest.png", dim=(2, 2))
+        self.has_ui = True
+        self.clickable = True
+        self.on_surface = True
+        self.data_bytes = 4 * self.INV_DIM[0] * self.INV_DIM[1]
+        self.add_drop(items.CHEST, 1)
+        self.map_color = (200, 200, 0)
+
+    def on_place(self, pos):
+        from Player.Inventory import new_inventory
+        c.update_dict(*pos, new_inventory(self.INV_DIM), o.world.block_data)
+
+    def on_break(self, pos):
+        data = c.get_from_dict(*pos, o.world.block_data)
+        if data is not None:
+            # Check if we have any items
+            for byte in data:
+                if byte != 0:
+                    return False
             # If not, remove our data
             c.remove_from_dict(*pos, o.world.block_data)
         return True
@@ -142,7 +256,7 @@ class Chest(Tile):
     class UI(ActiveUI):
         def __init__(self, pos, data):
             from Player.Inventory import Inventory
-            self.inventory = Inventory()
+            self.inventory = Inventory(Chest.INV_DIM)
             ActiveUI.__init__(self, self.inventory.surface,
                               self.inventory.rect.move(0, self.inventory.rect.h), pos=pos)
             self.inventory.load(data)

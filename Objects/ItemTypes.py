@@ -16,14 +16,14 @@ class Block(Item):
 
 
 class Weapon(Item):
-    def __init__(self, idx, damage=1, damage_type=0, projectiles=(),
-                 inv_img="", use_img=""):
-        Item.__init__(self, idx, inv_img=inv_img, use_img=use_img)
+    def __init__(self, idx, damage=1, damage_type=0, projectiles=(), **kwargs):
+        Item.__init__(self, idx, **kwargs)
         self.swing = True
         self.is_weapon = True
         self.damage = damage
         self.damage_type = damage_type
         self.projectiles = projectiles
+        self.max_stack = 1
 
     def use_anim(self, time_used, arm, left, player_center, rect):
         Item.use_anim(self, time_used, arm, left, player_center, rect)

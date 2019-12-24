@@ -12,7 +12,7 @@ hotbar_controls = {
 
 class PlayerInventory(Inventory):
     def __init__(self):
-        Inventory.__init__(self)
+        Inventory.__init__(self, (10, 5))
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
         # Defines current hotbar item
@@ -132,13 +132,11 @@ class PlayerInventory(Inventory):
 
     def new_inventory(self):
         data = bytearray(4 * self.dim[0] * self.dim[1])
-        items = [TEST_SWORD, TEST_PICKAXE, DIMENSION_HOPPER, DIMENSION_CREATOR,
-                 CHEST, DEMATERIALIZER, TIME_WARP]
-        amnts = [1, 1, 10, 10, 10, 1, 1]
         i = 0
-        for item, amnt in zip(items, amnts):
-            data[i: i + 2] = amnt.to_bytes(2, byteorder)
-            data[i + 2:i + 4] = item.to_bytes(2, byteorder)
-            i += 4
-        data[i:200] = (0).to_bytes(200 - i, byteorder)
+        for i, idx in enumerate(o.items.keys()):
+            byte = i * 4
+            data[byte: byte + 2] = o.items[idx].max_stack.to_bytes(2, byteorder)
+            data[byte + 2: byte + 4] = idx.to_bytes(2, byteorder)
+        byte = (i + 1) * 4
+        data[byte:] = (0).to_bytes(len(data) - byte, byteorder)
         return data

@@ -14,6 +14,10 @@ class EntityHandler:
         self.entities = []
         self.items = []
 
+    def reset(self):
+        self.entities.clear()
+        self.items.clear()
+
     def move(self, player_pos):
         for entity in self.entities:
             entity.move(player_pos)

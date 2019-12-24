@@ -14,6 +14,9 @@ from NPCs.Entity import check_collisions, touching_blocks_y
 from NPCs.EntityHandler import EntityHandler
 from Objects.DroppedItem import DroppedItem
 
+# Mouse pos relative to the screen and to the world, updated every frame
+pos, global_pos = [0, 0], [0, 0]
+
 
 class Player:
     def __init__(self, name):
@@ -70,6 +73,7 @@ class Player:
         mouse = list(pg.mouse.get_pressed())
         keys = list(pg.key.get_pressed())
 
+        global pos, global_pos
         rect = o.world.get_view_rect(self.rect.center)
         pos = pg.mouse.get_pos()
         global_pos = (pos[0] + rect.x, pos[1] + rect.y)
@@ -89,8 +93,7 @@ class Player:
                     if e.button == BUTTON_RIGHT:
                         dim = pg.display.get_surface().get_size()
                         center = (dim[0] / 2, dim[1] / 2)
-                        mouse = pg.mouse.get_pos()
-                        delta = [(mouse[i] - center[i]) / world.map_zoom for i in (0, 1)]
+                        delta = [(pos[i] - center[i]) / world.map_zoom for i in (0, 1)]
                         new_pos = [world.map_off[i] + delta[i] for i in (0, 1)]
                         for i in (0, 1):
                             if new_pos[i] < 0:
@@ -143,11 +146,11 @@ class Player:
                     (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
                 # Mouse click events
                 if mouse[BUTTON_LEFT - 1]:
-                    self.left_click(pos, global_pos)
+                    self.left_click()
                 else:
                     self.first_swing = True
                     if mouse[BUTTON_RIGHT - 1]:
-                        self.right_click(pos, global_pos)
+                        self.right_click()
                     else:
                         self.inventory.holding_r = 0
 
@@ -224,7 +227,7 @@ class Player:
         self.placement_range.center = self.rect.center
         self.collection_range.center = self.rect.center
 
-    def left_click(self, pos, global_pos):
+    def left_click(self):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
             self.use_time = self.inventory.left_click(pos)
         else:
@@ -238,24 +241,27 @@ class Player:
                     item.on_left_click()
                     self.item_used = item
                     self.use_time = item.use_time
-                    # Check if the item places a block or breaks a block and then
+                    block_pos = [p // BLOCK_W for p in global_pos]
+                    # Check if the item places a block or breaks a block
                     # Check if that item can place or break the block
-                    if (item.placeable and o.player.place_block(item.block_id)) or (
-                            item.breaks_blocks and o.player.break_block()) and item.consumable:
+                    used_item = item.placeable and self.place_block(*block_pos, item.block_id)
+                    if not used_item:
+                        used_item = item.breaks_blocks and self.break_block(*block_pos)
+                    if used_item and item.consumable:
                         self.inventory.use_item()
                     if item.has_ui:
                         self.active_ui = item.UI()
 
-    def right_click(self, pos, global_pos):
+    def right_click(self):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
             self.use_time = self.inventory.right_click(pos)
         else:
-            block_x, block_y = global_pos[0] // BLOCK_W, global_pos[1] // BLOCK_W
-            block = o.tiles[o.world.blocks[block_y][block_x]]
+            block_x, block_y = o.world.get_topleft(*[p // BLOCK_W for p in global_pos])
+            tile = o.tiles[o.world.blocks[block_y][block_x]]
             # Make sure we didn't click the same block more than once
-            if block.clickable and self.placement_range.collidepoint(*global_pos) and \
+            if tile.clickable and self.placement_range.collidepoint(*global_pos) and \
                     (self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
-                block.activate((block_x, block_y))
+                tile.activate((block_x, block_y))
             elif self.inventory.selected_item != -1:
                 # Check if we dropped an item
                 drop = self.inventory.drop_item()
@@ -275,54 +281,45 @@ class Player:
                         self.item_used = item
                         self.use_time = item.use_time
 
-    def break_block(self):
-        # Get mouse pos and viewing rectangle to calculate global mouse pos
-        pos = pg.mouse.get_pos()
-        rect = o.world.get_view_rect(self.rect.center)
-        pos = (pos[0] + rect.x, pos[1] + rect.y)
-        # Calculate block rectangle
-        block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
+    def break_block(self, block_x, block_y):
+        # Make sure we aren't hitting air
+        block_x, block_y = o.world.get_topleft(block_x, block_y)
+        block = o.world.blocks[block_y][block_x]
+        if block == AIR:
+            return False
+        tile = o.tiles[block]
         # Make sure this block does not have a ui open
         if self.active_ui is not None and self.active_ui.block_pos == [block_x, block_y]:
-            return
-        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W, BLOCK_W)
+            return False
+        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
         # Check if we can break the block
-        if self.placement_range.collidepoint(pos[0], pos[1]) and \
-                o.tiles[o.world.blocks[block_y][block_x]].on_break((block_x, block_y)):
-            block = o.world.destroy_block(pos)
-            if block != AIR:
-                tile = o.tiles[block]
-                o.world.map.set_at((block_x, block_y), (64, 64, 255))
-                drops = tile.get_drops()
-                for drop in drops:
-                    item, amnt = drop
-                    # Drop an item
-                    self.drop_item(item, amnt, block_rect.center, None)
-                return True
+        if self.placement_range.collidepoint(*global_pos) and tile.on_break((block_x, block_y)):
+            o.world.destroy_block(block_x, block_y)
+            drops = tile.get_drops()
+            for drop in drops:
+                item, amnt = drop
+                # Drop an item
+                self.drop_item(item, amnt, block_rect.center, None)
+            return True
         return False
 
-    def place_block(self, idx):
-        # Get mouse pos and viewing rectangle to calculate global mouse pos
-        pos = pg.mouse.get_pos()
-        rect = o.world.get_view_rect(self.rect.center)
-        pos = (pos[0] + rect.x, pos[1] + rect.y)
+    def place_block(self, block_x, block_y, idx):
+        tile = o.tiles[idx]
         # Calculate block rectangle
-        block_x, block_y = int(pos[0] / BLOCK_W), int(pos[1] / BLOCK_W)
-        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W, BLOCK_W)
+        block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[0])
         # Check if we can place the block
-        if self.placement_range.collidepoint(pos[0], pos[1]):
+        if self.placement_range.collidepoint(*global_pos):
             if not self.rect.colliderect(block_rect) and \
                     not self.handler.collides_with_entity(block_rect) and \
-                    o.world.place_block(pos, idx):
-                tile = o.tiles[o.world.blocks[block_y][block_x]]
-                o.world.map.set_at((block_x, block_y), tile.map_color)
+                    tile.can_place((block_x, block_y)):
+                o.world.place_block(block_x, block_y, idx)
                 tile.on_place((block_x, block_y))
                 return True
         return False
 
-    def drop_item(self, item, amnt, pos, left):
+    def drop_item(self, item, amnt, pos_, left):
         dropped = DroppedItem(item, amnt)
-        dropped.drop(pos, left)
+        dropped.drop(pos_, left)
         self.handler.items.append(dropped)
 
     def pick_up(self, item):
@@ -343,7 +340,18 @@ class Player:
         display.fill(o.get_sky_color())
         dim = display.get_size()
         # Draw blocks
+        o.world.update_anim(rect)
         display.blit(o.world.surface, (0, 0), area=rect)
+        # Draw shadow of placeable item if applicable
+        if self.placement_range.collidepoint(*global_pos):
+            item = self.inventory.get_held_item()
+            if item != -1 and o.items[item].placeable:
+                tile = o.tiles[o.items[item].block_id]
+                img = tile.image.copy().convert_alpha()
+                img.fill((255, 255, 255, 128), None, BLEND_RGBA_MULT)
+                # Find top left of current block in px
+                img_pos = [(int(m / BLOCK_W) * BLOCK_W) - p for m, p in zip(global_pos, rect.topleft)]
+                display.blit(img, img_pos)
         # Draw all entities/projectiles/items, in that order
         self.handler.get_display(rect)
 
@@ -381,7 +389,7 @@ class Player:
         # Draw selected item under cursor if there is one
         cursor = self.inventory.get_cursor_display()
         if cursor is not None:
-            display.blit(cursor, pg.mouse.get_pos())
+            display.blit(cursor, pos)
 
     def hit(self, dmg, centerx):
         self.stats.hp -= dmg

@@ -6,7 +6,7 @@ from UI.UIOperation import UIOperation
 from Tools import constants as c
 
 
-def def_loading_bar(progress, msg):
+def loading_bar(progress, msg):
     display = pg.display.get_surface()
     display.fill(c.BACKGROUND)
     # Get display size
@@ -28,9 +28,29 @@ def def_loading_bar(progress, msg):
     pg.draw.rect(display, (0, 0, 0), bar_rect, 2)
 
 
+def percent(progress, msg):
+    display = pg.display.get_surface()
+    display.fill(c.BACKGROUND)
+    # Get display size
+    w, h = display.get_size()
+    text_h = c.load_font.size("|")[1]
+    # Calculate center of each text block
+    load_c = [w // 2, (h // 2) - text_h]
+    perc_c = [w // 2, (h // 2) + text_h]
+
+    # Progress ellipses
+    dots = int(pg.time.get_ticks() / 400) % 4
+    text = c.load_font.render(msg + ("." * int(dots)), 1, (255, 255, 255))
+    text_rect = text.get_rect(center=load_c)
+    display.blit(text, text_rect)
+    # Draw percent text
+    text = c.load_font.render(str(int(progress * 100)) + "%", 1, (255, 255, 255))
+    text_rect = text.get_rect(center=perc_c)
+    display.blit(text, text_rect)
+
+
 class CompleteTask(UIOperation):
-    def __init__(self, task, task_args=(), draw_ui=def_loading_bar, draw_args=("Loading",),
-                 can_exit=True):
+    def __init__(self, task, task_args, draw_ui, draw_args, can_exit=True):
         UIOperation.__init__(self)
         self.progress = 0
         self.task = task

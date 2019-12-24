@@ -7,13 +7,15 @@ import pygame as pg
 from random import randint
 from Tools.constants import BLOCK_W
 from Tools import objects as o
+from Objects.tile_ids import AIR
 
 
 class Tile:
-    def __init__(self, idx, hardness=0, img=""):
+    def __init__(self, idx, hardness=0, img="", dim=(1, 1)):
         self.idx = idx
         self.name = "No Name"
         self.hardness = hardness
+        self.dim = dim
 
         # Tile spawns enemies
         self.spawner = False
@@ -21,18 +23,26 @@ class Tile:
         self.clickable = False
         # Tile brings up a ui when clicked
         self.has_ui = False
+        # Has animation
+        self.animation = False
+        # Must be placed on a surface
+        self.on_surface = False
 
         # Minimap color, does not need to be unique
-        self.map_color = (64,64,255)
+        self.map_color = (64, 64, 255)
         # Load image if given
         self.image = pg.Surface((BLOCK_W, BLOCK_W))
         if isfile(img):
-            self.image = pg.transform.scale(pg.image.load(img), (BLOCK_W, BLOCK_W))
+            self.image = pg.transform.scale(pg.image.load(img), (BLOCK_W * dim[0], BLOCK_W * dim[1]))
 
         # Number of bytes of data
         self.data_bytes = 0
         # List of drops, each drop is a item/amnt pair
         self.drops = []
+
+    # Return Animation object if tile has animation
+    def get_animation(self):
+        pass
 
     def add_drop(self, item, min_amnt, max_amnt=-1):
         if max_amnt == -1:
@@ -52,7 +62,15 @@ class Tile:
         return True
 
     def on_place(self, pos):
-        return
+        pass
+
+    def can_place(self, pos):
+        if not o.world.contains_only(*pos, *self.dim, AIR):
+            return False
+        if self.on_surface:
+            return not o.world.contains(pos[0], pos[1] + self.dim[1], self.dim[0], 1, AIR)
+        else:
+            return not o.world.adjacent(*pos, *self.dim, AIR, True)
 
     def activate(self, pos):
-        return
+        pass

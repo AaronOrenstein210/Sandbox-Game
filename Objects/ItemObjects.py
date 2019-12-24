@@ -46,6 +46,12 @@ class DimensionHopper(Block):
         self.name = "Dimension Hopper"
 
 
+class WorldBuilder(Block):
+    def __init__(self):
+        Block.__init__(self, items.WORLD_BUILDER, tiles.WORLD_BUILDER, inv_img=INV + "world_builder_0.png")
+        self.name = "World Builder"
+
+
 class DimensionCreator(Item):
     def __init__(self):
         Item.__init__(self, items.DIMENSION_CREATOR, inv_img=INV + "dimension_creator.png",
@@ -117,6 +123,24 @@ class TimeWarp(Item):
             o.world_time = (o.world_time - (60 * o.dt)) % MS_PER_DAY
         else:
             o.player.use_time = 0
+
+
+class ForestBiome(Item):
+    def __init__(self):
+        Item.__init__(self, items.FOREST, inv_img=INV + "forest.png")
+        self.name = "Forest Biome"
+
+
+class MountainBiome(Item):
+    def __init__(self):
+        Item.__init__(self, items.MOUNTAIN, inv_img=INV + "mountain.png")
+        self.name = "Mountain Biome"
+
+
+class ValleyBiome(Item):
+    def __init__(self):
+        Item.__init__(self, items.VALLEY, inv_img=INV + "valley.png")
+        self.name = "Valley Biome"
 
 
 class TestSword(Weapon):
