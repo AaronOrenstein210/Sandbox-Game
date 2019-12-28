@@ -6,31 +6,77 @@ from math import copysign, ceil
 from random import randint
 from pygame import Rect, Surface
 from pygame.image import load
-from pygame.transform import scale
-from Tools.constants import RANDOM, FOLLOW, BLOCK_W
+from Tools.constants import BLOCK_W
 from Objects.tile_ids import AIR
+from Tools.constants import scale_to_fit
 from Tools import objects as o
 from Player.Stats import Stats
 
 
+# AI functions, takes an entity object as its input
+def random_movement(entity):
+    entity.time -= o.dt
+    # Check if we are standing on the ground
+    if touching_blocks_y(entity.pos, entity.dim, False):
+        # Check if we are ready to start/stop moving
+        if entity.time <= 0:
+            # We were stopped
+            if entity.a[0] == 0:
+                entity.a[0] = 1 if randint(0, 1) == 0 else -1
+                entity.time = randint(2500, 5000)
+            # We were moving
+            else:
+                entity.a[0] = 0
+                entity.time = randint(1000, 3000)
+        # Check if we need to jump
+        if entity.a[0] != 0:
+            if (entity.a[0] < 0 and touching_blocks_x(entity.pos, entity.dim, True)) or \
+                    (entity.a[0] > 0 and touching_blocks_x(entity.pos, entity.dim, False)):
+                entity.v[1] = -12
+                entity.time = randint(1000, 3000)
+
+
+def follow_player(entity):
+    # Check if we are standing on the ground
+    if touching_blocks_y(entity.pos, entity.dim, False):
+        entity.a[0] = copysign(1, o.player.rect.centerx - entity.rect.centerx)
+        # Check if we need to jump
+        if entity.a[0] != 0:
+            if (entity.a[0] < 0 and touching_blocks_x(entity.pos, entity.dim, True)) or \
+                    (entity.a[0] > 0 and touching_blocks_x(entity.pos, entity.dim, False)):
+                entity.v[1] = -12
+
+
+def jump(entity, follow):
+    # If we are on the ground, progress our timer and make sure we aren't moving
+    if touching_blocks_y(entity.pos, entity.dim, False):
+        entity.a[0], entity.v[0] = 0, 0
+        entity.time -= o.dt
+        # If we are done waiting, jump
+        if entity.time <= 0:
+            if follow:
+                entity.a[0] = copysign(1, o.player.rect.centerx - entity.rect.centerx)
+            else:
+                entity.a[0] = 1 if randint(0, 1) == 0 else -1
+            entity.v[0] = entity.stats.spd[0] * entity.a[0]
+            entity.v[1] = randint(-15, -5)
+            entity.time = randint(1000, 2000)
+
+
 class Entity:
-    def __init__(self, name="No Name", w=1, ai=RANDOM, aggressive=False, rarity=1, img="",
+    def __init__(self, name="No Name", w=1, aggressive=False, rarity=1, img="",
                  stats=Stats()):
         self.rarity = rarity
         # Stores entity info
         self.name = name
         self.stats = stats
-        # Stores ai type to use
-        self.ai = ai
         self.aggressive = aggressive
 
-        self.dim = (w, w)
-        self.surface = Surface((int(w * BLOCK_W), int(w * BLOCK_W)))
         if isfile(img):
-            self.surface = load(img)
-            size = self.surface.get_size()
-            self.dim = (w, size[1] * w / size[0])
-            self.surface = scale(self.surface, (int(self.dim[0] * BLOCK_W), int(self.dim[1] * BLOCK_W)))
+            self.surface = scale_to_fit(load(img), w=w * BLOCK_W)
+        else:
+            self.surface = Surface((int(w * BLOCK_W), int(w * BLOCK_W)))
+        self.dim = (w, self.surface.get_size()[1] / BLOCK_W)
         # Hit box
         self.rect = Rect(0, 0, self.surface.get_size()[0], self.surface.get_size()[1])
         # Movement variables
@@ -44,8 +90,7 @@ class Entity:
         self.pos = [x, y]
         self.rect.topleft = self.pos
 
-    def move(self, player_pos):
-        self.time -= o.dt
+    def move(self):
         if self.immunity > 0:
             self.immunity -= o.dt
         dt = o.dt / 1000
@@ -53,9 +98,7 @@ class Entity:
         # Figure out change in position
         d = [0, 0]
         for i in range(2):
-            d[i] = self.v[i] * dt * BLOCK_W
-            # Update the position and constrain it within our bounds
-            d[i] = (BLOCK_W * 2 / 3) * (self.v[i] * dt)
+            d[i] = self.v[i] * dt * BLOCK_W * 2 / 3
             if self.a[i] == 0:
                 if self.v[i] != 0:
                     self.v[i] += copysign(min(self.v[0] + (dt * 1), abs(self.v[i])), -self.v[i])
@@ -63,14 +106,17 @@ class Entity:
                 self.v[i] += copysign(dt * 20, self.a[i])
                 self.v[i] = copysign(min(abs(self.v[i]), self.stats.spd[i]), self.v[i])
 
-        # Run ai, ai mostly influences horizontal motion but can also rewrite vertical motion
-        if self.ai == RANDOM:
-            random_movement(self)
-        elif self.ai == FOLLOW:
-            follow_player(self, player_pos)
-
+        # Update position and check for collisions
         check_collisions(self.pos, self.dim, d)
         self.rect.topleft = self.pos
+
+        # Run ai, ai affects acceleration and velocity
+        self.ai()
+
+    # Code the ai here, either using combinations of preexisting
+    # ones, ore making a new one
+    def ai(self):
+        random_movement(self)
 
     # Take damage, return if we are dead or not
     def hit(self, damage, centerx):
@@ -82,9 +128,6 @@ class Entity:
 
     def can_spawn(self, conditions):
         return True
-
-    def get_move_type(self):
-        return self.ai in (RANDOM, FOLLOW)
 
 
 # Handles movement, checking for collisions with blocks
@@ -105,7 +148,7 @@ def check_collisions(pos, block_dim, d):
     to_next = [0, 0]
     blocks = o.world.blocks
     for i in range(2):
-        # Get current anc next block
+        # Get current and next block
         current_block[i] = int(pos[i] / BLOCK_W)
         current_block[i + 2] = ceil((pos[i] + px_dim[i]) / BLOCK_W) - 1
         next_block[i] = int((pos[i] + d[i]) / BLOCK_W)
@@ -180,73 +223,39 @@ def check_collisions(pos, block_dim, d):
             pos[idx2] += to_next[idx2]
 
 
-def touching_blocks_x(pos, rect, left):
+def touching_blocks_x(pos, dim, left):
+    # Get dimensions in pixels
+    w, h = dim[0] * BLOCK_W, dim[1] * BLOCK_W
     # Check if we are actually touching a new block (including non-solid)
-    touching = abs(pos[0] + (0 if left else rect.w)) % BLOCK_W <= .1
-    if touching:
+    if abs(pos[0] + (0 if left else w)) % BLOCK_W == 0:
         # Get next x block
-        next_x = int(rect.left / BLOCK_W) - 1 if left else ceil(rect.right / BLOCK_W)
+        next_x = int(pos[0] / BLOCK_W) - 1 if left else ceil((pos[0] + w) / BLOCK_W)
         # Check if we are going to the world edge
         if next_x < 0 if left else next_x >= o.world.dim[0]:
             return True
         # Otherwise check if there is a solid block
         else:
-            y_range = (int(rect.top / BLOCK_W), ceil(rect.bottom / BLOCK_W))
+            y_range = (int(pos[1] / BLOCK_W), ceil((pos[1] + h) / BLOCK_W))
             collide = o.world.blocks[y_range[0]:y_range[1], next_x].tolist()
             return collide.count(AIR) < len(collide)
     return False
 
 
-def touching_blocks_y(pos, rect, top):
+def touching_blocks_y(pos, dim, top):
+    # Get dimensions in pixels
+    w, h = dim[0] * BLOCK_W, dim[1] * BLOCK_W
     # Check if we are actually touching a new block (including non-solid)
-    diff = abs(pos[1] + (0 if top else rect.h)) % BLOCK_W
-    touching = diff <= .5 or diff >= BLOCK_W - .5
+    diff = abs(pos[1] + (0 if top else h)) % BLOCK_W
+    touching = diff == 0
     if touching:
         # Get next y block
-        next_y = int(pos[1] / BLOCK_W) - 1 if top else ceil(rect.bottom / BLOCK_W)
+        next_y = int(pos[1] / BLOCK_W) - 1 if top else ceil((pos[1] + h) / BLOCK_W)
         # Check if we are going to the world edge
         if next_y < 0 if top else next_y >= o.world.dim[1]:
             return True
         # Otherwise check if there is a solid block
         else:
-            x_range = (int(rect.left / BLOCK_W), ceil(rect.right / BLOCK_W))
+            x_range = (int(pos[0] / BLOCK_W), ceil((pos[0] + w) / BLOCK_W))
             collide = o.world.blocks[next_y, x_range[0]:x_range[1]].tolist()
             return collide.count(AIR) < len(collide)
     return False
-
-
-# Handles directionless movement, code = RANDOM
-def random_movement(entity):
-    # Check if we are standing on the ground
-    if touching_blocks_y(entity.pos, entity.rect, False):
-        # Check if we are ready to start/stop moving
-        if entity.time <= 0:
-            # We were stopped
-            if entity.a[0] == 0:
-                entity.a[0] = 1 if randint(0, 1) == 0 else -1
-                entity.time = randint(2500, 5000)
-            # We were moving
-            else:
-                entity.a[0] = 0
-                entity.time = randint(1000, 3000)
-        # Check if we need to jump
-        hit_wall = -1 if touching_blocks_x(entity.pos, entity.rect, True) else 1 if \
-            touching_blocks_x(entity.pos, entity.rect, False) else None
-        if hit_wall is not None:
-            entity.v[1] = -12
-            entity.a[0] = copysign(1, hit_wall)
-            entity.time = randint(1000, 3000)
-
-
-# Handles movement following the player, code = FOLLOW
-def follow_player(entity, player_pos):
-    if entity.time <= 0:
-        # Check if we are standing on the ground
-        if touching_blocks_y(entity.pos, entity.rect, False):
-            entity.a[0] = copysign(1, player_pos[0] - entity.rect.centerx)
-            # Check if we need to jump
-            hit_wall = -1 if touching_blocks_x(entity.pos, entity.rect, True) else 1 if \
-                touching_blocks_x(entity.pos, entity.rect, False) else None
-            if hit_wall is not None:
-                entity.v[1] = -12
-        entity.time = 0

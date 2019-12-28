@@ -1,7 +1,7 @@
 # Created on 5 December 2019
 
 from Player.Inventory import *
-from Objects.item_ids import *
+from Objects.DroppedItem import DroppedItem
 
 hotbar_controls = {
     K_1: 0, K_2: 1, K_3: 2, K_4: 3,
@@ -129,6 +129,70 @@ class PlayerInventory(Inventory):
             if item.amnt == 0:
                 return True
         return False
+
+    def get_all_items(self):
+        results = []
+        for row1, row2 in zip(self.inv_items, self.inv_amnts):
+            for item, amnt in zip(row1, row2):
+                if item == -1:
+                    continue
+                # Special conditions
+                if len(results) == 0 or results[-1][0] < item:
+                    results.append([item, amnt])
+                # Place item into results
+                else:
+                    i = 0
+                    while i < len(results) and results[i][0] < item:
+                        i += 1
+                    if results[i][0] == item:
+                        results[i][1] += amnt
+                    else:
+                        results.insert(i, [item, amnt])
+        return results
+
+    def craft(self, recipe):
+        # Get result
+        item, amnt = recipe[0]
+        # First try to have the player hold the item
+        if self.selected_item == -1:
+            self.selected_item = item
+            self.selected_amnt = amnt
+        # Then try to add it to whatever the player is holding
+        elif self.selected_item == item:
+            grab = min(amnt, o.items[item].max_stack - self.selected_amnt)
+            self.selected_amnt += grab
+            amnt -= grab
+        else:
+            # Finally try to put it into the inventory
+            item_obj = DroppedItem(item, amnt)
+            if not self.pick_up_item(item_obj):
+                # Drop whatever is left
+                o.player.drop_item(item_obj, True)
+        # Get the amounts of ingredients that are required
+        parts = [r.copy() for r in recipe[1:]]
+        # Remove ingredients
+        for y in range(self.dim[1]):
+            for x in range(self.dim[0]):
+                inv_item = self.inv_items[y][x]
+                if inv_item != -1:
+                    i = 0
+                    while i < len(parts):
+                        item, amnt = parts[i]
+                        if item == inv_item:
+                            # Remove the item
+                            transfer = min(self.inv_amnts[y][x], amnt)
+                            self.inv_amnts[y][x] -= transfer
+                            parts[i][1] -= transfer
+                            # Check if we need to update this item
+                            if transfer > 0:
+                                self.update_item(y, x)
+                            # Delete this item
+                            if parts[i][1] <= 0:
+                                del parts[i]
+                                if len(parts) == 0:
+                                    return
+                                i -= 1
+                        i += 1
 
     def new_inventory(self):
         data = bytearray(4 * self.dim[0] * self.dim[1])

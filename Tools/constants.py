@@ -2,9 +2,7 @@
 # Contains all constant values for the project
 
 # NO IMPORTING FROM INSIDE THIS PROJECT!!!!!!
-from pygame.font import SysFont
-from pygame.display import set_mode
-from pygame.locals import RESIZABLE
+import pygame as pg
 
 # Dimension Constants
 MIN_W, MIN_H = 800, 600
@@ -50,19 +48,33 @@ def load_fonts():
 
 
 def resize(w, h):
-    set_mode((max(w, MIN_W), max(h, MIN_H)), RESIZABLE).fill(BACKGROUND)
+    pg.display.set_mode((max(w, MIN_W), max(h, MIN_H)), pg.RESIZABLE).fill(BACKGROUND)
+
+
+# Resizes surface to fit within desired dimensions, keeping surface's w:h ratio
+def scale_to_fit(s, w=-1, h=-1):
+    if w == -1 and h == -1:
+        return s
+    dim = s.get_size()
+    if w == -1:
+        frac = h / dim[1]
+    elif h == -1:
+        frac = w / dim[0]
+    else:
+        frac = min(w / dim[0], h / dim[1])
+    return pg.transform.scale(s, (int(frac * dim[0]), int(frac * dim[1])))
 
 
 # Gets the biggest font that fits the text within max_w and max_h
 def get_scaled_font(max_w, max_h, text, font_name):
     font_size = 0
-    font = SysFont(font_name, font_size)
+    font = pg.font.SysFont(font_name, font_size)
     w, h = font.size(text)
     while (w < max_w or max_w == -1) and (h < max_h or max_h == -1):
         font_size += 1
-        font = SysFont(font_name, font_size)
+        font = pg.font.SysFont(font_name, font_size)
         w, h = font.size(text)
-    return SysFont(font_name, font_size - 1)
+    return pg.font.SysFont(font_name, font_size - 1)
 
 
 def wrap_text(string, font, w):

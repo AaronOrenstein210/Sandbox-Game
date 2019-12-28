@@ -9,6 +9,7 @@ from Tools import constants as c
 from Tools import objects as o
 from Objects.tile_ids import AIR
 from Player.PlayerInventory import PlayerInventory
+from Player.CraftingUI import CraftingUI
 from Player.Stats import Stats
 from NPCs.Entity import check_collisions, touching_blocks_y
 from NPCs.EntityHandler import EntityHandler
@@ -34,6 +35,8 @@ class Player:
         self.surface = pg.image.load("res/player/player_pig.png")
         dim = self.surface.get_size()
         self.dim = [1.5, 1.5 * dim[1] / dim[0]]
+        w = c.MAP_W // 15
+        self.sprite = pg.transform.scale(self.surface, [w, w * dim[1] // dim[0]])
         # Hit box
         self.rect = Rect(0, 0, BLOCK_W * self.dim[0], BLOCK_W * self.dim[1])
         self.surface = pg.transform.scale(self.surface, self.rect.size)
@@ -56,6 +59,8 @@ class Player:
         # Position of block with ui
         self.active_block = [0, 0]
         self.map_open = False
+        # Crafting UI
+        self.crafting_ui = CraftingUI(self)
 
     def load(self):
         with open("saves/players/" + self.name + ".plr", "rb+") as data_file:
@@ -114,6 +119,14 @@ class Player:
                         self.map_open = False
             world.move_map(keys)
         else:
+            # Check if we need to open or close the crafting menu
+            if self.inventory.open:
+                if self.active_ui is None:
+                    self.active_ui = self.crafting_ui
+            else:
+                if self.active_ui is self.crafting_ui:
+                    self.active_ui = None
+            # Send the events to the current active UI
             if self.active_ui is not None:
                 self.active_ui.process_events(events, mouse, keys)
 
@@ -133,7 +146,7 @@ class Player:
                         if up:
                             self.a[1] = 1
                         else:
-                            if touching_blocks_y(self.pos, self.rect, False):
+                            if touching_blocks_y(self.pos, self.dim, False):
                                 self.v[1] = -15
                     elif up and e.key == K_m:
                         self.map_open = True
@@ -169,11 +182,11 @@ class Player:
         elif self.use_time >= 0:
             self.use_time -= o.dt
 
-        self.handler.spawn(self.rect.center)
+        self.handler.spawn()
         # Update player and all entities/items/projectiles
         if self.can_move:
             self.move()
-        self.handler.move(self.rect.center)
+        self.handler.move()
         # Check if anything hit the player
         if self.immunity <= 0:
             dmg, entity_x = self.handler.check_hit_player(self.rect)
@@ -184,7 +197,8 @@ class Player:
         if self.map_open:
             display = pg.display.get_surface()
             display.fill(c.BACKGROUND)
-            map_ = world.get_map(display.get_size())
+            sprites = {(i / BLOCK_W for i in self.rect.center): self.sprite}
+            map_ = world.get_map(display.get_size(), sprites=sprites)
             map_rect = map_.get_rect(center=display.get_rect().center)
             display.blit(map_, map_rect)
         else:
@@ -266,10 +280,9 @@ class Player:
                 # Check if we dropped an item
                 drop = self.inventory.drop_item()
                 if drop is not None:
-                    item, amnt = drop
                     # This determines if we clicked to the left or right of the player
                     left = global_pos[0] < self.rect.centerx
-                    self.drop_item(item, amnt, self.rect.center, left)
+                    self.drop_item(DroppedItem(*drop), left)
             else:
                 item = self.inventory.get_held_item()
                 if item != -1:
@@ -297,9 +310,8 @@ class Player:
             o.world.destroy_block(block_x, block_y)
             drops = tile.get_drops()
             for drop in drops:
-                item, amnt = drop
                 # Drop an item
-                self.drop_item(item, amnt, block_rect.center, None)
+                self.drop_item(DroppedItem(*drop), None, pos_=block_rect.center)
             return True
         return False
 
@@ -317,10 +329,11 @@ class Player:
                 return True
         return False
 
-    def drop_item(self, item, amnt, pos_, left):
-        dropped = DroppedItem(item, amnt)
-        dropped.drop(pos_, left)
-        self.handler.items.append(dropped)
+    def drop_item(self, item_obj, left, pos_=None):
+        if pos_ is None:
+            pos_ = self.rect.center
+        item_obj.drop(pos_, left)
+        self.handler.items.append(item_obj)
 
     def pick_up(self, item):
         if self.collection_range.colliderect(item.rect):
@@ -366,7 +379,7 @@ class Player:
 
         # Draw block ui
         if self.active_ui is not None:
-            display.blit(self.active_ui.ui, self.active_ui.rect)
+            self.active_ui.draw()
 
         # Draw other UI
         life_text = str(self.stats.hp) + " / " + str(self.stats.max_hp) + " HP"
@@ -377,13 +390,14 @@ class Player:
         display.blit(text, text_rect)
 
         # Get minimap
-        minimap = o.world.get_minimap([i / BLOCK_W for i in self.rect.center])
+        player_c = [i / BLOCK_W for i in self.rect.center]
+        minimap = o.world.get_minimap(player_c, sprites={tuple(player_c): self.sprite})
         # Figure out where to place the player
-        x_frac = (self.rect.left - rect.left) / rect.w
-        y_frac = (self.rect.top - rect.top) / rect.h
-        img = pg.transform.scale(self.surface, (c.MAP_W // 15, c.MAP_W // 15))
+        # x_frac = (self.rect.left - rect.left) / rect.w
+        # y_frac = (self.rect.top - rect.top) / rect.h
+        # img = pg.transform.scale(self.surface, (c.MAP_W // 15, c.MAP_W // 15))
         # Draw everything
-        minimap.blit(img, (int(c.MAP_W * x_frac), int(c.MAP_W * y_frac)))
+        # minimap.blit(img, (int(c.MAP_W * x_frac), int(c.MAP_W * y_frac)))
         display.blit(minimap, (dim[0] - c.MAP_W, text_rect.h))
 
         # Draw selected item under cursor if there is one

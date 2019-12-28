@@ -16,7 +16,9 @@ class DroppedItem:
         self.item = o.items[item_id]
         self.max_stack = self.item.max_stack
         self.amnt = amnt
-        self.rect = pg.Rect(0, 0, ITEM_W, ITEM_W)
+        self.rect = pg.Rect((0, 0), self.item.image.get_size())
+        # Used to check for collisions with blocks
+        self.ratio = (self.rect.w / BLOCK_W, self.rect.h / BLOCK_W)
         # Movement variables
         self.pos = [0., 0.]
         self.v = [0., 0.]
@@ -35,9 +37,7 @@ class DroppedItem:
             self.v[0] = math.copysign(max(abs(self.v[0]) - 1, 0), self.v[0])
             self.v[1] += MAX_FALL_SPEED * dt / 2
             self.v[1] = min(self.v[1], MAX_FALL_SPEED / 2)
-
-            ratio = ITEM_W / BLOCK_W
-            check_collisions(self.pos, (ratio, ratio), d)
+            check_collisions(self.pos, self.ratio, d)
         else:
             self.pos = [self.pos[0] + d[0], self.pos[1] + d[1]]
         self.rect.topleft = self.pos

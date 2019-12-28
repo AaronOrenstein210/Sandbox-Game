@@ -1,8 +1,6 @@
 # Created on 9 December 2019
 
 import pygame as pg
-from pygame.locals import *
-from Tools import objects as o
 
 
 class ActiveUI:
@@ -20,3 +18,6 @@ class ActiveUI:
     # Set a specific key of button to be false if it shouldn't be used further
     def process_events(self, events, mouse, keys):
         return
+
+    def draw(self):
+        pg.display.get_surface().blit(self.ui, self.rect)

@@ -28,6 +28,19 @@ class Snow(Block):
         self.name = "Snow"
 
 
+class SnowBall(Item):
+    def __init__(self):
+        Item.__init__(self, items.SNOW_BALL, inv_img=INV + "snow_ball.png")
+        self.name = "Snow Ball"
+        self.max_stack = 99
+
+
+class WorkTable(Block):
+    def __init__(self):
+        Block.__init__(self, items.WORK_TABLE, tiles.WORK_TABLE, inv_img=INV + "work_table.png")
+        self.name = "Work Table"
+
+
 class CatSpawner(Block):
     def __init__(self):
         Block.__init__(self, items.CAT, tiles.CAT, inv_img=INV + "spawner_1.png")
@@ -38,6 +51,12 @@ class ZombieSpawner(Block):
     def __init__(self):
         Block.__init__(self, items.ZOMBIE, tiles.ZOMBIE, inv_img=INV + "spawner_2.png")
         self.name = "Zombie Spawner"
+
+
+class DoomBunny(Block):
+    def __init__(self):
+        Block.__init__(self, items.DOOM_BUNNY, tiles.DOOM_BUNNY, inv_img=INV + "spawner_3.png")
+        self.name = "Doom Bunny Spawner"
 
 
 class DimensionHopper(Block):

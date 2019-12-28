@@ -18,9 +18,9 @@ class EntityHandler:
         self.entities.clear()
         self.items.clear()
 
-    def move(self, player_pos):
+    def move(self):
         for entity in self.entities:
-            entity.move(player_pos)
+            entity.move()
         for item in self.items:
             item.move()
             if item.pick_up_immunity <= 0 and o.player.pick_up(item):
@@ -56,18 +56,19 @@ class EntityHandler:
                 return True
         return False
 
-    def spawn(self, player_pos):
+    def spawn(self):
         conditions = SpawnConditions()
         conditions.check_world()
-        player_pos = [i // BLOCK_W for i in player_pos]
+        player_pos = [i // BLOCK_W for i in o.player.rect.center]
         spawners = o.world.spawners
         for x in range(max(0, player_pos[0] - 50), min(o.world.dim[0], player_pos[0] + 50)):
             if x in spawners.keys():
                 for y in range(max(0, player_pos[1] - 50, min(o.world.dim[1], player_pos[1] + 50))):
-                    if y in spawners[x].keys() and randint(1, 10000) == 1:
-                        entity = o.tiles[spawners[x][y]].spawn((x, y), conditions)
-                        if entity is not None:
-                            self.entities.append(entity)
+                    if y in spawners[x].keys():
+                        if randint(1, 10000) == 1:
+                            entity = o.tiles[spawners[x][y]].spawn((x, y), conditions)
+                            if entity is not None:
+                                self.entities.append(entity)
 
 
 # Maybe used in future

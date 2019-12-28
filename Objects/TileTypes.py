@@ -4,9 +4,51 @@
 from random import random
 from Objects import INV
 from Objects.Tile import Tile
-from Tools.constants import BLOCK_W
+from Tools.constants import BLOCK_W, update_dict
 from Tools import objects as o
 from Objects.tile_ids import AIR
+
+
+class CraftingStation(Tile):
+    def __init__(self, idx, **kwargs):
+        Tile.__init__(self, idx, **kwargs)
+        self.crafting = True
+        self.recipes = self.get_recipes()
+        i = 0
+        # Optimize recipes and sort them
+        while i < len(self.recipes):
+            idxs = {}
+            r = self.recipes[i]
+            delete = False
+            j = 0
+            while not delete and j < len(r):
+                item, amnt = r[j]
+                # Repeat item, merge and delete
+                if item in idxs.keys():
+                    idx = idxs[item]
+                    if idx == 0:
+                        r[0][1] -= amnt
+                        # This recipe produces nothing, remove it
+                        if r[0][1] <= 0:
+                            delete = True
+                    else:
+                        r[idx][1] += amnt
+                    del r[j]
+                else:
+                    idxs[item] = j
+                    j += 1
+            if delete:
+                del self.recipes[i]
+            else:
+                # Sort recipe ingredients
+                ingredients = r[1:]
+                ingredients.sort(key=lambda arr: arr[0])
+                self.recipes[i] = [r[0]] + ingredients
+                del ingredients
+                i += 1
+
+    def get_recipes(self):
+        return []
 
 
 class SpawnTile(Tile):
@@ -16,7 +58,6 @@ class SpawnTile(Tile):
         self.rarity = self.test_entity.rarity
         Tile.__init__(self, idx, self.rarity, dim=dim,
                       img=INV + "spawner_" + str(self.rarity) + ".png")
-        self.name = self.test_entity.name + " Spawner"
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
 
@@ -24,7 +65,7 @@ class SpawnTile(Tile):
         conditions.check_area(pos, 5 * self.rarity)
         if not self.test_entity.can_spawn(conditions.conditions):
             return
-        air = get_spawn_spaces(pos, 5 * self.rarity, self.test_entity.get_move_type())
+        air = get_spawn_spaces(pos, 5 * self.rarity, True)
         places = find_valid_spawns(air, *self.test_entity.dim)
         if len(places) > 0:
             chances = []
@@ -50,11 +91,6 @@ def get_spawn_spaces(center, r, walking):
     v2_min, v2_max = max(0, center[1] - r), max(0, center[1] + r)
     air = {}
 
-    def add_val(v1_, v2_, val):
-        if v1_ not in air.keys():
-            air[v1_] = {}
-        air[v1_][v2_] = val
-
     blocks = o.world.blocks
     for v1 in range(v1_min, v1_max):
         air_count = 0
@@ -63,12 +99,12 @@ def get_spawn_spaces(center, r, walking):
             block = blocks[v2][v1] if walking else blocks[v1][v2]
             if block != AIR:
                 if air_count > 0:
-                    add_val(v1, v2 + air_count, air_count)
+                    update_dict(v1, v2 + air_count, air_count, air)
                 air_count = 0
             else:
                 air_count += 1
         if air_count > 0:
-            add_val(v1, v2 + air_count, air_count)
+            update_dict(v1, v2 + air_count, air_count, air)
     return air
 
 

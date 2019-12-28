@@ -5,7 +5,7 @@
 from os.path import isfile
 import pygame as pg
 from random import randint
-from Tools.constants import BLOCK_W
+from Tools.constants import BLOCK_W, scale_to_fit
 from Tools import objects as o
 from Objects.tile_ids import AIR
 
@@ -13,7 +13,6 @@ from Objects.tile_ids import AIR
 class Tile:
     def __init__(self, idx, hardness=0, img="", dim=(1, 1)):
         self.idx = idx
-        self.name = "No Name"
         self.hardness = hardness
         self.dim = dim
 
@@ -27,18 +26,24 @@ class Tile:
         self.animation = False
         # Must be placed on a surface
         self.on_surface = False
+        # Player can craft at this item
+        self.crafting = False
 
         # Minimap color, does not need to be unique
         self.map_color = (64, 64, 255)
         # Load image if given
-        self.image = pg.Surface((BLOCK_W, BLOCK_W))
+        img_dim = (BLOCK_W * dim[0], BLOCK_W * dim[1])
         if isfile(img):
-            self.image = pg.transform.scale(pg.image.load(img), (BLOCK_W * dim[0], BLOCK_W * dim[1]))
+            self.image = scale_to_fit(pg.image.load(img), *img_dim)
+        else:
+            self.image = pg.Surface(img_dim)
 
         # Number of bytes of data
         self.data_bytes = 0
         # List of drops, each drop is a item/amnt pair
         self.drops = []
+        # Recipes for crafting blocks
+        self.recipes = []
 
     # Return Animation object if tile has animation
     def get_animation(self):

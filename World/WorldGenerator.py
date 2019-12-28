@@ -19,27 +19,32 @@ class WorldGenerator:
         self.surface = []
 
     def generate(self, dim, biomes):
-        self.world.dim = dim
+        self.world.new_world(dim)
         self.surface = [-1] * dim[0]
-        self.world.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
         zones.set_world_heights(dim[1])
         # Generate biomes
-        x = 0
+        current = [-1, -1, -1]
         section_w = 100
         min_w, max_w = section_w * 9 // 10, section_w * 11 / 10
+        x = 0
         while x < dim[0]:
+            # Get random biome type and width
             if dim[0] - x >= section_w * 3 // 2:
                 dx = randint(min_w, max_w)
             else:
                 dx = dim[0] - x
             biome = choice(biomes)
-            if biome == FOREST:
-                self.forest(x, x + dx)
-            elif biome == MOUNTAIN:
-                self.mountains(x, x + dx)
-            elif biome == VALLEY:
-                self.valley(x, x + dx)
+            # If it is a new biome, generate the old biome and start a new entry
+            if current[0] != biome:
+                if current[0] != -1:
+                    self.generate_biome(*current)
+                current = [biome, x, dx]
+            # Otherwise increase the length of the biome
+            else:
+                current[2] += dx
             x += dx
+        self.generate_biome(*current)
+        self.add_snow()
         # Save file
         centerx = dim[0] // 2
         self.world.spawn = [centerx,
@@ -48,41 +53,32 @@ class WorldGenerator:
         CompleteTask(self.world.save_part, [2], loading_bar, ["Saving New World"],
                      can_exit=False).run_now()
 
-    def smooth(self, x, left):
-        next_x = x - 1 if left else x + 1
-        if 0 <= next_x < self.world.dim[0] and self.surface[next_x] != -1:
-            # Positive if we are higher, negative if lower
-            diff = self.surface[next_x] - self.surface[x]
-            if abs(diff) > 5:
-                # If the y diff is over 30 self.world.blocks, make y:x ratio bigger (steeper curve)
-                # 1 <= y/x <= 2.5
-                dx = int(abs(diff) / min(2, max(1, diff / 30)))
-                # The left side is higher if we are looking at our left side and
-                # We are smaller or the opposite
-                higher_left = (left and diff < 0) or (not left and diff >= 0)
-                if higher_left:
-                    # If we are using our right side, we need to use next x
-                    x_min = x if left else next_x
-                    x_max = min(self.world.dim[0], x + dx)
-                else:
-                    x_min = max(0, x - dx)
-                    # If we are using our right side, we need to use next_x
-                    x_max = x if left else next_x
-                dx = x_max - x_min
-                for x1 in range(+x_min, x_max):
-                    if self.surface[x1] == -1:
-                        break
-                    # Start high if higher left
-                    frac = (dx - abs(x1 - x_min) if higher_left else abs(x1 - x_min)) / dx
-                    dy = int(s_curve(frac) * abs(diff))
-                    self.fill_chunk(x1, 1, self.surface[x1], -dy, DIRT)
-                    self.surface[x1] -= dy
-                # Return new x
-                if left:
-                    return x if dx < 0 else x + dx
-                else:
-                    return x if dx >= 0 else x + dx
-        return x
+    def add_snow(self):
+        for x, y in enumerate(self.surface):
+            if zones.surface - y >= 20:
+                # Add some snow
+                chance = 25
+                while randint(1, 25) <= chance:
+                    self.world.blocks[y][x] = SNOW
+                    y += 1
+                    chance /= 1.5
+
+    # Wrapper for generating a specific biome
+    def generate_biome(self, biome, x, dx):
+        x2 = x + dx
+        if x >= self.world.dim[0] or x2 <= 0:
+            return
+        else:
+            if x < 0:
+                x = 0
+            if x2 > self.world.dim[0]:
+                x2 = self.world.dim[0]
+        if biome == FOREST:
+            self.forest(x, x2)
+        elif biome == MOUNTAIN:
+            self.mountains(x, x2)
+        elif biome == VALLEY:
+            self.valley(x, x2)
 
     # Smooth left boundary between biomes
     # X is the left-most index of the biome
@@ -155,6 +151,8 @@ class WorldGenerator:
             self.fill_chunk(x1 + dx, 1, self.world.dim[1], border - self.world.dim[1], STONE)
             if randint(1, 150) == 1:
                 self.world.blocks[surface + randint(1, 3)][x1 + dx] = CAT
+            elif randint(1, 100) == 1:
+                self.world.blocks[surface + randint(1, 4)][x1 + dx] = DOOM_BUNNY
 
         self.smooth_left(x1)
         self.smooth_right(x2 - 1)
@@ -170,12 +168,6 @@ class WorldGenerator:
             self.fill_chunk(x1 + dx, 1, border, surface - border, DIRT)
             self.surface[x1 + dx] = surface
             self.fill_chunk(x1 + dx, 1, self.world.dim[1], border - self.world.dim[1], STONE)
-            # Add some snow
-            chance, y = 25, surface
-            while randint(1, 25) <= chance:
-                self.world.blocks[y][x1 + dx] = SNOW
-                y -= 1
-                chance /= 1.5
 
         self.smooth_left(x1)
         self.smooth_right(x2 - 1)

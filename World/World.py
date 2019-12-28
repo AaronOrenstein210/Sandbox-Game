@@ -16,18 +16,20 @@ from World.WorldGenerator import WorldGenerator
 class World:
     def __init__(self, universe, name):
         # Visual variables
-        self.dim = [0, 0]
         self.surface = None
         self.map = None
         self.minimap_zoom = 2
         self.map_zoom = 1
         self.map_off = [0, 0]
         # World data
+        self.dim = [0, 0]
+        self.num_blocks = 0
         self.blocks = None
         self.spawn = [0, 0]
         self.spawners = {}
         self.animations = {}
         self.block_data = {}
+        self.crafters = {}
         # File variables
         self.universe = universe
         self.name = name
@@ -38,6 +40,11 @@ class World:
     @property
     def file(self):
         return "saves/universes/" + self.universe + "/" + self.name + ".wld"
+
+    def new_world(self, dim):
+        self.dim = dim
+        self.num_blocks = dim[0] * dim[1]
+        self.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
 
     # Load world
     def load_part(self, progress):
@@ -53,41 +60,58 @@ class World:
                     self.block_data.clear()
                     self.animations.clear()
                     self.dim = [int.from_bytes(data[:2], byteorder), int.from_bytes(data[2:4], byteorder)]
+                    self.num_blocks = self.dim[0] * self.dim[1]
                     self.spawn = (int.from_bytes(data[4:6], byteorder), int.from_bytes(data[6:8], byteorder))
                     self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
                     self.current_byte = 8
-                # Get current height and data for that row
-                current_y = int(progress * self.dim[1])
                 data = data[self.current_byte:]
+                # Get current row and column and the blocks left to load
+                current_block = int(progress * self.num_blocks)
+                col, row = current_block % self.dim[0], current_block // self.dim[0]
+                blocks_left = math.ceil(self.num_blocks / 100)
                 # Write data to array
-                num_rows = math.ceil(self.dim[1] / 100)
-                for y in range(current_y, min(current_y + num_rows, self.dim[1])):
-                    for x in range(self.dim[0]):
-                        # Extract tile id
-                        val = int.from_bytes(data[:2], byteorder)
-                        data = data[2:]
-                        self.current_byte += 2
-                        if val != AIR:
-                            tile = tiles[val]
+                while blocks_left > 0:
+                    # Extract tile id and number of tiles
+                    val = int.from_bytes(data[:2], byteorder)
+                    num = int.from_bytes(data[2:4], byteorder)
+                    data = data[4:]
+                    self.current_byte += 4
+                    # Make sure we don't go over the row
+                    if col + num > self.dim[0]:
+                        num = self.dim[0] - col
+                    if val != AIR:
+                        tile = tiles[val]
+                        # If the block has a width > 1, there is automatically only one block in this strip
+                        if tile.dim[0] != 1:
                             # Save multiblock parts
-                            for dy in range(tile.dim[1]):
-                                for dx in range(tile.dim[0]):
-                                    self.blocks[y + dy][x + dx] = -(dx * 100 + dy)
-                            self.blocks[y][x] = val
-                            # Save it if it is a spawner
-                            if tile.spawner:
-                                c.update_dict(x, y, val, self.spawners)
-                            if tile.animation:
-                                anim = tile.get_animation()
-                                if anim is not None:
-                                    c.update_dict(x, y, tile.get_animation(), self.animations)
-                            # Check if we should be loading extra data
-                            num_bytes = tile.data_bytes
-                            if num_bytes > 0:
-                                c.update_dict(x, y, data[:num_bytes], self.block_data)
+                            for dr in range(tile.dim[1]):
+                                for dc in range(tile.dim[0]):
+                                    self.blocks[row + dr][col + dc] = -(dr * 100 + dc)
+                        self.blocks[row][col:col + num] = [val] * num
+                        # Check if we should be loading extra data
+                        num_bytes = tile.data_bytes
+                        has_bytes = num_bytes > 0
+                        # Loop through every block
+                        for col1 in range(col, col + num):
+                            # Add the block to applicable lists
+                            self.add_block(col1, row, val)
+                            # Load extra data if the block has any
+                            if has_bytes:
+                                c.update_dict(col1, row, data[:num_bytes], self.block_data)
                                 data = data[num_bytes:]
                                 self.current_byte += num_bytes
-                return (y + 1) / self.dim[1]
+                    # Update our column and blocks left
+                    blocks_left -= num
+                    col += num
+                    # Check if we made it to the next row
+                    if col >= self.dim[0]:
+                        col %= self.dim[0]
+                        row += 1
+                        # Check if we hit the end of the map
+                        if row >= self.dim[1]:
+                            return 1
+                return (row * self.dim[0] + col) / self.num_blocks
+        return
 
     # Save world
     def save_part(self, progress, num_rows):
@@ -101,36 +125,83 @@ class World:
                     file.write(self.dim[1].to_bytes(2, byteorder))
                     file.write(self.spawn[0].to_bytes(2, byteorder))
                     file.write(self.spawn[1].to_bytes(2, byteorder))
-                # Save the requested rows
-                y = int(progress * self.dim[1])
-                for dy, row in enumerate(self.blocks[y: min(y + num_rows, self.dim[1])]):
-                    for x, val in enumerate(row):
-                        # Save the tile id
-                        val = int(val)
-                        if val < 0 or val == AIR:
-                            file.write(AIR.to_bytes(2, byteorder))
-                            continue
+                # Get current block along with rows and columns to save
+                block_num = int(progress * self.num_blocks)
+                col, row = block_num % self.dim[0], block_num // self.dim[0]
+                blocks_left = int(num_rows * self.dim[0])
+                while blocks_left > 0:
+                    # Save the tile id
+                    val = int(self.blocks[row][col])
+                    col1 = col + 1
+                    # Keep going until we hit a new tile or the end of the row
+                    # This ignores blocks_left so we can store the entire strip of this block type
+                    while col1 < self.dim[0]:
+                        val1 = self.blocks[row][col1]
+                        if val != val1 and (val > 0 or val1 > 0):
+                            break
+                        col1 += 1
+                    num_byte = (col1 - col).to_bytes(2, byteorder)
+                    # Need to skip checking bytes in case val < 0
+                    if val < 0 or val == AIR:
+                        file.write(AIR.to_bytes(2, byteorder))
+                        file.write(num_byte)
+                    else:
+                        # Write data
                         file.write(val.to_bytes(2, byteorder))
+                        file.write(num_byte)
                         # Write any extra data
                         num_extra = tiles[val].data_bytes
                         if num_extra > 0:
-                            # We have to write the correct number of bytes no matter what
-                            # Bad block data is better than bad world data
-                            bytes_ = c.get_from_dict(x, y + dy, self.block_data)
-                            # Create a new bytearray
-                            if bytes_ is None:
-                                bytes_ = bytearray(num_extra)
-                            else:
-                                length = len(bytes_)
-                                # Cut off extra bytes
-                                if length > num_extra:
-                                    bytes_ = bytes_[:num_extra]
-                                # Add extra bytes
-                                elif length < num_extra:
-                                    bytes_ += (0).to_bytes(num_extra - length, byteorder)
-                            file.write(bytes_)
-                return (y + num_rows) / self.dim[1]
+                            # Write it for each block
+                            for x in range(col, col1):
+                                # We have to write the correct number of bytes no matter what
+                                # Bad block data is better than bad world data
+                                bytes_ = c.get_from_dict(x, row, self.block_data)
+                                # Create a new bytearray
+                                if bytes_ is None:
+                                    bytes_ = bytearray(num_extra)
+                                else:
+                                    length = len(bytes_)
+                                    # Cut off extra bytes
+                                    if length > num_extra:
+                                        bytes_ = bytes_[:num_extra]
+                                    # Add extra bytes
+                                    elif length < num_extra:
+                                        bytes_ += (0).to_bytes(num_extra - length, byteorder)
+                                file.write(bytes_)
+                    # Now that we are done, update our column and blocks left
+                    blocks_left -= col1 - col
+                    col = col1
+                    # Check if we made it to the next row
+                    if col >= self.dim[0]:
+                        col %= self.dim[0]
+                        row += 1
+                        # Check if we hit the end of the map
+                        if row >= self.dim[1]:
+                            return 1
+                return (row * self.dim[0] + col) / self.num_blocks
         return 1
+
+    # Update dictionaries
+    def add_block(self, x, y, idx):
+        tile = o.tiles[idx]
+        if tile.spawner:
+            c.update_dict(x, y, idx, self.spawners)
+        if tile.crafting:
+            c.update_dict(x, y, idx, self.crafters)
+        if tile.animation:
+            anim = tile.get_animation()
+            if anim is not None:
+                c.update_dict(x, y, anim, self.animations)
+
+    def remove_block(self, x, y, idx):
+        tile = o.tiles[idx]
+        if tile.spawner:
+            c.remove_from_dict(x, y, self.spawners)
+        if tile.crafting:
+            c.remove_from_dict(x, y, self.crafters)
+        if tile.animation:
+            c.remove_from_dict(x, y, self.animations)
 
     # Multiblocks whose topleft is off screen won't update
     # Go through all x/y and check if x+w is on screen (same for y)
@@ -150,13 +221,15 @@ class World:
         dim = pg.display.get_surface().get_size()
         rect = Rect(0, 0, dim[0], dim[1])
         rect.center = player_pos
+        topleft = list(rect.topleft)
         for i in (0, 1):
-            if rect.topleft[i] < 0:
-                rect.topleft[i] = 0
+            if topleft[i] < 0:
+                topleft[i] = 0
             else:
                 ub = self.dim[i] * c.BLOCK_W - dim[i]
-                if rect.topleft[i] > ub:
-                    rect.topleft[i] = ub
+                if topleft[i] > ub:
+                    topleft[i] = ub
+        rect.topleft = topleft
         return rect
 
     def draw_blocks(self):
@@ -191,10 +264,7 @@ class World:
         self.surface.fill(SRCALPHA, block_rect)
         pg.draw.rect(self.map, (64, 64, 255), (x, y, *tile.dim))
         # Update data
-        if tile.spawner:
-            c.remove_from_dict(x, y, self.spawners)
-        if tile.animation:
-            c.remove_from_dict(x, y, self.animations)
+        self.remove_block(x, y, tile.idx)
 
     def place_block(self, x, y, block):
         tile = o.tiles[block]
@@ -203,12 +273,8 @@ class World:
         self.blocks[y][x] = block
         self.surface.blit(o.tiles[block].image, (x * c.BLOCK_W, y * c.BLOCK_W))
         pg.draw.rect(self.map, tile.map_color, (x, y, *tile.dim))
-        if tile.spawner:
-            c.update_dict(x, y, block, self.spawners)
-        if tile.animation:
-            anim = tile.get_animation()
-            if anim is not None:
-                c.update_dict(x, y, anim, self.animations)
+        # Update data
+        self.add_block(x, y, block)
 
     def get_topleft(self, x, y):
         if 0 <= x < self.dim[0] and 0 <= y < self.dim[1]:
@@ -250,26 +316,29 @@ class World:
         return False
 
     def adjacent(self, x, y, w, h, tile, only):
-        if only:
-            if not 1 <= x < self.dim[0] - w + 1 or not 1 <= y < self.dim[1] - h + 1:
-                return False
-        else:
-            # lb must be >= 0, If ub < 0 then d is now <= 0
-            if x < 1:
-                w += x - 1
-                x = 1
-            if y < 1:
-                h += y - 1
-                y = 1
-            # ub must be < world size, if lb > world size then d is now <= 0
-            if x + w > self.dim[0] - 1:
-                w = self.dim[0] - x - 1
-            if y + h > self.dim[1] - 1:
-                h = self.dim[1] - y - 1
-            if w < 0 or h < 0:
-                return False
+        left, top, right, bot = True, True, True, True
+        # lb must be >= 0, If ub < 0 then d is now <= 0
+        if x < 1:
+            w += x - 1
+            x = 1
+            left = False
+        if y < 1:
+            h += y - 1
+            y = 1
+            top = False
+        # ub must be < world size, if lb > world size then d is now <= 0
+        if x + w > self.dim[0] - 1:
+            w = self.dim[0] - x - 1
+            right = False
+        if y + h > self.dim[1] - 1:
+            h = self.dim[1] - y - 1
+            bot = False
+        if not (left or right) or not (top or bot):
+            return False
         # Iterate through relevant data
-        data = self.blocks[y:y + h, (x - 1, x + w + 1)].flatten() + self.blocks[(y - 1, y + h + 1), x:x + w].flatten()
+        x_points = ([x - 1] if left else []) + ([x + w] if right else [])
+        y_points = ([y - 1] if top else []) + ([y + h] if bot else [])
+        data = self.blocks[y:y + h + 1, x_points].flatten() + self.blocks[y_points, x:x + w + 1].flatten()
         for val in data:
             equal = val == tile
             if only and not equal:
@@ -278,7 +347,7 @@ class World:
                 return True
         return only
 
-    def get_map(self, dim):
+    def get_map(self, dim, sprites=None):
         dim = [min(dim[i], self.dim[i] * self.map_zoom) for i in (0, 1)]
         # Get map width in terms of blocks
         block_dim = (dim[0] / self.map_zoom, dim[1] / self.map_zoom)
@@ -302,9 +371,12 @@ class World:
         off_x, off_y = int((left - b_left) * self.map_zoom), int((top - b_top) * self.map_zoom)
         s2 = pg.Surface(dim)
         s2.blit(s1, (0, 0), area=((off_x, off_y), dim))
+        if sprites is not None:
+            rect = pg.Rect(b_left * self.map_zoom + off_x, b_top * self.map_zoom + off_y, *dim)
+            draw_sprites(s2, rect, self.map_zoom, sprites)
         return s2
 
-    def get_minimap(self, center):
+    def get_minimap(self, center, sprites=None):
         from Tools.constants import MAP_W
         # Get map width in terms of blocks
         block_w = MAP_W / self.minimap_zoom
@@ -323,6 +395,9 @@ class World:
         off_x, off_y = int((left - b_left) * self.minimap_zoom), int((top - b_top) * self.minimap_zoom)
         s2 = pg.Surface((MAP_W, MAP_W))
         s2.blit(s1, (0, 0), area=(off_x, off_y, MAP_W, MAP_W))
+        if sprites is not None:
+            rect = pg.Rect(b_left * self.minimap_zoom + off_x, b_top * self.minimap_zoom + off_y, MAP_W, MAP_W)
+            draw_sprites(s2, rect, self.minimap_zoom, sprites)
         return s2
 
     def move_map(self, keys):
@@ -334,3 +409,14 @@ class World:
             self.map_off[1] -= o.dt / 10
         elif keys[K_s]:
             self.map_off[1] += o.dt / 10
+
+
+def draw_sprites(surface, rect, zoom, sprites):
+    for key in sprites.keys():
+        pos = [int(p * zoom) for p in key]
+        if rect.collidepoint(*pos):
+            pos[0] -= rect.x
+            pos[1] -= rect.y
+            img = sprites[key]
+            img_rect = img.get_rect(center=pos)
+            surface.blit(img, img_rect)

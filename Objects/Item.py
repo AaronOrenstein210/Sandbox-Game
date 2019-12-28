@@ -4,7 +4,7 @@
 from os.path import isfile
 import math
 import pygame as pg
-from Tools.constants import ITEM_W, INV_IMG_W
+from Tools.constants import ITEM_W, INV_IMG_W, scale_to_fit
 from Tools.collision import Polygon
 from Tools import objects as o
 from Objects.tile_ids import AIR
@@ -35,17 +35,15 @@ class Item:
         self.left_click, self.right_click = True, False
 
         # Used for inventories
-        self.inv_img = pg.Surface((INV_IMG_W, INV_IMG_W))
         if isfile(inv_img):
-            self.inv_img = pg.transform.scale(pg.image.load(inv_img), (INV_IMG_W, INV_IMG_W))
+            self.inv_img = scale_to_fit(pg.image.load(inv_img), INV_IMG_W, INV_IMG_W)
+        else:
+            self.inv_img = pg.Surface((INV_IMG_W, INV_IMG_W))
         # Used for item use animations and dropped items
         if isfile(use_img):
-            self.image = pg.image.load(use_img)
-            size = self.image.get_size()
-            frac = ITEM_W / min(size)
-            self.image = pg.transform.scale(self.image, (int(frac * size[0]), int(frac * size[1])))
+            self.image = scale_to_fit(pg.image.load(use_img), w=ITEM_W)
         else:
-            self.image = pg.transform.scale(self.inv_img, (ITEM_W, ITEM_W))
+            self.image = scale_to_fit(self.inv_img, ITEM_W, ITEM_W)
         # Used for blocks
         self.block_id = AIR
         # Attack box, if applicable

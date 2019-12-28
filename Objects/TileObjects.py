@@ -1,11 +1,10 @@
 # Created on 4 December 2019
 
-from sys import byteorder
 import pygame as pg
 from pygame.locals import *
 from Objects.TileTypes import *
 from Objects.Animation import Animation
-from Objects import item_ids as items, tile_ids as tiles
+from Objects import item_ids as i, tile_ids as t
 from NPCs import Mobs as mobs
 from Player.ActiveUI import ActiveUI
 from Tools import constants as c
@@ -17,49 +16,69 @@ from UI.Operations import TextInput
 
 class Air(Tile):
     def __init__(self):
-        Tile.__init__(self, tiles.AIR)
+        Tile.__init__(self, t.AIR)
 
 
 class Dirt(Tile):
     def __init__(self):
-        Tile.__init__(self, tiles.DIRT, hardness=1, img=INV + "dirt.png")
-        self.add_drop(items.DIRT, 1)
+        Tile.__init__(self, t.DIRT, hardness=1, img=INV + "dirt.png")
+        self.add_drop(i.DIRT, 1)
         self.map_color = (150, 75, 0)
 
 
 class Stone(Tile):
     def __init__(self):
-        Tile.__init__(self, tiles.STONE, hardness=2, img=INV + "stone.png")
-        self.add_drop(items.STONE, 1)
+        Tile.__init__(self, t.STONE, hardness=2, img=INV + "stone.png")
+        self.add_drop(i.STONE, 1)
         self.map_color = (200, 200, 200)
 
 
 class Snow(Tile):
     def __init__(self):
-        Tile.__init__(self, tiles.SNOW, hardness=1, img=INV + "snow.png")
-        self.add_drop(items.SNOW, 1)
+        Tile.__init__(self, t.SNOW, hardness=1, img=INV + "snow.png")
+        self.add_drop(i.SNOW_BALL, 2, 5)
         self.map_color = (255, 255, 255)
+
+
+class WorkTable(CraftingStation):
+    def __init__(self):
+        CraftingStation.__init__(self, t.WORK_TABLE, dim=(2, 1), img=INV + "work_table.png")
+        self.on_surface = True
+        self.map_color = (54, 78, 154)
+        self.add_drop(i.WORK_TABLE, 1)
+
+    def get_recipes(self):
+        return [[[i.SNOW, 1], [i.SNOW_BALL, 4]],
+                [[i.FOREST, 1], [i.DIRT, 50], [i.CAT, 1]],
+                [[i.MOUNTAIN, 1], [i.STONE, 10], [i.SNOW, 15]],
+                [[i.VALLEY, 1], [i.STONE, 50], [i.ZOMBIE, 1]]]
 
 
 class CatSpawner(SpawnTile):
     def __init__(self):
-        SpawnTile.__init__(self, tiles.CAT, mobs.Cat)
-        self.add_drop(items.CAT, 1)
+        SpawnTile.__init__(self, t.CAT, mobs.Cat)
+        self.add_drop(i.CAT, 1)
 
 
 class ZombieSpawner(SpawnTile):
     def __init__(self):
-        SpawnTile.__init__(self, tiles.ZOMBIE, mobs.Zombie)
-        self.add_drop(items.ZOMBIE, 1)
+        SpawnTile.__init__(self, t.ZOMBIE, mobs.Zombie)
+        self.add_drop(i.ZOMBIE, 1)
+
+
+class DoomBunnySpawner(SpawnTile):
+    def __init__(self):
+        SpawnTile.__init__(self, t.DOOM_BUNNY, mobs.DoomBunny)
+        self.add_drop(i.DOOM_BUNNY, 1)
 
 
 class DimensionHopper(Tile):
     def __init__(self):
-        Tile.__init__(self, tiles.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png")
+        Tile.__init__(self, t.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png")
         self.has_ui = True
         self.clickable = True
         self.scroller = None
-        self.add_drop(items.DIMENSION_HOPPER, 1)
+        self.add_drop(i.DIMENSION_HOPPER, 1)
         self.map_color = (0, 0, 0)
 
     def activate(self, pos):
@@ -117,13 +136,13 @@ class WorldBuilder(Tile):
     INV_DIM = (4, 2)
 
     def __init__(self):
-        Tile.__init__(self, tiles.WORLD_BUILDER, img=INV + "world_builder_0.png")
+        Tile.__init__(self, t.WORLD_BUILDER, img=INV + "world_builder_0.png")
         self.animation = True
         self.has_ui = True
         self.clickable = True
         self.on_surface = True
         self.data_bytes = 4 * self.INV_DIM[0] * self.INV_DIM[1]
-        self.add_drop(items.WORLD_BUILDER, 1)
+        self.add_drop(i.WORLD_BUILDER, 1)
         self.map_color = (0, 0, 0)
 
     def get_animation(self):
@@ -142,7 +161,7 @@ class WorldBuilder(Tile):
     def on_break(self, pos):
         data = c.get_from_dict(*pos, o.world.block_data)
         if data is not None:
-            # Check if we have any items
+            # Check if we have any i
             for byte in data:
                 if byte != 0:
                     return False
@@ -151,9 +170,9 @@ class WorldBuilder(Tile):
         return True
 
     class UI(ActiveUI):
-        biomes = {items.FOREST: wg.FOREST,
-                  items.MOUNTAIN: wg.MOUNTAIN,
-                  items.VALLEY: wg.VALLEY}
+        biomes = {i.FOREST: wg.FOREST,
+                  i.MOUNTAIN: wg.MOUNTAIN,
+                  i.VALLEY: wg.VALLEY}
 
         def __init__(self, pos, data):
             from Player.Inventory import Inventory
@@ -225,12 +244,12 @@ class Chest(Tile):
     INV_DIM = (10, 5)
 
     def __init__(self):
-        Tile.__init__(self, tiles.CHEST, hardness=1, img=INV + "chest.png", dim=(2, 2))
+        Tile.__init__(self, t.CHEST, hardness=1, img=INV + "chest.png", dim=(2, 2))
         self.has_ui = True
         self.clickable = True
         self.on_surface = True
         self.data_bytes = 4 * self.INV_DIM[0] * self.INV_DIM[1]
-        self.add_drop(items.CHEST, 1)
+        self.add_drop(i.CHEST, 1)
         self.map_color = (200, 200, 0)
 
     def on_place(self, pos):
@@ -240,7 +259,7 @@ class Chest(Tile):
     def on_break(self, pos):
         data = c.get_from_dict(*pos, o.world.block_data)
         if data is not None:
-            # Check if we have any items
+            # Check if we have any i
             for byte in data:
                 if byte != 0:
                     return False

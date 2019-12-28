@@ -31,8 +31,11 @@ def load_files(what):
             if name.endswith(".plr"):
                 data.append(trim_file_name(name))
         else:
-            if isdir(path + name) and isfile(path + name + "/" + name + ".wld"):
-                data.append(name)
+            if isdir(path + name):
+                if isfile(path + name + "/" + name + ".wld"):
+                    data.append(name)
+                else:
+                    rmtree(path + name)
     return data
 
 
