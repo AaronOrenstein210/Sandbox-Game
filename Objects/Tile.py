@@ -8,10 +8,12 @@ from random import randint
 from Tools.constants import BLOCK_W, scale_to_fit
 from Tools import objects as o
 from Objects.tile_ids import AIR
+from Objects.ItemTypes import Block
 
 
 class Tile:
-    def __init__(self, idx, hardness=0, img="", dim=(1, 1)):
+    def __init__(self, idx, hardness=0, img="", dim=(1, 1),
+                 item_idx=0, item_name="", item_img=""):
         self.idx = idx
         self.hardness = hardness
         self.dim = dim
@@ -44,6 +46,18 @@ class Tile:
         self.drops = []
         # Recipes for crafting blocks
         self.recipes = []
+
+        # Add tile to list
+        o.tiles[self.idx] = self
+        # Add corresponding item to list
+        if item_img == "":
+            item_img = img
+        self.create_item(item_idx, item_img, item_name)
+
+    # Creates a generic item whiche places this block and shares this block's image resource
+    # You can just create a generic block item or create a custom class and instantiate it
+    def create_item(self, idx, img, name):
+        Block(idx, self.idx, inv_img=img, name=name)
 
     # Return Animation object if tile has animation
     def get_animation(self):

@@ -1,87 +1,49 @@
 # Created on 3 December 2019
 
-import pygame as pg
 from pygame.locals import *
-from Objects import INV, USE, item_ids as items, tile_ids as tiles
+from Objects import INV, USE, item_ids as items
 from Objects.ItemTypes import *
 from Tools.constants import *
+from Tools import objects as o
 from World.World import World
 from World.WorldGenerator import get_random_biome
 from Player.ActiveUI import ActiveUI
+from NPCs.Mobs import Dragon
 
 
-class Dirt(Block):
-    def __init__(self):
-        Block.__init__(self, items.DIRT, tiles.DIRT, inv_img=INV + "dirt.png")
-        self.name = "Dirt"
-
-
-class Stone(Block):
-    def __init__(self):
-        Block.__init__(self, items.STONE, tiles.STONE, inv_img=INV + "stone.png")
-        self.name = "Stone"
-
-
-class Snow(Block):
-    def __init__(self):
-        Block.__init__(self, items.SNOW, tiles.SNOW, inv_img=INV + "snow.png")
-        self.name = "Snow"
-
+# Don't create items that place blocks here, see the tile class
+# for implementing blocks
 
 class SnowBall(Item):
     def __init__(self):
-        Item.__init__(self, items.SNOW_BALL, inv_img=INV + "snow_ball.png")
-        self.name = "Snow Ball"
+        Item.__init__(self, items.SNOW_BALL, inv_img=INV + "snow_ball.png", name="Snow Ball")
         self.max_stack = 99
 
 
-class WorkTable(Block):
+class DragonClaw(Item):
     def __init__(self):
-        Block.__init__(self, items.WORK_TABLE, tiles.WORK_TABLE, inv_img=INV + "work_table.png")
-        self.name = "Work Table"
+        Item.__init__(self, items.DRAGON_CLAW, inv_img=INV + "dragon_claw.png", name="Dragon Claw")
+        self.consumable = True
 
-
-class CatSpawner(Block):
-    def __init__(self):
-        Block.__init__(self, items.CAT, tiles.CAT, inv_img=INV + "spawner_1.png")
-        self.name = "Cat Spawner"
-
-
-class ZombieSpawner(Block):
-    def __init__(self):
-        Block.__init__(self, items.ZOMBIE, tiles.ZOMBIE, inv_img=INV + "spawner_2.png")
-        self.name = "Zombie Spawner"
-
-
-class DoomBunny(Block):
-    def __init__(self):
-        Block.__init__(self, items.DOOM_BUNNY, tiles.DOOM_BUNNY, inv_img=INV + "spawner_3.png")
-        self.name = "Doom Bunny Spawner"
-
-
-class DimensionHopper(Block):
-    def __init__(self):
-        Block.__init__(self, items.DIMENSION_HOPPER, tiles.DIMENSION_HOPPER, inv_img=INV + "dimension_hopper.png")
-        self.name = "Dimension Hopper"
-
-
-class WorldBuilder(Block):
-    def __init__(self):
-        Block.__init__(self, items.WORLD_BUILDER, tiles.WORLD_BUILDER, inv_img=INV + "world_builder_0.png")
-        self.name = "World Builder"
+    def on_left_click(self):
+        d = Dragon()
+        d.set_pos(o.player.pos[0] + randint(15, 30) * BLOCK_W * random_sign(),
+                  o.player.pos[1] + randint(15, 30) * BLOCK_W * random_sign())
+        o.player.handler.entities.append(d)
 
 
 class DimensionCreator(Item):
     def __init__(self):
-        Item.__init__(self, items.DIMENSION_CREATOR, inv_img=INV + "dimension_creator.png",
-                      use_img=USE + "dimension_creator.png")
-        self.name = "Dimension Creator"
+        Item.__init__(self, items.DIMENSION_CREATOR, inv_img=INV + "dimension_creator.png", name="Dimension Creator")
         self.consumable = True
         self.has_ui = True
         self.get_input = None
 
+    def on_left_click(self):
+        pass
+
     def on_tick(self):
-        return
+        pass
 
     class UI(ActiveUI):
         def __init__(self):
@@ -106,8 +68,8 @@ class DimensionCreator(Item):
 
 class Dematerializer(Item):
     def __init__(self):
-        Item.__init__(self, items.DEMATERIALIZER, inv_img=INV + "dematerializer.png")
-        self.name = "Dematerializer"
+        Item.__init__(self, items.DEMATERIALIZER, inv_img=INV + "dematerializer.png",
+                      name="Dematerializer")
         self.use_time = 1000
 
     def on_left_click(self):
@@ -130,8 +92,7 @@ class Dematerializer(Item):
 
 class TimeWarp(Item):
     def __init__(self):
-        Item.__init__(self, items.TIME_WARP, inv_img=INV + "time_warp.png")
-        self.name = "Time Warp"
+        Item.__init__(self, items.TIME_WARP, inv_img=INV + "time_warp.png", name="Time Warp")
         self.right_click = True
 
     def on_tick(self):
@@ -146,39 +107,28 @@ class TimeWarp(Item):
 
 class ForestBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.FOREST, inv_img=INV + "forest.png")
-        self.name = "Forest Biome"
+        Item.__init__(self, items.FOREST, inv_img=INV + "forest.png", name="Forest Biome")
 
 
 class MountainBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.MOUNTAIN, inv_img=INV + "mountain.png")
-        self.name = "Mountain Biome"
+        Item.__init__(self, items.MOUNTAIN, inv_img=INV + "mountain.png", name="Mountain Biome")
 
 
 class ValleyBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.VALLEY, inv_img=INV + "valley.png")
-        self.name = "Valley Biome"
+        Item.__init__(self, items.VALLEY, inv_img=INV + "valley.png", name="Valley Biome")
 
 
 class TestSword(Weapon):
     def __init__(self):
         Weapon.__init__(self, items.TEST_SWORD, damage=15, damage_type=MELEE,
-                        inv_img=INV + "test_sword.png", use_img=USE + "test_sword.png")
-        self.name = "Test Sword"
+                        inv_img=INV + "test_sword.png", use_img=USE + "test_sword.png", name="Test Sword")
 
 
 class TestPickaxe(Weapon):
     def __init__(self):
         Weapon.__init__(self, items.TEST_PICKAXE, damage=5, damage_type=MELEE,
-                        inv_img=INV + "test_pickaxe.png", use_img=USE + "test_pickaxe.png")
-        self.name = "Test Pickaxe"
+                        inv_img=INV + "test_pickaxe.png", use_img=USE + "test_pickaxe.png", name="Test Pickaxe")
         self.auto_use = True
         self.breaks_blocks = True
-
-
-class Chest(Block):
-    def __init__(self):
-        Block.__init__(self, items.CHEST, tiles.CHEST, inv_img=INV + "chest.png")
-        self.name = "Chest"

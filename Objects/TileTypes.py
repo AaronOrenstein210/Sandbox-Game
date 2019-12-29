@@ -52,12 +52,14 @@ class CraftingStation(Tile):
 
 
 class SpawnTile(Tile):
-    def __init__(self, idx, entity, dim=(1, 1)):
+    def __init__(self, idx, entity, **kwargs):
         self.entity = entity
         self.test_entity = entity()
         self.rarity = self.test_entity.rarity
-        Tile.__init__(self, idx, self.rarity, dim=dim,
-                      img=INV + "spawner_" + str(self.rarity) + ".png")
+        # Spawner image defaults based on entity rarity
+        if "img" not in kwargs.keys():
+            kwargs["img"] = INV + "spawner_" + str(self.rarity) + ".png"
+        Tile.__init__(self, idx, self.rarity, **kwargs)
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
 

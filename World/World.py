@@ -76,6 +76,9 @@ class World:
                     num = int.from_bytes(data[2:4], byteorder)
                     data = data[4:]
                     self.current_byte += 4
+                    # Tile defaults to air if it doesn't exist
+                    if val not in tiles.keys():
+                        val = AIR
                     # Make sure we don't go over the row
                     if col + num > self.dim[0]:
                         num = self.dim[0] - col
@@ -251,7 +254,9 @@ class World:
             return (y + 1) / self.dim[1]
 
         self.surface.fill(SRCALPHA)
-        CompleteTask(draw_row, [], percent, ["Drawing World"]).run_now()
+        if not CompleteTask(draw_row, [], percent, ["Drawing World"]).run_now():
+            pg.quit()
+            exit(0)
 
     def destroy_block(self, x, y):
         x, y = self.get_topleft(x, y)

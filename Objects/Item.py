@@ -11,8 +11,8 @@ from Objects.tile_ids import AIR
 
 
 class Item:
-    def __init__(self, idx, use_img="", inv_img=""):
-        self.idx, self.name = idx, "No Name"
+    def __init__(self, idx, use_img="", inv_img="", name=""):
+        self.idx, self.name = idx, name
         self.max_stack = 999
         self.use_time = 300
 
@@ -48,6 +48,8 @@ class Item:
         self.block_id = AIR
         # Attack box, if applicable
         self.polygon = None
+
+        o.items[self.idx] = self
 
     def use_anim(self, time_used, arm, left, player_center, rect):
         if self.swing:
@@ -95,12 +97,13 @@ class Item:
                     p[1] += tool_c[1] + rect.y
                 self.polygon = Polygon([a, b, c, d])
 
-    # Don't implement breaking/placing blocks here, just ui and other stuff
+    # Override this for special functionality and custom item consumption
     def on_left_click(self):
-        return
+        if self.consumable:
+            o.player.inventory.use_item()
 
     def on_right_click(self):
-        return
+        pass
 
     def on_tick(self):
         o.player.use_time -= o.dt

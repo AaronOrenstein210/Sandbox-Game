@@ -29,11 +29,17 @@ class Inventory:
     def load(self, data):
         for y in range(self.dim[1]):
             for x in range(self.dim[0]):
-                self.inv_amnts[y][x] = int.from_bytes(data[:2], byteorder)
-                if self.inv_amnts[y][x] == 0:
+                val = int.from_bytes(data[2:4], byteorder)
+                # Item defaults to nothing if it doesn't exist
+                if val not in o.items.keys():
+                    self.inv_amnts[y][x] = 0
                     self.inv_items[y][x] = -1
                 else:
-                    self.inv_items[y][x] = int.from_bytes(data[2:4], byteorder)
+                    self.inv_amnts[y][x] = int.from_bytes(data[:2], byteorder)
+                    if self.inv_amnts[y][x] == 0:
+                        self.inv_items[y][x] = -1
+                    else:
+                        self.inv_items[y][x] = val
                 data = data[4:]
         self.draw_inventory()
 

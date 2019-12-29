@@ -149,10 +149,14 @@ class WorldGenerator:
             self.fill_chunk(x1 + dx, 1, border, surface - border, DIRT)
             self.surface[x1 + dx] = surface
             self.fill_chunk(x1 + dx, 1, self.world.dim[1], border - self.world.dim[1], STONE)
+            # Add spawners
             if randint(1, 150) == 1:
                 self.world.blocks[surface + randint(1, 3)][x1 + dx] = CAT
             elif randint(1, 100) == 1:
                 self.world.blocks[surface + randint(1, 4)][x1 + dx] = DOOM_BUNNY
+            # Add trees
+            if randint(0, 10) == 1:
+                self.tree(x1 + dx, 5, 10)
 
         self.smooth_left(x1)
         self.smooth_right(x2 - 1)
@@ -189,13 +193,50 @@ class WorldGenerator:
         self.smooth_left(x1)
         self.smooth_right(x2 - 1)
 
-    def copy_chunk(self, chunk, point):
+    # Tree
+    def tree(self, x, h_min, h_max):
+        # Get random height
+        h = randint(h_min, h_max)
+        # Get leaf radius
+        r = max(h // 3, 1)
+        w = r * 2 + 1
+        tree = full((h, w), -1, dtype=int16)
+        # Add leaves
+        i = .5
+        c_x = w / 2
+        c_y = r + .5
+        # Check number of spawners allowed
+        num_birdie = 2 if h >= 9 else 1 if h >= 7 else 0
+        num_helicopter = 1 if h >= 8 else 0
+        # Go through the center of each x
+        while i <= w - .5:
+            # Use pythagorean theorem to compute height of leaves
+            dx = c_x - i
+            dy = math.sqrt((r * r) - (dx * dx))
+            y_min, y_max = int(c_y - dy), int(c_y + dy) + 1
+            tree[y_min:y_max, int(i)] = [LEAVES] * (y_max - y_min)
+            if num_birdie > 0 and randint(1, 10) == 1:
+                tree[randint(y_min, y_max), int(i)] = BIRDIE
+                num_birdie -= 1
+            elif num_helicopter > 0 and randint(1, 20) == 1:
+                tree[randint(y_min, y_max), int(i)] = HELICOPTER
+                num_helicopter -= 1
+            i += 1
+        # Add trunk
+        tree[r:, r] = [WOOD] * (h - r)
+        # Add tree to world
+        self.add_chunk(tree, [x - r, self.surface[x] - h])
+
+    def add_chunk(self, chunk, point):
         point = list(point)
         world_h, world_w = self.world.blocks.shape
-        if point[0] >= world_w or point[1] >= world_h:
+        struct_h, struct_w = chunk.shape
+        # Make sure at least some of the shape is in the world
+        if not (0 <= point[0] <= world_w - struct_w or
+                0 <= point[1] <= world_h - struct_h):
             return
 
-        struct_h, struct_w = chunk.shape
+        # Trim the shape as needed
         if point[0] < 0:
             chunk = chunk[:, abs(point[0]):]
             point[0] = 0
@@ -208,9 +249,12 @@ class WorldGenerator:
             chunk = chunk[:world_h - struct_h - point[1], :]
         struct_h, struct_w = chunk.shape
 
-        self.world.blocks[point[1]:point[1] + struct_h, point[0]:point[0] + struct_w] = chunk
-
-        return pg.Rect(point[0], point[1], struct_w, struct_h)
+        # Ignore -1 values (Air values are good)
+        for dy in range(struct_h):
+            for dx in range(struct_w):
+                val = chunk[dy][dx]
+                if val != -1:
+                    self.world.blocks[point[1] + dy][point[0] + dx] = val
 
     def fill_chunk(self, x, dx, y, dy, val):
         world_h, world_w = self.world.blocks.shape

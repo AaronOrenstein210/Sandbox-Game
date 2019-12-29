@@ -15,8 +15,8 @@ from NPCs.Entity import check_collisions, touching_blocks_y
 from NPCs.EntityHandler import EntityHandler
 from Objects.DroppedItem import DroppedItem
 
-# Mouse pos relative to the screen and to the world, updated every frame
-pos, global_pos = [0, 0], [0, 0]
+# Mouse pos relative to the screen and to the world and viewing rect, updated every frame
+pos, global_pos, rect = [0, 0], [0, 0], pg.Rect(0, 0, 0, 0)
 
 
 class Player:
@@ -72,13 +72,16 @@ class Player:
         with open("saves/players/" + self.name + ".plr", "wb+") as file:
             file.write(self.inventory.write())
 
+    def get_cursor_block_pos(self):
+        return [(p + r) // BLOCK_W for p, r in zip(pos, rect.topleft)]
+
     def run(self, events):
         world = o.world
 
         mouse = list(pg.mouse.get_pressed())
         keys = list(pg.key.get_pressed())
 
-        global pos, global_pos
+        global pos, global_pos, rect
         rect = o.world.get_view_rect(self.rect.center)
         pos = pg.mouse.get_pos()
         global_pos = (pos[0] + rect.x, pos[1] + rect.y)
@@ -255,14 +258,6 @@ class Player:
                     item.on_left_click()
                     self.item_used = item
                     self.use_time = item.use_time
-                    block_pos = [p // BLOCK_W for p in global_pos]
-                    # Check if the item places a block or breaks a block
-                    # Check if that item can place or break the block
-                    used_item = item.placeable and self.place_block(*block_pos, item.block_id)
-                    if not used_item:
-                        used_item = item.breaks_blocks and self.break_block(*block_pos)
-                    if used_item and item.consumable:
-                        self.inventory.use_item()
                     if item.has_ui:
                         self.active_ui = item.UI()
 

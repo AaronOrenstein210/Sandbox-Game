@@ -3,7 +3,6 @@
 
 # BE WARY OF IMPORT LOOPS!!!
 from sys import exit
-from math import ceil
 import pygame as pg
 from Tools.constants import MS_PER_DAY, NOON
 from UI.Operations import CompleteTask, loading_bar, percent
@@ -28,16 +27,15 @@ def init():
     for name, obj in getmembers(ItemObjects):
         if isclass(obj):
             if "Objects.ItemObjects" in str(obj):
-                instance = obj()
-                items[instance.idx] = instance
-
+                # The constructor automatically adds the item to the list
+                obj()
     # Compile a list of tiles
     tiles.clear()
     for name, obj in getmembers(TileObjects):
         if isclass(obj):
             if "Objects.TileObjects" in str(obj):
-                instance = obj()
-                tiles[instance.idx] = instance
+                # The constructor automatically adds the tile to the list
+                obj()
 
     global player, world
     player = Player(run_selector(PLAYER))

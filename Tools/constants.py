@@ -3,6 +3,7 @@
 
 # NO IMPORTING FROM INSIDE THIS PROJECT!!!!!!
 import pygame as pg
+from random import randint
 
 # Dimension Constants
 MIN_W, MIN_H = 800, 600
@@ -63,6 +64,10 @@ def scale_to_fit(s, w=-1, h=-1):
     else:
         frac = min(w / dim[0], h / dim[1])
     return pg.transform.scale(s, (int(frac * dim[0]), int(frac * dim[1])))
+
+
+def random_sign():
+    return 1 if randint(0, 1) == 0 else -1
 
 
 # Gets the biggest font that fits the text within max_w and max_h

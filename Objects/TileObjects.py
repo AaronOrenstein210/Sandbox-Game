@@ -4,7 +4,7 @@ import pygame as pg
 from pygame.locals import *
 from Objects.TileTypes import *
 from Objects.Animation import Animation
-from Objects import item_ids as i, tile_ids as t
+from Objects import item_ids as i, tile_ids as t, INV, USE
 from NPCs import Mobs as mobs
 from Player.ActiveUI import ActiveUI
 from Tools import constants as c
@@ -18,31 +18,54 @@ class Air(Tile):
     def __init__(self):
         Tile.__init__(self, t.AIR)
 
+    def create_item(self, idx, img, name):
+        pass
+
 
 class Dirt(Tile):
     def __init__(self):
-        Tile.__init__(self, t.DIRT, hardness=1, img=INV + "dirt.png")
+        Tile.__init__(self, t.DIRT, hardness=1, img=INV + "dirt.png",
+                      item_idx=i.DIRT, item_name="Dirt")
         self.add_drop(i.DIRT, 1)
         self.map_color = (150, 75, 0)
 
 
 class Stone(Tile):
     def __init__(self):
-        Tile.__init__(self, t.STONE, hardness=2, img=INV + "stone.png")
+        Tile.__init__(self, t.STONE, hardness=2, img=INV + "stone.png",
+                      item_idx=i.STONE, item_name="Stone")
         self.add_drop(i.STONE, 1)
         self.map_color = (200, 200, 200)
 
 
 class Snow(Tile):
     def __init__(self):
-        Tile.__init__(self, t.SNOW, hardness=1, img=INV + "snow.png")
+        Tile.__init__(self, t.SNOW, hardness=1, img=INV + "snow.png",
+                      item_idx=i.SNOW, item_name="Snow")
         self.add_drop(i.SNOW_BALL, 2, 5)
         self.map_color = (255, 255, 255)
 
 
+class Wood(Tile):
+    def __init__(self):
+        Tile.__init__(self, t.WOOD, hardness=1, img=INV + "wood.png",
+                      item_idx=i.WOOD, item_name="Wood", item_img=USE + "wood.png")
+        self.add_drop(i.WOOD, 1)
+        self.map_color = (100, 50, 0)
+
+
+class Leaves(Tile):
+    def __init__(self):
+        Tile.__init__(self, t.LEAVES, hardness=0, img=INV + "leaves.png",
+                      item_idx=i.LEAVES, item_name="Leaves")
+        self.add_drop(i.LEAVES, 1)
+        self.map_color = (0, 0, 100)
+
+
 class WorkTable(CraftingStation):
     def __init__(self):
-        CraftingStation.__init__(self, t.WORK_TABLE, dim=(2, 1), img=INV + "work_table.png")
+        CraftingStation.__init__(self, t.WORK_TABLE, dim=(2, 1), img=INV + "work_table.png",
+                                 item_idx=i.WORK_TABLE, item_name="Work Table")
         self.on_surface = True
         self.map_color = (54, 78, 154)
         self.add_drop(i.WORK_TABLE, 1)
@@ -56,25 +79,43 @@ class WorkTable(CraftingStation):
 
 class CatSpawner(SpawnTile):
     def __init__(self):
-        SpawnTile.__init__(self, t.CAT, mobs.Cat)
+        SpawnTile.__init__(self, t.CAT, mobs.Cat, item_idx=i.CAT, item_name="Cat Spawner")
         self.add_drop(i.CAT, 1)
 
 
 class ZombieSpawner(SpawnTile):
     def __init__(self):
-        SpawnTile.__init__(self, t.ZOMBIE, mobs.Zombie)
+        SpawnTile.__init__(self, t.ZOMBIE, mobs.Zombie, item_idx=i.ZOMBIE, item_name="Zombie Spawner")
         self.add_drop(i.ZOMBIE, 1)
 
 
 class DoomBunnySpawner(SpawnTile):
     def __init__(self):
-        SpawnTile.__init__(self, t.DOOM_BUNNY, mobs.DoomBunny)
+        SpawnTile.__init__(self, t.DOOM_BUNNY, mobs.DoomBunny, item_idx=i.DOOM_BUNNY,
+                           item_name="Doom Bunny Spawner")
         self.add_drop(i.DOOM_BUNNY, 1)
+
+
+class HelicopterSpawner(SpawnTile):
+    def __init__(self):
+        SpawnTile.__init__(self, t.HELICOPTER, mobs.Helicopter, img=INV + "leaves.png",
+                           item_idx=i.HELICOPTER, item_name="Helicopter Spawner", item_img=INV + "spawner_1.png")
+        self.add_drop(i.HELICOPTER, 1)
+        self.map_color = (0, 0, 80)
+
+
+class BirdieSpawner(SpawnTile):
+    def __init__(self):
+        SpawnTile.__init__(self, t.BIRDIE, mobs.Birdie, img=INV + "leaves.png",
+                           item_idx=i.BIRDIE, item_name="Birdie Spawner", item_img=INV + "spawner_1.png")
+        self.add_drop(i.BIRDIE, 1)
+        self.map_color = (0, 0, 80)
 
 
 class DimensionHopper(Tile):
     def __init__(self):
-        Tile.__init__(self, t.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png")
+        Tile.__init__(self, t.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png",
+                      item_idx=i.DIMENSION_HOPPER, item_name="Dimension Hopper")
         self.has_ui = True
         self.clickable = True
         self.scroller = None
@@ -136,7 +177,8 @@ class WorldBuilder(Tile):
     INV_DIM = (4, 2)
 
     def __init__(self):
-        Tile.__init__(self, t.WORLD_BUILDER, img=INV + "world_builder_0.png")
+        Tile.__init__(self, t.WORLD_BUILDER, img=INV + "world_builder_0.png",
+                      item_idx=i.WORLD_BUILDER, item_name="World Builder")
         self.animation = True
         self.has_ui = True
         self.clickable = True
@@ -146,7 +188,7 @@ class WorldBuilder(Tile):
         self.map_color = (0, 0, 0)
 
     def get_animation(self):
-        return Animation([INV + "world_builder_{}.png".format(i) for i in range(6)],
+        return Animation([INV + "world_builder_{}.png".format(j) for j in range(6)],
                          [BLOCK_W, BLOCK_W], delay=250)
 
     def activate(self, pos):
@@ -244,7 +286,8 @@ class Chest(Tile):
     INV_DIM = (10, 5)
 
     def __init__(self):
-        Tile.__init__(self, t.CHEST, hardness=1, img=INV + "chest.png", dim=(2, 2))
+        Tile.__init__(self, t.CHEST, hardness=1, img=INV + "chest.png", dim=(2, 2),
+                      item_idx=i.CHEST, item_name="Chest")
         self.has_ui = True
         self.clickable = True
         self.on_surface = True
