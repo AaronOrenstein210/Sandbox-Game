@@ -5,7 +5,7 @@ from random import randint
 from pygame.display import get_surface
 from NPCs.SpawnConditions import SpawnConditions
 from Tools.constants import BLOCK_W
-from Objects.tile_ids import AIR
+from Tools.tile_ids import AIR
 from Tools import objects as o
 
 

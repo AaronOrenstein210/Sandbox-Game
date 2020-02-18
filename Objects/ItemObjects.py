@@ -1,28 +1,26 @@
 # Created on 3 December 2019
 
 from pygame.locals import *
-from Objects import INV, USE, item_ids as items
+from Objects import INV
 from Objects.ItemTypes import *
 from Tools.constants import *
-from Tools import objects as o
-from World.World import World
-from World.WorldGenerator import get_random_biome
-from Player.ActiveUI import ActiveUI
+from Tools import objects as o, item_ids as items
 from NPCs.Mobs import Dragon
 
 
 # Don't create items that place blocks here, see the tile class
 # for implementing blocks
 
+# Useable Items
 class SnowBall(Item):
     def __init__(self):
-        Item.__init__(self, items.SNOW_BALL, inv_img=INV + "snow_ball.png", name="Snow Ball")
+        super().__init__(items.SNOW_BALL, img=INV + "snow_ball.png", name="Snow Ball")
         self.max_stack = 99
 
 
 class DragonClaw(Item):
     def __init__(self):
-        Item.__init__(self, items.DRAGON_CLAW, inv_img=INV + "dragon_claw.png", name="Dragon Claw")
+        super().__init__(items.DRAGON_CLAW, img=INV + "dragon_claw.png", name="Dragon Claw")
         self.consumable = True
 
     def on_left_click(self):
@@ -32,44 +30,10 @@ class DragonClaw(Item):
         o.player.handler.entities.append(d)
 
 
-class DimensionCreator(Item):
-    def __init__(self):
-        Item.__init__(self, items.DIMENSION_CREATOR, inv_img=INV + "dimension_creator.png", name="Dimension Creator")
-        self.consumable = True
-        self.has_ui = True
-        self.get_input = None
-
-    def on_left_click(self):
-        pass
-
-    def on_tick(self):
-        pass
-
-    class UI(ActiveUI):
-        def __init__(self):
-            from UI.Operations import TextInput
-            self.get_input = TextInput("Input World Name", char_limit=10)
-            ActiveUI.__init__(self, self.get_input.surface, self.get_input.rect)
-
-        def on_resize(self):
-            self.rect.center = pg.display.get_surface().get_rect().center
-
-        def process_events(self, events, mouse, keys):
-            world_name = self.get_input.check_events(events)
-            if world_name is not None:
-                if world_name != "":
-                    new = World(o.world.universe, world_name)
-                    new.generator.generate([1000, 500], [get_random_biome() for i in range(5)])
-                    del new
-                    o.player.inventory.use_item()
-                o.player.use_time = 0
-                o.player.active_ui = None
-
-
 class Dematerializer(Item):
     def __init__(self):
-        Item.__init__(self, items.DEMATERIALIZER, inv_img=INV + "dematerializer.png",
-                      name="Dematerializer")
+        super().__init__(items.DEMATERIALIZER, img=INV + "dematerializer.png",
+                         name="Dematerializer")
         self.use_time = 1000
 
     def on_left_click(self):
@@ -83,7 +47,7 @@ class Dematerializer(Item):
         delta = [s - p for p, s in zip(o.player.pos, spawn)]
         if progress <= 0 or delta.count(0) == 2:
             o.player.can_move = True
-            o.player.set_pos(spawn)
+            o.player.spawn()
         else:
             # Get distance from spawn (distance left to go) and move player to that point
             pos = [s + progress * -d for s, d in zip(spawn, delta)]
@@ -92,7 +56,7 @@ class Dematerializer(Item):
 
 class TimeWarp(Item):
     def __init__(self):
-        Item.__init__(self, items.TIME_WARP, inv_img=INV + "time_warp.png", name="Time Warp")
+        super().__init__(items.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
         self.right_click = True
 
     def on_tick(self):
@@ -105,30 +69,78 @@ class TimeWarp(Item):
             o.player.use_time = 0
 
 
+# Biome Items
 class ForestBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.FOREST, inv_img=INV + "forest.png", name="Forest Biome")
+        super().__init__(items.FOREST, img=INV + "forest.png", name="Forest Biome")
 
 
 class MountainBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.MOUNTAIN, inv_img=INV + "mountain.png", name="Mountain Biome")
+        super().__init__(items.MOUNTAIN, img=INV + "mountain.png", name="Mountain Biome")
 
 
 class ValleyBiome(Item):
     def __init__(self):
-        Item.__init__(self, items.VALLEY, inv_img=INV + "valley.png", name="Valley Biome")
+        super().__init__(items.VALLEY, img=INV + "valley.png", name="Valley Biome")
 
 
+class SmallWorld(Item):
+    def __init__(self):
+        super().__init__(items.SMALL_WORLD, img=INV + "small_world.png", name="Small World")
+
+
+class MedWorld(Item):
+    def __init__(self):
+        super().__init__(items.MED_WORLD, img=INV + "med_world.png", name="Medium World")
+
+
+class LargeWorld(Item):
+    def __init__(self):
+        super().__init__(items.LARGE_WORLD, img=INV + "large_world.png", name="Large World")
+
+
+class BonusStructure(Item):
+    def __init__(self):
+        super().__init__(items.BONUS_STRUCTURE, img=INV + "bonus_structure.png", name="Bonus Structure")
+
+
+# Ore items
+class IronOre(Item):
+    def __init__(self):
+        super().__init__(items.IRON_ORE, img=INV + "iron_ore.png", name="Iron Ore")
+
+
+class GoldOre(Item):
+    def __init__(self):
+        super().__init__(items.GOLD_ORE, img=INV + "gold_ore.png", name="Gold Ore")
+
+
+class Pyrite(Item):
+    def __init__(self):
+        super().__init__(items.PYRITE, img=INV + "pyrite.png", name="Pyrite Chunk")
+
+
+class Sphalerite(Item):
+    def __init__(self):
+        super().__init__(items.SPHALERITE, img=INV + "sphalerite.png", name="Sphalerite Crystal")
+
+
+class Obsidian(Item):
+    def __init__(self):
+        super().__init__(items.OBSIDIAN, img=INV + "obsidian.png", name="Obsidian Shard")
+
+
+# Weapons/Tools
 class TestSword(Weapon):
     def __init__(self):
-        Weapon.__init__(self, items.TEST_SWORD, damage=15, damage_type=MELEE,
-                        inv_img=INV + "test_sword.png", use_img=USE + "test_sword.png", name="Test Sword")
+        super().__init__(items.TEST_SWORD, damage=15, damage_type=MELEE,
+                         img=INV + "test_sword.png", name="Test Sword")
 
 
 class TestPickaxe(Weapon):
     def __init__(self):
-        Weapon.__init__(self, items.TEST_PICKAXE, damage=5, damage_type=MELEE,
-                        inv_img=INV + "test_pickaxe.png", use_img=USE + "test_pickaxe.png", name="Test Pickaxe")
+        super().__init__(items.TEST_PICKAXE, damage=5, damage_type=MELEE,
+                         img=INV + "test_pickaxe.png", name="Test Pickaxe")
         self.auto_use = True
         self.breaks_blocks = True

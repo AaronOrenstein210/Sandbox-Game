@@ -70,16 +70,53 @@ def random_sign():
     return 1 if randint(0, 1) == 0 else -1
 
 
-# Gets the biggest font that fits the text within max_w and max_h
-def get_scaled_font(max_w, max_h, text, font_name):
-    font_size = 0
+# Gets the biggest font size that fits the text within max_w and max_h
+def get_scaled_font(max_w, max_h, text, font_name="Times New Roman"):
+    font_size = 1
     font = pg.font.SysFont(font_name, font_size)
     w, h = font.size(text)
-    while (w < max_w or max_w == -1) and (h < max_h or max_h == -1):
-        font_size += 1
+    min_size = max_size = 1
+    while (max_w == -1 or w < max_w) and (max_h == -1 or h < max_h):
+        font_size *= 2
+        min_size = max_size
+        max_size = font_size
         font = pg.font.SysFont(font_name, font_size)
         w, h = font.size(text)
-    return pg.font.SysFont(font_name, font_size - 1)
+    if font_size == 1:
+        return font
+    while True:
+        font_size = (max_size + min_size) // 2
+        font = pg.font.SysFont(font_name, font_size)
+        w, h = font.size(text)
+        # Too small
+        if (max_w == -1 or w < max_w) and (max_h == -1 or h < max_h):
+            # Check if the next size is too big
+            font_ = pg.font.SysFont(font_name, font_size + 1)
+            w, h = font_.size(text)
+            if (max_w == -1 or w < max_w) and (max_h == -1 or h < max_h):
+                min_size = font_size + 1
+            else:
+                return font
+        # Too big
+        else:
+            # Check if the previous size is too small
+            font_ = pg.font.SysFont(font_name, font_size - 1)
+            w, h = font_.size(text)
+            if (max_w == -1 or w < max_w) and (max_h == -1 or h < max_h):
+                return font
+            else:
+                max_size = font_size - 1
+
+
+def get_widest_string(strs, font_name="Times New Roman"):
+    biggest = ""
+    last_w = 0
+    font = pg.font.SysFont(font_name, 12)
+    for string in strs:
+        if font.size(string)[0] > last_w:
+            biggest = string
+            last_w = font.size(string)[0]
+    return biggest
 
 
 def wrap_text(string, font, w):

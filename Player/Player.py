@@ -3,11 +3,11 @@
 
 import pygame as pg
 from pygame.locals import *
-from math import copysign
+from math import copysign, ceil
 from Tools.constants import BLOCK_W, resize
 from Tools import constants as c
 from Tools import objects as o
-from Objects.tile_ids import AIR
+from Tools.tile_ids import AIR
 from Player.PlayerInventory import PlayerInventory
 from Player.CraftingUI import CraftingUI
 from Player.Stats import Stats
@@ -174,6 +174,8 @@ class Player:
             if self.can_move:
                 self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
                     else 1
+                if keys[K_SPACE]:
+                    self.v[1] = -15
 
         # If we are using an item, let it handle the use time
         if self.item_used is not None:
@@ -210,6 +212,9 @@ class Player:
 
     def spawn(self):
         self.set_pos((o.world.spawn[0] * BLOCK_W, o.world.spawn[1] * BLOCK_W))
+        for x in range(o.world.spawn[0], ceil(o.world.spawn[0] + self.dim[0])):
+            for y in range(o.world.spawn[1], ceil(o.world.spawn[1] + self.dim[1])):
+                self.break_block(x, y)
 
     def move(self):
         if o.dt == 0:
@@ -246,7 +251,7 @@ class Player:
 
     def left_click(self):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
-            self.use_time = self.inventory.left_click(pos)
+            self.inventory.left_click(pos)
         else:
             idx = self.inventory.get_held_item()
             if idx != -1:
@@ -263,7 +268,7 @@ class Player:
 
     def right_click(self):
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
-            self.use_time = self.inventory.right_click(pos)
+            self.inventory.right_click(pos)
         else:
             block_x, block_y = o.world.get_topleft(*[p // BLOCK_W for p in global_pos])
             tile = o.tiles[o.world.blocks[block_y][block_x]]
@@ -301,12 +306,13 @@ class Player:
             return False
         block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
         # Check if we can break the block
-        if self.placement_range.collidepoint(*global_pos) and tile.on_break((block_x, block_y)):
+        if self.placement_range.collidepoint(*block_rect.center) and tile.on_break((block_x, block_y)):
             o.world.destroy_block(block_x, block_y)
             drops = tile.get_drops()
             for drop in drops:
-                # Drop an item
-                self.drop_item(DroppedItem(*drop), None, pos_=block_rect.center)
+                if drop[1] > 0:
+                    # Drop an item
+                    self.drop_item(DroppedItem(*drop), None, pos_=block_rect.center)
             return True
         return False
 
@@ -324,6 +330,7 @@ class Player:
                 return True
         return False
 
+    # pos in pixels
     def drop_item(self, item_obj, left, pos_=None):
         if pos_ is None:
             pos_ = self.rect.center
@@ -343,6 +350,7 @@ class Player:
         return False
 
     def draw_ui(self):
+        global rect
         rect = o.world.get_view_rect(self.rect.center)
         display = pg.display.get_surface()
         display.fill(o.get_sky_color())

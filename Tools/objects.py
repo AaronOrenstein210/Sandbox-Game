@@ -8,6 +8,8 @@ from Tools.constants import MS_PER_DAY, NOON
 from UI.Operations import CompleteTask, loading_bar, percent
 
 items, tiles = {}, {}
+biomes, structures = {}, {}
+animations = []
 player, world = None, None
 # World time
 world_time = MS_PER_DAY * .4
@@ -19,22 +21,16 @@ def init():
     from inspect import getmembers, isclass
     from Player.Player import Player
     from Objects import ItemObjects, TileObjects
+    from World import WorldGenParts
     from World.World import World
     from World.WorldSelector import run_selector, PLAYER, UNIVERSE
 
     # Compile a list of items
-    items.clear()
-    for name, obj in getmembers(ItemObjects):
-        if isclass(obj):
-            if "Objects.ItemObjects" in str(obj):
+    items.clear(), tiles.clear(), biomes.clear(), structures.clear()
+    for module in [ItemObjects, TileObjects, WorldGenParts]:
+        for name, obj in getmembers(module):
+            if isclass(obj) and module.__name__ in str(obj):
                 # The constructor automatically adds the item to the list
-                obj()
-    # Compile a list of tiles
-    tiles.clear()
-    for name, obj in getmembers(TileObjects):
-        if isclass(obj):
-            if "Objects.TileObjects" in str(obj):
-                # The constructor automatically adds the tile to the list
                 obj()
 
     global player, world

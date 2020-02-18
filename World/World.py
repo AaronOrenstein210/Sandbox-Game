@@ -6,11 +6,10 @@ from numpy import full, int16
 import math
 import pygame as pg
 from pygame.locals import *
-from Objects.tile_ids import AIR
+from Tools.tile_ids import AIR
 from Tools import constants as c
 from Tools import objects as o
 from UI.Operations import CompleteTask, percent
-from World.WorldGenerator import WorldGenerator
 
 
 class World:
@@ -34,8 +33,14 @@ class World:
         self.universe = universe
         self.name = name
         self.current_byte = 0
-        # World generator
-        self.generator = WorldGenerator(self)
+
+    @property
+    def surface_h(self):
+        return self.dim[1] // 2
+
+    @property
+    def underground(self):
+        return self.dim[1] * 2 // 3
 
     @property
     def file(self):
@@ -89,8 +94,15 @@ class World:
                             # Save multiblock parts
                             for dr in range(tile.dim[1]):
                                 for dc in range(tile.dim[0]):
-                                    self.blocks[row + dr][col + dc] = -(dr * 100 + dc)
-                        self.blocks[row][col:col + num] = [val] * num
+                                    self.blocks[row + dr][col + dc] = -(dc * 100 + dr)
+                            self.blocks[row][col] = val
+                        # Otherwise, it is either a single block, or a vertical multiblock
+                        else:
+                            # Save single block
+                            self.blocks[row][col:col + num] = [val] * num
+                            # Save vertical multiblock
+                            for i in range(1, tile.dim[1]):
+                                self.blocks[row + i][col + num] = [-i] * num
                         # Check if we should be loading extra data
                         num_bytes = tile.data_bytes
                         has_bytes = num_bytes > 0
@@ -192,10 +204,8 @@ class World:
             c.update_dict(x, y, idx, self.spawners)
         if tile.crafting:
             c.update_dict(x, y, idx, self.crafters)
-        if tile.animation:
-            anim = tile.get_animation()
-            if anim is not None:
-                c.update_dict(x, y, anim, self.animations)
+        if tile.anim_idx != -1:
+            c.update_dict(x, y, tile.anim_idx, self.animations)
 
     def remove_block(self, x, y, idx):
         tile = o.tiles[idx]
@@ -203,22 +213,27 @@ class World:
             c.remove_from_dict(x, y, self.spawners)
         if tile.crafting:
             c.remove_from_dict(x, y, self.crafters)
-        if tile.animation:
+        if tile.anim_idx != -1:
             c.remove_from_dict(x, y, self.animations)
 
-    # Multiblocks whose topleft is off screen won't update
-    # Go through all x/y and check if x+w is on screen (same for y)
     def update_anim(self, rect):
+        # Update every animation
+        for a in o.animations:
+            a.update()
         from Tools.constants import BLOCK_W
-        ymin, ymax = int(rect.top / BLOCK_W), int(rect.bottom / BLOCK_W)
-        for x in range(rect.left // BLOCK_W, (rect.right // BLOCK_W) + 1):
-            if x in self.animations.keys():
+        xmin, xmax = rect.left // BLOCK_W, rect.right // BLOCK_W
+        ymin, ymax = rect.top // BLOCK_W, rect.bottom // BLOCK_W
+        # Multiblocks whose topleft is off screen won't update
+        # Go through all x/y and check if x+w is on screen (same for y)
+        for x in self.animations.keys():
+            if xmin <= x <= xmax:
                 for y in self.animations[x].keys():
                     if ymin <= y <= ymax:
-                        anim = self.animations[x][y]
-                        img = anim.get_frame(o.dt)
-                        if img is not None:
-                            self.surface.blit(img, (x * BLOCK_W, y * BLOCK_W))
+                        anim = o.animations[self.animations[x][y]]
+                        img = anim.get_frame()
+                        rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
+                        pg.draw.rect(self.surface, SRCALPHA, rect)
+                        self.surface.blit(anim.get_frame(), rect)
 
     def get_view_rect(self, player_pos):
         dim = pg.display.get_surface().get_size()

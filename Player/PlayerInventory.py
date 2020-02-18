@@ -31,15 +31,13 @@ class PlayerInventory(Inventory):
 
     def left_click(self, pos):
         if self.open:
-            return Inventory.left_click(self, pos)
+            Inventory.left_click(self, pos)
         else:
             self.select_hotbar(int(pos[0] / INV_W))
-            return 0
 
     def right_click(self, pos):
         if self.open:
-            return Inventory.right_click(self, pos)
-        return 0
+            Inventory.right_click(self, pos)
 
     def select_hotbar(self, idx):
         if idx != self.hot_bar_item:

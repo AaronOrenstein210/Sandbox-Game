@@ -6,6 +6,7 @@ from numpy import full, int16
 from math import ceil
 from pygame import Surface
 from pygame.draw import rect as draw_rect
+from pygame.time import get_ticks
 from pygame.locals import *
 from Tools.constants import INV_W, INV_IMG_W
 from Tools import constants as c
@@ -15,8 +16,10 @@ BKGROUND = (0, 255, 0, 64)
 
 
 class Inventory:
-    def __init__(self, dim):
+    def __init__(self, dim, items_list=(), max_stack=999):
         self.dim = dim
+        self.items_list = items_list
+        self.max_stack = max_stack
         self.rect = Rect(0, 0, INV_W * self.dim[0], INV_W * self.dim[1])
         self.surface = Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
         self.surface.fill(BKGROUND)
@@ -25,6 +28,10 @@ class Inventory:
         self.inv_amnts = full((self.dim[1], self.dim[0]), 0, dtype=int16)
         # How long we've been right clicking
         self.holding_r = 0
+
+    @property
+    def num_bytes(self):
+        return 4 * self.dim[0] * self.dim[1]
 
     def load(self, data):
         for y in range(self.dim[1]):
@@ -44,17 +51,15 @@ class Inventory:
         self.draw_inventory()
 
     def write(self):
-        data = bytearray(4 * self.dim[0] * self.dim[1])
-        pos = 0
+        data = bytearray()
         for y, (row1, row2) in enumerate(zip(self.inv_amnts, self.inv_items)):
             for x, (amnt, item) in enumerate(zip(row1, row2)):
                 amnt, item = int(amnt), int(item)
                 if item == -1 or amnt <= 0:
-                    data[pos:pos + 4] = (0).to_bytes(4, byteorder)
+                    data += (0).to_bytes(4, byteorder)
                 else:
-                    data[pos: pos + 2] = amnt.to_bytes(2, byteorder)
-                    data[pos + 2:pos + 4] = item.to_bytes(2, byteorder)
-                pos += 4
+                    data += amnt.to_bytes(2, byteorder)
+                    data += item.to_bytes(2, byteorder)
         return data
 
     def draw_inventory(self):
@@ -84,37 +89,50 @@ class Inventory:
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
         inv = o.player.inventory
         item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
+        if inv.selected_amnt == 0 and amnt == 0:
+            return
         # Remove whatever item our mouse was over from the inventory
-        if inv.selected_item == -1:
-            if self.inv_items[y][x] == -1:
-                return 0
-            inv.selected_item, inv.selected_amnt = self.inv_items[y][x], self.inv_amnts[y][x]
+        if inv.selected_amnt == 0:
+            inv.selected_item, inv.selected_amnt = item, amnt
             self.inv_items[y][x] = -1
             self.inv_amnts[y][x] = 0
-        else:
+        elif len(self.items_list) == 0 or inv.selected_item in self.items_list:
             # Add selected item to inventory
-            if inv.selected_item == item:
-                max_stack = o.items[item].max_stack
+            if inv.selected_item == item or amnt == 0:
+                if amnt == 0:
+                    max_stack = self.max_stack
+                else:
+                    max_stack = min(o.items[item].max_stack, self.max_stack)
                 amnt_ = min(max_stack, amnt + inv.selected_amnt)
                 self.inv_amnts[y][x] = amnt_
+                self.inv_items[y][x] = inv.selected_item
                 inv.selected_amnt -= amnt_ - amnt
                 if inv.selected_amnt == 0:
                     inv.selected_item = -1
             # Swap out items
-            else:
-                new_item = [self.inv_items[y][x], self.inv_amnts[y][x]]
+            elif inv.selected_amnt <= self.max_stack:
                 self.inv_items[y][x], self.inv_amnts[y][x] = inv.selected_item, inv.selected_amnt
-                inv.selected_item, inv.selected_amnt = new_item
-        self.update_item(y, x)
-        return 500
+                inv.selected_item, inv.selected_amnt = item, amnt
+        if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
+            self.update_item(y, x)
+            o.player.use_time = 300
 
     def right_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
         item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
         # Make sure we clicked on an item
         inv = o.player.inventory
-        if amnt > 0 and inv.selected_item in [-1, item]:
-            ideal_grab = ceil(o.dt / self.calc_wait_time())
+        if amnt > 0 and (inv.selected_amnt == 0 or inv.selected_item == item):
+            # Calculate wait time
+            time = get_ticks()
+            wait_time = (time - self.holding_r) * 19 // 20
+            if wait_time > 1000:
+                wait_time = 1000
+            elif wait_time < 10:
+                wait_time = 10
+            self.holding_r = time
+            # Do click
+            ideal_grab = ceil(o.dt / wait_time)
             max_grab = o.items[item].max_stack - inv.selected_amnt
             grab_amnt = min(ideal_grab, max_grab, amnt)
             if grab_amnt > 0:
@@ -123,15 +141,14 @@ class Inventory:
                 self.inv_amnts[y][x] -= grab_amnt
                 if self.inv_amnts[y][x] == 0:
                     self.inv_items[y][x] = -1
-                self.holding_r += o.dt
                 self.update_item(y, x)
-                return self.calc_wait_time()
-        self.holding_r = 0
-        return 0
+                o.player.use_time = wait_time
 
-    def calc_wait_time(self):
-        # min 1 second
-        return 1000 / (self.holding_r / 100 + 1)
+    def is_empty(self):
+        for amnt in self.inv_amnts.flatten():
+            if amnt != 0:
+                return False
+        return True
 
 
 def new_inventory(dim):

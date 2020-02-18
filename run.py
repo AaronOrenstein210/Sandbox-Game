@@ -8,7 +8,7 @@ from Tools import objects as o
 from Tools.constants import load_fonts, resize, MIN_W, MIN_H, get_scaled_font
 
 # Make sure all necessary folders exist
-folders = ["res", "res/inventory_icons", "res/item_images", "res/entity_images",
+folders = ["res", "res/item_images", "res/item_images", "res/entity_images",
            "saves", "saves/players/", "saves/universes/"]
 for folder in folders:
     if not os.path.exists(folder):

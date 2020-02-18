@@ -6,7 +6,7 @@ from math import copysign, ceil
 from random import randint
 import pygame as pg
 from Tools.constants import BLOCK_W
-from Objects.tile_ids import AIR
+from Tools.tile_ids import AIR
 from Tools.constants import scale_to_fit, random_sign
 from Tools import objects as o
 from Player.Stats import Stats

@@ -2,11 +2,93 @@
 # SpawnBlocks are blocks that spawn enemies
 
 from random import random
-from Objects import INV
-from Objects.Tile import Tile
-from Tools.constants import BLOCK_W, update_dict
+from os.path import isfile
+import pygame as pg
+from random import randint
+from Tools.constants import BLOCK_W, scale_to_fit, update_dict
 from Tools import objects as o
-from Objects.tile_ids import AIR
+from Tools.tile_ids import AIR
+from Objects import INV
+from Objects.ItemTypes import Block
+from Objects.Animation import Animation
+
+
+class Tile:
+    def __init__(self, idx, hardness=0, img="", dim=(1, 1), delay=250):
+        self.idx = idx
+        self.hardness = hardness
+        self.dim = dim
+
+        # Tile spawns enemies
+        self.spawner = False
+        # Tile is interactable
+        self.clickable = False
+        # Tile brings up a ui when clicked
+        self.has_ui = False
+        # Must be placed on a surface
+        self.on_surface = False
+        # Player can craft at this item
+        self.crafting = False
+        # Has an animation
+        self.anim_idx = -1
+
+        # Minimap color, does not need to be unique
+        self.map_color = (64, 64, 255)
+        # Load image if given
+        img_dim = (BLOCK_W * dim[0], BLOCK_W * dim[1])
+        self.image = pg.Surface(img_dim)
+        if isfile(img):
+            if img.endswith(".png"):
+                self.image = scale_to_fit(pg.image.load(img), *img_dim)
+            elif img.endswith(".zip"):
+                self.anim_idx = len(o.animations)
+                o.animations.append(Animation(img, img_dim, delay=delay))
+                self.image = o.animations[-1].frames[0]
+
+        # Number of bytes of data
+        self.data_bytes = 0
+        # List of drops, each drop is a item/amnt pair
+        self.drops = []
+        # Recipes for crafting blocks
+        self.recipes = []
+
+        # Add tile to list
+        o.tiles[self.idx] = self
+
+    # Return Animation object if tile has animation
+    def get_animation(self):
+        pass
+
+    def add_drop(self, item, min_amnt, max_amnt=-1):
+        if max_amnt == -1:
+            max_amnt = min_amnt
+        self.drops.append([item, min_amnt, max_amnt])
+
+    # Return what items to drop
+    def get_drops(self):
+        drops = []
+        for drop in self.drops:
+            drops.append([drop[0], randint(drop[1], drop[2])])
+        return drops
+
+    # Called when block is broken, return True if successful,
+    # false otherwise
+    def on_break(self, pos):
+        return True
+
+    def on_place(self, pos):
+        pass
+
+    def can_place(self, pos):
+        if not o.world.contains_only(*pos, *self.dim, AIR):
+            return False
+        if self.on_surface:
+            return not o.world.contains(pos[0], pos[1] + self.dim[1], self.dim[0], 1, AIR)
+        else:
+            return not o.world.adjacent(*pos, *self.dim, AIR, True)
+
+    def activate(self, pos):
+        pass
 
 
 class CraftingStation(Tile):
@@ -51,17 +133,25 @@ class CraftingStation(Tile):
         return []
 
 
+class FunctionalTile(Tile):
+    def __init__(self, idx, data_bytes, **kwargs):
+        Tile.__init__(self, idx, **kwargs)
+        self.clickable = True
+        self.has_ui = True
+        self.data_bytes = data_bytes
+
+
 class SpawnTile(Tile):
-    def __init__(self, idx, entity, **kwargs):
+    def __init__(self, idx, entity, item_id=-1):
         self.entity = entity
         self.test_entity = entity()
         self.rarity = self.test_entity.rarity
-        # Spawner image defaults based on entity rarity
-        if "img" not in kwargs.keys():
-            kwargs["img"] = INV + "spawner_" + str(self.rarity) + ".png"
-        Tile.__init__(self, idx, self.rarity, **kwargs)
+        img = INV + "spawner_{}.png".format(self.rarity)
+        Tile.__init__(self, idx, hardness=self.rarity, img=img)
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
+        if item_id != -1:
+            Block(item_id, idx, name=self.test_entity.name + " Spawner", img=img)
 
     def spawn(self, pos, conditions):
         conditions.check_area(pos, 5 * self.rarity)

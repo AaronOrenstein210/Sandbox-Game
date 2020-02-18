@@ -4,7 +4,6 @@
 from NPCs import conditions as con
 from Tools.constants import DAY_START, NIGHT_START
 from Tools import objects as o
-from World.world_zones import *
 
 
 class SpawnConditions:
@@ -16,5 +15,5 @@ class SpawnConditions:
         self.conditions[con.NIGHT] = not self.conditions[con.DAY]
 
     def check_area(self, pos, r):
-        self.conditions[con.SURFACE] = pos[1] >= surface
-        self.conditions[con.UNDERGROUND] = pos[1] >= underground
+        self.conditions[con.SURFACE] = pos[1] >= 0
+        self.conditions[con.UNDERGROUND] = pos[1] >= 0

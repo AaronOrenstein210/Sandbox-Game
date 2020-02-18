@@ -80,7 +80,13 @@ class Dragon(Entity):
 
     def ai(self):
         if self.stage == 0:
-            self.v = [0, -15]
+            orig_vx = self.v[0]
+            self.v[1] = -15
+            dx = self.pos[0] - o.player.pos[0]
+            if abs(dx) > 10 * BLOCK_W:
+                self.v[0] = copysign(15, -dx)
+            else:
+                self.v[0] = 0
             # When we get high enough, switch modes
             if self.pos[1] < o.player.pos[1] - 10 * BLOCK_W:
                 d = [o.player.pos[0] - self.pos[0], self.pos[1] - o.player.pos[1]]
@@ -92,12 +98,15 @@ class Dragon(Entity):
                     if d[0] < 0:
                         theta = math.pi - theta
                     self.v = [15 * math.cos(theta), -15 * math.sin(theta)]
-                self.surface = self.attacking_img
+                if orig_vx < 0:
+                    self.surface = self.attacking_img
+                else:
+                    self.surface = pg.transform.flip(self.attacking_img, True, False)
                 self.stage = 1
-        # If we go too low or we hit the ground, switch modes
-        elif self.pos[1] > o.player.pos[1] + 10 * BLOCK_W:
-            self.v = [0, -15]
-            # Save the direction our surface is facing so it will switch correctly
-            self.attacking_img = self.surface
-            self.surface = self.rising_img
-            self.stage = 0
+        # If we get too far away, switch modes
+        else:
+            dx = self.pos[0] - o.player.pos[0]
+            dy = self.pos[1] - o.player.pos[1]
+            if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
+                self.surface = self.rising_img
+                self.stage = 0
