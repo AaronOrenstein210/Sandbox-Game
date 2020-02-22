@@ -4,10 +4,15 @@ import pygame as pg
 
 
 class ActiveUI:
-    def __init__(self, ui, rect, pos=(-1, -1)):
+    def __init__(self, ui, rect, pos=(-1, -1), invs=None):
         self.ui, self.rect = ui, rect
         # Used if it is tied to a block
         self.block_pos = list(pos)
+        # Stores any inventories
+        if invs is None:
+            self.invs = {}
+        else:
+            self.invs = invs
 
     # Override these if implementing a UI
     # Called when the screen is resized
@@ -19,5 +24,17 @@ class ActiveUI:
     def process_events(self, events, mouse, keys):
         return
 
+    # Draws stored surface
     def draw(self):
         pg.display.get_surface().blit(self.ui, self.rect)
+        self.draw_inventories()
+
+    # Handles mouse hovering over item in inventory
+    def draw_inventories(self):
+        pos = pg.mouse.get_pos()
+        if self.rect.collidepoint(*pos):
+            ui_pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+            for inv in self.invs.values():
+                if inv.rect.collidepoint(*ui_pos):
+                    inv_pos = [ui_pos[0] - inv.rect.x, ui_pos[1] - inv.rect.y]
+                    inv.draw_hover_item(inv_pos)

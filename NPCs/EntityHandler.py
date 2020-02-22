@@ -41,7 +41,7 @@ class EntityHandler:
                 return entity.stats.dmg, entity.rect.centerx
         return 0, 0
 
-    def get_display(self, rect):
+    def draw_display(self, rect):
         display = get_surface()
         for entity in self.entities:
             if rect.colliderect(entity.rect):

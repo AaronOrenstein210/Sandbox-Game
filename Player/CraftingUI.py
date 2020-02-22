@@ -4,30 +4,40 @@ import pygame as pg
 from pygame.locals import *
 from math import ceil
 from Tools.constants import BLOCK_W, INV_W
-from Tools import objects as o, constants as c
+from Tools import objects as o, constants as c, item_ids as items
 from Player.ActiveUI import ActiveUI
 
 
 class CraftingUI(ActiveUI):
+    # Recipes that don't need a crafting station
+    HAND_CRAFTS = [[[items.WORK_TABLE, 1], [items.WOOD, 10]]]
+
     def __init__(self, player):
         self.player = player
+        # Recipes that we can and can't craft
         self.can_craft, self.cant_craft = [], []
+        # Recipes
         self.recipes = []
+        # Crafting stations
         self.blocks = []
+        # Ui scroll amount
         self.scroll = 0
-        self.rect = pg.Rect(0, 5 * INV_W, 10 * INV_W, 5 * INV_W)
+        # Set rectangle based on player inventory rectangle
+        inv_rect = player.inventory.surface.get_rect(topleft=player.inventory.rect.topleft)
+        self.rect = inv_rect.move(0, inv_rect.h)
+        # Used to scroll horizontally on a recipe
         self.hold_x = -1
         # Variables for the current recipe
         self.selected = []
         self.selected_ui = None
-        self.selected_off = 0
+        self.selected_scroll = 0
         self.max_off = 0
         # Craft button
         font = c.get_scaled_font(self.rect.w, INV_W, "Craft", "Times New Roman")
         self.craft = font.render("Craft", 1, (0, 0, 0))
         self.craft_rect = self.craft.get_rect(centery=self.rect.h - INV_W // 2, right=self.rect.right - 2)
         self.recipe_rect = pg.Rect(0, self.craft_rect.y, self.craft_rect.x, INV_W)
-        ActiveUI.__init__(self, None, self.rect)
+        super().__init__(None, self.rect)
 
     @property
     def max_scroll(self):
@@ -44,6 +54,7 @@ class CraftingUI(ActiveUI):
         rect = self.player.placement_range
         blocks = []
         self.recipes.clear()
+        self.recipes += self.HAND_CRAFTS
         for x in crafters.keys():
             for y in crafters[x].keys():
                 tile = o.tiles[crafters[x][y]]
@@ -110,17 +121,20 @@ class CraftingUI(ActiveUI):
         surface.fill((0, 200, 200, 128))
         min_row = -self.scroll / INV_W
         for i, idx in enumerate(indexes[int(min_row) * 10: ceil(min_row + 4) * 10]):
+            # Get rectangle
+            x, y = (i % 10) * INV_W, (i // 10) * INV_W + self.scroll
+            rect = pg.Rect(x, y, INV_W, INV_W)
+            # Get the recipe
             r = self.recipes[idx]
-            img = pg.transform.scale(o.items[r[0][0]].inv_img, (INV_W, INV_W))
+            # Draw the result item's image
+            img = o.items[r[0][0]].inv_img
+            surface.blit(img, img.get_rect(center=rect.center))
+            # Draw result amount
             text = c.inv_font.render(str(r[0][1]), 1, (255, 255, 255))
-            text_rect = text.get_rect(bottomright=(INV_W, INV_W))
-            img.blit(text, text_rect)
-            # img.convert_alpha()
-            # img.fill((255, 255, 255, 128), None, pg.BLEND_RGBA_MULT)
-            surface.blit(img, ((i % 10) * INV_W, (i // 10) * INV_W + self.scroll))
+            surface.blit(text, text.get_rect(bottomright=rect.bottomright))
         if self.selected_ui is not None:
             surface.blit(self.selected_ui, self.recipe_rect.topleft,
-                         area=(-self.selected_off, 0, *self.recipe_rect.size))
+                         area=(-self.selected_scroll, 0, *self.recipe_rect.size))
         surface.blit(self.craft, self.craft_rect)
         pg.display.get_surface().blit(surface, self.rect)
         del surface
@@ -128,6 +142,25 @@ class CraftingUI(ActiveUI):
     def draw(self):
         self.update_blocks()
         self.update_ui(self.can_craft)
+        pos = pg.mouse.get_pos()
+        if self.rect.collidepoint(*pos):
+            pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+            # Draw description for result item
+            if not pos[1] >= self.recipe_rect.y:
+                # Get recipe we are hovering over
+                x, y = pos[0] // INV_W, (pos[1] - self.scroll) // INV_W
+                idx = y * 10 + x
+                if idx < len(self.can_craft):
+                    item = self.recipes[self.can_craft[idx]][0][0]
+                    o.items[item].draw_description()
+            # Draw description for recipe item
+            elif self.recipe_rect.collidepoint(*pos):
+                # Get index of recipe item we are hovering over
+                # +1 to skip the result item
+                idx = (pos[0] - self.selected_scroll) // INV_W + 1
+                if idx < len(self.selected):
+                    item = self.selected[idx][0]
+                    o.items[item].draw_description()
 
     def process_events(self, events, mouse, keys):
         pos = pg.mouse.get_pos()
@@ -135,68 +168,69 @@ class CraftingUI(ActiveUI):
         if self.hold_x != -1:
             # Moved mouse
             if mouse[BUTTON_LEFT - 1]:
-                self.selected_off += pos[0] - self.hold_x
-                if self.selected_off > 0:
-                    self.selected_off = 0
-                elif self.selected_off < self.max_off:
-                    self.selected_off = self.max_off
+                self.selected_scroll += pos[0] - self.hold_x
+                if self.selected_scroll > 0:
+                    self.selected_scroll = 0
+                elif self.selected_scroll < self.max_off:
+                    self.selected_scroll = self.max_off
                 self.hold_x = pos[0]
             # Stopped dragging
             else:
                 self.hold_x = -1
             mouse[BUTTON_LEFT - 1] = False
+        # Check events
         elif self.rect.collidepoint(*pos):
-            pos = [pos[0], pos[1] - self.rect.y]
+            pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
             inv = o.player.inventory
             if mouse[BUTTON_RIGHT - 1] and self.i_can_craft(pos):
                 inv.craft(self.selected)
                 o.player.use_time = 500
-                return
-            # Check for clicking
-            for e in events:
-                if e.type == MOUSEBUTTONUP:
-                    if e.button == BUTTON_LEFT:
-                        # Craft the item
-                        if self.i_can_craft(pos):
-                            # Use up ingredients
-                            inv.craft(self.selected)
-                            o.player.use_time = 500
-                            return
-                        # Select a new recipe
-                        elif pos[1] < self.recipe_rect.y:
-                            row = (pos[1] - self.scroll) // INV_W
-                            col = pos[0] // INV_W
-                            idx = row * 10 + col
-                            if idx < len(self.can_craft):
-                                self.selected = self.recipes[self.can_craft[idx]]
-                                items = self.selected[1:]
-                                w = len(items) * INV_W
-                                # Draw ingredients
-                                self.selected_ui = pg.Surface((w, INV_W), pg.SRCALPHA)
-                                for i, (item, amnt) in enumerate(items):
-                                    img = pg.transform.scale(o.items[item].inv_img, (INV_W, INV_W))
-                                    text = c.inv_font.render(str(amnt), 1, (255, 255, 255))
-                                    text_rect = text.get_rect(bottomright=(INV_W, INV_W))
-                                    img.blit(text, text_rect)
-                                    self.selected_ui.blit(img, (i * INV_W, 0))
-                                # Reset ingredient scroll
-                                if w > self.recipe_rect.w:
-                                    self.max_off = self.recipe_rect.w - w
-                                else:
-                                    self.max_off = 0
-                                self.selected_off = 0
-                    elif e.button in [BUTTON_WHEELUP, BUTTON_WHEELDOWN]:
-                        self.scroll += INV_W // 2 * (1 if e.button == BUTTON_WHEELUP else -1)
-                        if self.scroll > 0:
-                            self.scroll = 0
-                        else:
-                            ub = self.max_scroll
-                            if self.scroll < ub:
-                                self.scroll = self.max_scroll
-                # Start dragging
-                elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT and \
-                        self.recipe_rect.collidepoint(*pos):
-                    self.hold_x = pos[0]
-                else:
-                    continue
-                events.remove(e)
+            else:
+                # Check for clicking
+                for e in events:
+                    if e.type == MOUSEBUTTONUP:
+                        if e.button == BUTTON_LEFT:
+                            # Craft the item
+                            if self.i_can_craft(pos):
+                                # Use up ingredients
+                                inv.craft(self.selected)
+                                o.player.use_time = 500
+                                return
+                            # Select a new recipe
+                            elif pos[1] < self.recipe_rect.y:
+                                row = (pos[1] - self.scroll) // INV_W
+                                col = pos[0] // INV_W
+                                idx = row * 10 + col
+                                if idx < len(self.can_craft):
+                                    self.selected = self.recipes[self.can_craft[idx]]
+                                    parts = self.selected[1:]
+                                    w = len(parts) * INV_W
+                                    # Draw ingredients
+                                    self.selected_ui = pg.Surface((w, INV_W), pg.SRCALPHA)
+                                    for i, (item, amnt) in enumerate(parts):
+                                        rect = pg.Rect(i * INV_W, 0, INV_W, INV_W)
+                                        img = o.items[item].inv_img
+                                        self.selected_ui.blit(img, img.get_rect(center=rect.center))
+                                        text = c.inv_font.render(str(amnt), 1, (255, 255, 255))
+                                        self.selected_ui.blit(text, text.get_rect(bottomright=rect.bottomright))
+                                    # Reset ingredient scroll
+                                    if w > self.recipe_rect.w:
+                                        self.max_off = self.recipe_rect.w - w
+                                    else:
+                                        self.max_off = 0
+                                    self.selected_scroll = 0
+                        elif e.button in [BUTTON_WHEELUP, BUTTON_WHEELDOWN]:
+                            self.scroll += INV_W // 2 * (1 if e.button == BUTTON_WHEELUP else -1)
+                            if self.scroll > 0:
+                                self.scroll = 0
+                            else:
+                                ub = self.max_scroll
+                                if self.scroll < ub:
+                                    self.scroll = self.max_scroll
+                    # Start dragging
+                    elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT and \
+                            self.recipe_rect.collidepoint(*pos):
+                        self.hold_x = pos[0]
+                    else:
+                        continue
+                    events.remove(e)

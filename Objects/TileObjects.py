@@ -4,7 +4,6 @@ from sys import byteorder
 from random import choice
 from pygame.locals import *
 from Objects.TileTypes import *
-from Objects.ItemTypes import Block, create_block_from_zip
 from Objects.DroppedItem import DroppedItem
 from Objects import INV
 from NPCs import Mobs as mobs
@@ -14,7 +13,6 @@ from Tools import constants as c, item_ids as i, tile_ids as t
 from Tools import objects as o
 from World import WorldGenerator
 from World.World import World
-from UI.Operations import TextInput
 
 
 # Normal Tiles
@@ -28,7 +26,6 @@ class Dirt(Tile):
         super().__init__(t.DIRT, hardness=1, img=INV + "dirt.png")
         self.add_drop(i.DIRT, 1)
         self.map_color = (150, 75, 0)
-        Block(i.DIRT, t.DIRT, name="Dirt", img=INV + "dirt.png")
 
 
 class Stone(Tile):
@@ -36,7 +33,6 @@ class Stone(Tile):
         super().__init__(t.STONE, hardness=2, img=INV + "stone.png")
         self.add_drop(i.STONE, 1)
         self.map_color = (200, 200, 200)
-        Block(i.STONE, t.STONE, name="Stone", img=INV + "stone.png")
 
 
 class Snow(Tile):
@@ -44,7 +40,6 @@ class Snow(Tile):
         super().__init__(t.SNOW, hardness=1, img=INV + "snow.png")
         self.add_drop(i.SNOW_BALL, 2, 5)
         self.map_color = (255, 255, 255)
-        Block(i.SNOW, t.SNOW, name="Snow", img=INV + "snow.png")
 
 
 class Wood(Tile):
@@ -52,7 +47,6 @@ class Wood(Tile):
         super().__init__(t.WOOD, hardness=1, img=INV + "wood_tile.png")
         self.add_drop(i.WOOD, 1)
         self.map_color = (100, 50, 0)
-        Block(i.WOOD, t.WOOD, name="Wood", img=INV + "wood_item.png")
 
 
 class Leaves(Tile):
@@ -60,7 +54,6 @@ class Leaves(Tile):
         super().__init__(t.LEAVES, hardness=0, img=INV + "leaves.png")
         self.add_drop(i.LEAVES, 1)
         self.map_color = (0, 0, 100)
-        Block(i.LEAVES, t.LEAVES, name="Leaves", img=INV + "leaves.png")
 
 
 class Boulder1(Tile):
@@ -89,8 +82,6 @@ class ShinyStone1(Tile):
         super().__init__(t.SHINY_STONE_1, hardness=1, img=INV + "shiny_stone_1.png")
         self.add_drop(i.SHINY_STONE_1, 1)
         self.map_color = (175, 175, 175)
-        Block(i.SHINY_STONE_1, t.SHINY_STONE_1, name="Shiny Stone: Tier 1",
-              img=INV + "shiny_stone_1.png")
 
 
 class ShinyStone2(Tile):
@@ -98,8 +89,6 @@ class ShinyStone2(Tile):
         super().__init__(t.SHINY_STONE_2, hardness=1, img=INV + "shiny_stone_2.png")
         self.add_drop(i.SHINY_STONE_2, 1)
         self.map_color = (150, 150, 150)
-        Block(i.SHINY_STONE_2, t.SHINY_STONE_2, name="Shiny Stone: Tier 2",
-              img=INV + "shiny_stone_2.png")
 
 
 class ShinyStone3(Tile):
@@ -107,8 +96,6 @@ class ShinyStone3(Tile):
         super().__init__(t.SHINY_STONE_3, hardness=1, img=INV + "shiny_stone_3.png")
         self.add_drop(i.SHINY_STONE_3, 1)
         self.map_color = (125, 125, 125)
-        Block(i.SHINY_STONE_3, t.SHINY_STONE_3, name="Shiny Stone: Tier 3",
-              img=INV + "shiny_stone_3.png")
 
 
 class DragonEgg(Tile):
@@ -116,7 +103,6 @@ class DragonEgg(Tile):
         super().__init__(t.DRAGON_EGG, hardness=3, img=INV + "dragon_egg.png")
         self.add_drop(i.DRAGON_EGG, 1)
         self.map_color = (64, 200, 0)
-        Block(i.DRAGON_EGG, t.DRAGON_EGG, name="Dragon Egg", img=INV + "dragon_egg.png")
 
     def on_break(self, pos):
         d = mobs.Dragon()
@@ -136,13 +122,16 @@ class WorkTable(CraftingStation):
         self.on_surface = True
         self.map_color = (54, 78, 154)
         self.add_drop(i.WORK_TABLE, 1)
-        Block(i.WORK_TABLE, t.WORK_TABLE, name="Work Table", img=INV + "work_table.png")
 
     def get_recipes(self):
         return [[[i.SNOW, 1], [i.SNOW_BALL, 4]],
                 [[i.FOREST, 1], [i.DIRT, 50], [i.CAT, 1]],
                 [[i.MOUNTAIN, 1], [i.STONE, 10], [i.SNOW, 15]],
-                [[i.VALLEY, 1], [i.STONE, 50], [i.ZOMBIE, 1]]]
+                [[i.VALLEY, 1], [i.STONE, 50], [i.ZOMBIE, 1]],
+                [[i.BASIC_SWORD, 1], [i.WOOD, 10], [i.STONE, 20]],
+                [[i.CRUSHER, 1], [i.STONE, 15], [i.SHINY_STONE_1, 10]],
+                [[i.CHEST, 1], [i.WOOD, 15], [i.STONE, 5]],
+                [[i.WORLD_BUILDER, 1], [i.STONE, 25], [i.OBSIDIAN, 5]]]
 
 
 # Spawners
@@ -188,8 +177,6 @@ class DimensionHopper(FunctionalTile):
         self.scroller = None
         self.add_drop(i.DIMENSION_HOPPER, 1)
         self.map_color = (0, 0, 0)
-        Block(i.DIMENSION_HOPPER, t.DIMENSION_HOPPER, name="Dimension Hopper",
-              img=INV + "dimension_hopper.png")
 
     def activate(self, pos):
         o.player.active_ui = self.UI(pos)
@@ -246,12 +233,10 @@ class WorldBuilder(FunctionalTile):
     INV_SPOTS = 6
 
     def __init__(self):
-        super().__init__(t.WORLD_BUILDER, 4 * self.INV_SPOTS, img=INV + "world_builder.zip")
+        super().__init__(t.WORLD_BUILDER, 4 * self.INV_SPOTS, img=INV + "world_builder/")
         self.on_surface = True
         self.add_drop(i.WORLD_BUILDER, 1)
         self.map_color = (0, 0, 0)
-        create_block_from_zip(i.WORLD_BUILDER, t.WORLD_BUILDER, "World Builder",
-                              INV + "world_builder.zip")
 
     def activate(self, pos):
         data = c.get_from_dict(*pos, o.world.block_data)
@@ -274,26 +259,27 @@ class WorldBuilder(FunctionalTile):
         return True
 
     class UI(ActiveUI):
-        WRITE_ORDER = ["Biome", "Structure", "Size"]
+        BIOME, STRUCTURE, SIZE = range(3)
+        INV_ORDER = [BIOME, STRUCTURE, SIZE]
 
         def __init__(self, pos, data):
             self.name = ""
             self.cursor = False
-            # Load inventories and rectangles
-            self.invs = {"Biome": Inventory((2, 2), max_stack=1, items_list=o.biomes.keys()),
-                         "Structure": Inventory((1, 1), max_stack=4, items_list=[i.BONUS_STRUCTURE]),
-                         "Size": Inventory((1, 1), max_stack=1, items_list=WorldGenerator.WORLD_DIMS.keys())}
-            for j, key in enumerate(self.WRITE_ORDER):
+            # Load inventories
+            invs = {self.BIOME: Inventory((2, 2), max_stack=1, items_list=o.biomes.keys()),
+                    self.STRUCTURE: Inventory((1, 1), max_stack=4, items_list=[i.BONUS_STRUCTURE]),
+                    self.SIZE: Inventory((1, 1), max_stack=1, items_list=WorldGenerator.WORLD_DIMS.keys())}
+            for idx in self.INV_ORDER:
                 # Load data
-                num_bytes = self.invs[key].num_bytes
-                self.invs[key].load(data[:num_bytes])
+                num_bytes = invs[idx].num_bytes
+                invs[idx].load(data[:num_bytes])
                 data = data[num_bytes:]
-            # Set rectangles
+            # Set text height
             text_h = c.INV_W // 2
             # Text
-            text = {"Biome": "Biome Cards",
-                    "Structure": "Bonus Structure",
-                    "Size": "Size Card"}
+            text = {self.BIOME: "Biome Cards",
+                    self.STRUCTURE: "Bonus Structure",
+                    self.SIZE: "Size Card"}
             # Get font and inventory section width
             longest = c.get_widest_string(text.values())
             font = c.get_scaled_font(-1, text_h, longest)
@@ -301,12 +287,12 @@ class WorldBuilder(FunctionalTile):
             # Get all surfaces to draw
             surfaces = []
             y = 0
-            for key in self.WRITE_ORDER:
-                text_s = font.render(text[key], 1, (255, 255, 255))
+            for idx in self.INV_ORDER:
+                text_s = font.render(text[idx], 1, (255, 255, 255))
                 text_rect = text_s.get_rect(centerx=inv_w // 2, centery=y + text_h // 2)
                 surfaces.append([text_s, text_rect])
                 y += text_h
-                inv = self.invs[key]
+                inv = invs[idx]
                 inv.rect.y, inv.rect.centerx = y, inv_w // 2
                 surfaces.append([inv.surface, inv.rect])
                 y += inv.rect.h
@@ -326,7 +312,7 @@ class WorldBuilder(FunctionalTile):
             s = pg.Surface((inv_w * 2, y))
             for surface, rect in surfaces:
                 s.blit(surface, rect)
-            super().__init__(s, s.get_rect(), pos=pos)
+            super().__init__(s, s.get_rect(), pos=pos, invs=invs)
             self.on_resize()
 
             if not o.player.inventory.open:
@@ -335,8 +321,8 @@ class WorldBuilder(FunctionalTile):
         @property
         def data(self):
             data = bytearray()
-            for key in self.WRITE_ORDER:
-                data += self.invs[key].write()
+            for idx in self.INV_ORDER:
+                data += self.invs[idx].write()
             return data
 
         def process_events(self, events, mouse, keys):
@@ -411,7 +397,6 @@ class Chest(FunctionalTile):
         self.on_surface = True
         self.add_drop(i.CHEST, 1)
         self.map_color = (200, 200, 0)
-        Block(i.CHEST, t.CHEST, name="Chest", img=INV + "chest.png")
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
@@ -435,10 +420,10 @@ class Chest(FunctionalTile):
 
     class UI(ActiveUI):
         def __init__(self, pos, data):
-            self.inventory = Inventory(Chest.INV_DIM)
-            ActiveUI.__init__(self, self.inventory.surface,
-                              self.inventory.rect.move(0, self.inventory.rect.h), pos=pos)
-            self.inventory.load(data)
+            inventory = Inventory(Chest.INV_DIM)
+            ActiveUI.__init__(self, inventory.surface, inventory.rect.move(0, inventory.rect.h),
+                              pos=pos, invs={0: inventory})
+            self.invs[0].load(data)
 
             if not o.player.inventory.open:
                 o.player.inventory.toggle()
@@ -449,10 +434,10 @@ class Chest(FunctionalTile):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                 if o.player.use_time <= 0:
                     if mouse[BUTTON_LEFT - 1]:
-                        self.inventory.left_click(pos)
+                        self.invs[0].left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
-                        self.inventory.right_click(pos)
-                    c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
+                        self.invs[0].right_click(pos)
+                    c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
             if keys[K_ESCAPE]:
                 o.player.active_ui = None
                 keys[K_ESCAPE] = False
@@ -460,11 +445,10 @@ class Chest(FunctionalTile):
 
 class Crusher(FunctionalTile):
     def __init__(self):
-        super().__init__(t.CRUSHER, 4, img=INV + "crusher.zip", dim=(2, 2))
+        super().__init__(t.CRUSHER, 4, img=INV + "crusher/", dim=(2, 2))
         self.on_surface = True
         self.add_drop(i.CRUSHER, 1)
         self.map_color = (64, 64, 64)
-        create_block_from_zip(i.CRUSHER, t.CRUSHER, "Crusher", INV + "crusher.zip")
 
     def on_place(self, pos):
         c.update_dict(*pos, (0).to_bytes(4, byteorder), o.world.block_data)
@@ -504,12 +488,12 @@ class Crusher(FunctionalTile):
             s = pg.Surface((w, c.INV_W * 2))
             s.blit(text, self.text_rect)
             # This is where we will take/add items
-            self.inventory = Inventory((1, 1), items_list=self.ITEMS, max_stack=9)
-            self.inventory.rect = pg.Rect((w - c.INV_W) // 2, 0, c.INV_W, c.INV_W)
-            self.inventory.load(data)
-            s.blit(self.inventory.surface, self.inventory.rect)
+            inventory = Inventory((1, 1), items_list=self.ITEMS, max_stack=9)
+            inventory.rect = pg.Rect((w - c.INV_W) // 2, 0, c.INV_W, c.INV_W)
+            inventory.load(data)
+            s.blit(inventory.surface, inventory.rect)
 
-            ActiveUI.__init__(self, s, s.get_rect(), pos=pos)
+            ActiveUI.__init__(self, s, s.get_rect(), pos=pos, invs={0: inventory})
 
             self.on_resize()
 
@@ -522,18 +506,18 @@ class Crusher(FunctionalTile):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                 for e in events:
                     if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT and \
-                            self.text_rect.collidepoint(*pos) and self.inventory.inv_amnts[0][0] != 0:
+                            self.text_rect.collidepoint(*pos) and self.invs[0].inv_amnts[0][0] != 0:
                         from Objects import CRUSH_DROPS
                         items = {}
-                        item = self.inventory.inv_items[0][0]
+                        item = self.invs[0].inv_items[0][0]
                         # Go through each item and get a random drop
-                        while self.inventory.inv_amnts[0][0] > 0:
+                        while self.invs[0].inv_amnts[0][0] > 0:
                             idx, amnt = CRUSH_DROPS[item](randint(1, 100))
                             if idx in items.keys():
                                 items[idx] += amnt
                             else:
                                 items[idx] = amnt
-                            self.inventory.inv_amnts[0][0] -= 1
+                            self.invs[0].inv_amnts[0][0] -= 1
                         # Drop the results
                         block_pos = [self.block_pos[0] * BLOCK_W, self.block_pos[1] * BLOCK_W]
                         for idx, amnt in zip(items.keys(), items.values()):
@@ -544,22 +528,22 @@ class Crusher(FunctionalTile):
                                 item_obj = DroppedItem(idx, transfer)
                                 o.player.drop_item(item_obj, choice([True, False]), block_pos)
                                 amnt -= transfer
-                        c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
-                        self.inventory.update_item(0, 0)
+                        c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
+                        self.invs[0].update_item(0, 0)
 
-                if o.player.use_time <= 0 and self.inventory.rect.collidepoint(*pos):
-                    pos = [pos[0] - self.inventory.rect.x, pos[1] - self.inventory.rect.y]
+                if o.player.use_time <= 0 and self.invs[0].rect.collidepoint(*pos):
+                    pos = [pos[0] - self.invs[0].rect.x, pos[1] - self.invs[0].rect.y]
                     if mouse[BUTTON_LEFT - 1]:
-                        self.inventory.left_click(pos)
+                        self.invs[0].left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
-                        self.inventory.right_click(pos)
-                    c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
+                        self.invs[0].right_click(pos)
+                    c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
 
-                self.ui.fill((0, 0, 0), self.inventory.rect)
-                self.ui.blit(self.inventory.surface, self.inventory.rect)
+                self.ui.fill((0, 0, 0), self.invs[0].rect)
+                self.ui.blit(self.invs[0].surface, self.invs[0].rect)
 
             if keys[K_ESCAPE]:
-                c.update_dict(*self.block_pos, self.inventory.write(), o.world.block_data)
+                c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
                 o.player.active_ui = None
 
 # End

@@ -4,7 +4,7 @@ from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
 from Tools.constants import *
-from Tools import objects as o, item_ids as items
+from Tools import objects as o, item_ids as i, tile_ids as t
 from NPCs.Mobs import Dragon
 
 
@@ -14,13 +14,16 @@ from NPCs.Mobs import Dragon
 # Useable Items
 class SnowBall(Item):
     def __init__(self):
-        super().__init__(items.SNOW_BALL, img=INV + "snow_ball.png", name="Snow Ball")
+        super().__init__(i.SNOW_BALL, img=INV + "snow_ball.png", name="Snow Ball")
         self.max_stack = 99
+
+    def get_description(self):
+        return "Fun to throw!"
 
 
 class DragonClaw(Item):
     def __init__(self):
-        super().__init__(items.DRAGON_CLAW, img=INV + "dragon_claw.png", name="Dragon Claw")
+        super().__init__(i.DRAGON_CLAW, img=INV + "dragon_claw.png", name="Dragon Claw")
         self.consumable = True
 
     def on_left_click(self):
@@ -29,10 +32,13 @@ class DragonClaw(Item):
                   o.player.pos[1] + randint(15, 30) * BLOCK_W * random_sign())
         o.player.handler.entities.append(d)
 
+    def get_description(self):
+        return "A claw, torn from a defeated dragon\nIt holds many magical properties"
+
 
 class Dematerializer(Item):
     def __init__(self):
-        super().__init__(items.DEMATERIALIZER, img=INV + "dematerializer.png",
+        super().__init__(i.DEMATERIALIZER, img=INV + "dematerializer.png",
                          name="Dematerializer")
         self.use_time = 1000
 
@@ -53,10 +59,13 @@ class Dematerializer(Item):
             pos = [s + progress * -d for s, d in zip(spawn, delta)]
             o.player.set_pos(pos)
 
+    def get_description(self):
+        return "Teleports the user back to spawn"
+
 
 class TimeWarp(Item):
     def __init__(self):
-        super().__init__(items.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
+        super().__init__(i.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
         self.right_click = True
 
     def on_tick(self):
@@ -68,79 +77,222 @@ class TimeWarp(Item):
         else:
             o.player.use_time = 0
 
+    def get_description(self):
+        return "Left click to move time forwards, right click to move time backwards"
+
 
 # Biome Items
 class ForestBiome(Item):
     def __init__(self):
-        super().__init__(items.FOREST, img=INV + "forest.png", name="Forest Biome")
+        super().__init__(i.FOREST, img=INV + "forest.png", name="Forest Biome")
+
+    def get_description(self):
+        return "Contains the essence of the Forest"
 
 
 class MountainBiome(Item):
     def __init__(self):
-        super().__init__(items.MOUNTAIN, img=INV + "mountain.png", name="Mountain Biome")
+        super().__init__(i.MOUNTAIN, img=INV + "mountain.png", name="Mountain Biome")
+
+    def get_description(self):
+        return "Holds the secret of the Mountains"
 
 
 class ValleyBiome(Item):
     def __init__(self):
-        super().__init__(items.VALLEY, img=INV + "valley.png", name="Valley Biome")
+        super().__init__(i.VALLEY, img=INV + "valley.png", name="Valley Biome")
+
+    def get_description(self):
+        return "Reveals the mysteries of the Valley"
 
 
 class SmallWorld(Item):
     def __init__(self):
-        super().__init__(items.SMALL_WORLD, img=INV + "small_world.png", name="Small World")
+        super().__init__(i.SMALL_WORLD, img=INV + "small_world.png", name="Small World")
+
+    def get_description(self):
+        return "Holds the power to create a small world"
 
 
 class MedWorld(Item):
     def __init__(self):
-        super().__init__(items.MED_WORLD, img=INV + "med_world.png", name="Medium World")
+        super().__init__(i.MED_WORLD, img=INV + "med_world.png", name="Medium World")
+
+    def get_description(self):
+        return "Holds the power to create a medium-sized world"
 
 
 class LargeWorld(Item):
     def __init__(self):
-        super().__init__(items.LARGE_WORLD, img=INV + "large_world.png", name="Large World")
+        super().__init__(i.LARGE_WORLD, img=INV + "large_world.png", name="Large World")
+
+    def get_description(self):
+        return "Holds the power to bring a large world into existence"
 
 
 class BonusStructure(Item):
     def __init__(self):
-        super().__init__(items.BONUS_STRUCTURE, img=INV + "bonus_structure.png", name="Bonus Structure")
+        super().__init__(i.BONUS_STRUCTURE, img=INV + "bonus_structure.png", name="Bonus Structure")
+
+    def get_description(self):
+        return "With this item, new worlds can hold one more structure"
 
 
 # Ore items
 class IronOre(Item):
     def __init__(self):
-        super().__init__(items.IRON_ORE, img=INV + "iron_ore.png", name="Iron Ore")
+        super().__init__(i.IRON_ORE, img=INV + "iron_ore.png", name="Iron Ore")
 
 
 class GoldOre(Item):
     def __init__(self):
-        super().__init__(items.GOLD_ORE, img=INV + "gold_ore.png", name="Gold Ore")
+        super().__init__(i.GOLD_ORE, img=INV + "gold_ore.png", name="Gold Ore")
 
 
 class Pyrite(Item):
     def __init__(self):
-        super().__init__(items.PYRITE, img=INV + "pyrite.png", name="Pyrite Chunk")
+        super().__init__(i.PYRITE, img=INV + "pyrite.png", name="Pyrite Chunk")
+
+    def get_description(self):
+        return "Oooh, shiny!"
 
 
 class Sphalerite(Item):
     def __init__(self):
-        super().__init__(items.SPHALERITE, img=INV + "sphalerite.png", name="Sphalerite Crystal")
+        super().__init__(i.SPHALERITE, img=INV + "sphalerite.png", name="Sphalerite Crystal")
+
+    def get_description(self):
+        return "Sphaler-what?"
 
 
 class Obsidian(Item):
     def __init__(self):
-        super().__init__(items.OBSIDIAN, img=INV + "obsidian.png", name="Obsidian Shard")
+        super().__init__(i.OBSIDIAN, img=INV + "obsidian.png", name="Obsidian Shard")
+
+    def get_description(self):
+        return "Obtained from the nether regions of the world"
 
 
 # Weapons/Tools
 class TestSword(Weapon):
     def __init__(self):
-        super().__init__(items.TEST_SWORD, damage=15, damage_type=MELEE,
-                         img=INV + "test_sword.png", name="Test Sword")
+        super().__init__(i.BASIC_SWORD, damage=7, damage_type=MELEE,
+                         img=INV + "basic_sword.png", name="Basic Sword")
+
+    def get_description(self):
+        return "Your basic sword\nIt has so much potential"
 
 
 class TestPickaxe(Weapon):
     def __init__(self):
-        super().__init__(items.TEST_PICKAXE, damage=5, damage_type=MELEE,
-                         img=INV + "test_pickaxe.png", name="Test Pickaxe")
+        super().__init__(i.BASIC_PICKAXE, damage=3, damage_type=MELEE,
+                         img=INV + "basic_pickaxe.png", name="Basic Pickaxe")
         self.auto_use = True
         self.breaks_blocks = True
+
+    def get_description(self):
+        return "Your basic pickaxe\nIt has so much potential"
+
+
+# Blocks
+class Dirt(Block):
+    def __init__(self):
+        super().__init__(i.DIRT, t.DIRT, name="Dirt", img=INV + "dirt.png")
+
+
+class Stone(Block):
+    def __init__(self):
+        super().__init__(i.STONE, t.STONE, name="Stone", img=INV + "stone.png")
+
+
+class Snow(Block):
+    def __init__(self):
+        super().__init__(i.SNOW, t.SNOW, name="Snow", img=INV + "snow.png")
+
+
+class Wood(Block):
+    def __init__(self):
+        super().__init__(i.WOOD, t.WOOD, name="Wood", img=INV + "wood_item.png")
+
+
+class Leaves(Block):
+    def __init__(self):
+        super().__init__(i.LEAVES, t.LEAVES, name="Leaves", img=INV + "leaves.png")
+
+
+class ShinyStone1(Block):
+    def __init__(self):
+        super().__init__(i.SHINY_STONE_1, t.SHINY_STONE_1, name="Shiny Stone: Tier 1",
+                         img=INV + "shiny_stone_1.png")
+
+    def get_description(self):
+        return "You can kind of see something shiny inside"
+
+
+class ShinyStone2(Block):
+    def __init__(self):
+        super().__init__(i.SHINY_STONE_2, t.SHINY_STONE_2, name="Shiny Stone: Tier 2",
+                         img=INV + "shiny_stone_2.png")
+
+    def get_description(self):
+        return "Ooh, this rock is pretty"
+
+
+class ShinyStone3(Block):
+    def __init__(self):
+        super().__init__(i.SHINY_STONE_3, t.SHINY_STONE_3, name="Shiny Stone: Tier 3",
+                         img=INV + "shiny_stone_3.png")
+
+    def get_description(self):
+        return "The glow of untold riches within tempts your greed"
+
+
+class DragonEgg(Block):
+    def __init__(self):
+        super().__init__(i.DRAGON_EGG, t.DRAGON_EGG, name="Dragon Egg", img=INV + "dragon_egg.png")
+
+    def get_description(self):
+        return "There's definitely something alive in here"
+
+
+class WorkTable(Block):
+    def __init__(self):
+        super().__init__(i.WORK_TABLE, t.WORK_TABLE, name="Work Table", img=INV + "work_table.png")
+
+    def get_description(self):
+        return "Now you can make pretty furniture!"
+
+
+class DimensionHopper(Block):
+    def __init__(self):
+        super().__init__(i.DIMENSION_HOPPER, t.DIMENSION_HOPPER, name="Dimension Hopper",
+                         img=INV + "dimension_hopper.png")
+
+    def get_description(self):
+        return "A mysterious portal that calls to your adventurous spirit"
+
+
+class Chest(Block):
+    def __init__(self):
+        super().__init__(i.CHEST, t.CHEST, name="Chest", img=INV + "chest.png")
+
+    def get_description(self):
+        return "Challenge idea: this block is only unlocked after beating the final boss"
+
+
+class WorldBuilder(Block):
+    def __init__(self):
+        super().__init__(i.WORLD_BUILDER, t.WORLD_BUILDER, name="World Builder",
+                         img=INV + "world_builder/world_builder_0.png")
+
+    def get_description(self):
+        return "Channels the energy of biomes to create entire worlds\n" + \
+               "Legend says that the presence of certain biome combinations will allow rare creatures to spawn"
+
+
+class Crusher(Block):
+    def __init__(self):
+        super().__init__(i.CRUSHER, t.CRUSHER, name="Crusher", img=INV + "crusher/crusher_0.png")
+
+    def get_description(self):
+        return "This machine looks powerful enough to crush those shiny stones that you found"

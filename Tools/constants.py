@@ -38,14 +38,16 @@ MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 RANDOM, FOLLOW, FLY = 0, 1, 2
 
 # Fonts
-inv_font, load_font, ui_font = None, None, None
+pg.init()
+# Inventory font, Loading screen font, UI font
+inv_font = load_font = ui_font = None
 
 
 def load_fonts():
     global inv_font, load_font, ui_font
-    inv_font = get_scaled_font(INV_W, INV_W // 3, "_" * 3, "Times New Roman")
-    load_font = get_scaled_font(MIN_W // 2, MIN_H // 10, "_" * 25, "Times New Roman")
-    ui_font = get_scaled_font(MIN_W // 3, MIN_H // 20, "_" * 30, "Times New Roman")
+    inv_font = get_scaled_font(INV_W, INV_W // 3, "999")
+    load_font = get_scaled_font(-1, MIN_H // 15, "|")
+    ui_font = get_scaled_font(-1, INV_W * 2 // 5, "|")
 
 
 def resize(w, h):

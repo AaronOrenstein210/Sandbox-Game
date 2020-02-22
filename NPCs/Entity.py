@@ -288,7 +288,7 @@ def touching_blocks_y(pos, dim, top):
     # Get dimensions in pixels
     w, h = dim[0] * BLOCK_W, dim[1] * BLOCK_W
     # Check if we are actually touching a new block (including non-solid)
-    diff = abs(pos[1] + (0 if top else h)) % BLOCK_W
+    diff = (pos[1] + (0 if top else h)) % BLOCK_W
     touching = diff == 0
     if touching:
         # Get next y block

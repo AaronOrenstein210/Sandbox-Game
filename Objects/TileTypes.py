@@ -1,8 +1,7 @@
 # Created on 23 November 2019
-# SpawnBlocks are blocks that spawn enemies
 
 from random import random
-from os.path import isfile
+from os.path import isfile, isdir
 import pygame as pg
 from random import randint
 from Tools.constants import BLOCK_W, scale_to_fit, update_dict
@@ -36,15 +35,14 @@ class Tile:
         self.map_color = (64, 64, 255)
         # Load image if given
         img_dim = (BLOCK_W * dim[0], BLOCK_W * dim[1])
-        self.image = pg.Surface(img_dim)
-        if isfile(img):
-            if img.endswith(".png"):
-                self.image = scale_to_fit(pg.image.load(img), *img_dim)
-            elif img.endswith(".zip"):
-                self.anim_idx = len(o.animations)
-                o.animations.append(Animation(img, img_dim, delay=delay))
-                self.image = o.animations[-1].frames[0]
-
+        if isfile(img) and img.endswith(".png") or img.endswith(".jpg"):
+            self.image = scale_to_fit(pg.image.load(img), *img_dim)
+        elif isdir(img):
+            self.anim_idx = len(o.animations)
+            o.animations.append(Animation(img, img_dim, delay=delay))
+            self.image = o.animations[-1].frames[0]
+        else:
+            self.image = pg.Surface(img_dim)
         # Number of bytes of data
         self.data_bytes = 0
         # List of drops, each drop is a item/amnt pair
@@ -130,6 +128,7 @@ class CraftingStation(Tile):
                 i += 1
 
     def get_recipes(self):
+        # Format = [[[result, amnt], [input1, amnt], [input2, amnt], ...], ...]
         return []
 
 
@@ -141,6 +140,7 @@ class FunctionalTile(Tile):
         self.data_bytes = data_bytes
 
 
+# SpawnBlocks are blocks that spawn enemies
 class SpawnTile(Tile):
     def __init__(self, idx, entity, item_id=-1):
         self.entity = entity

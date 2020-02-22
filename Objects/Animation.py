@@ -1,22 +1,21 @@
 # Created on 22 December 2019
 
-from os import remove
+from os import listdir
+from os.path import isdir
 import pygame as pg
-from zipfile import ZipFile
+from Tools.constants import scale_to_fit
 from Tools import objects as o
 
 
 # Generic animations, goes through list of frames
 class Animation:
-    def __init__(self, gif, dim, delay=100):
+    def __init__(self, folder, dim, delay=100):
         self.frames = []
         # Load frames
-        with ZipFile(gif, "r") as file:
-            for name in file.namelist():
-                file.extract(name)
-                if name.endswith(".png"):
-                    self.frames.append(pg.transform.scale(pg.image.load(name), dim))
-                remove(name)
+        if isdir(folder):
+            for file in listdir(folder):
+                if file.endswith(".png") or file.endswith(".jpg"):
+                    self.frames.append(scale_to_fit(pg.image.load(folder + file), *dim))
         self.frame_delay = delay
         self.idx = 0
         self.time = 0

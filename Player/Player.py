@@ -11,7 +11,7 @@ from Tools.tile_ids import AIR
 from Player.PlayerInventory import PlayerInventory
 from Player.CraftingUI import CraftingUI
 from Player.Stats import Stats
-from NPCs.Entity import check_collisions, touching_blocks_y
+from NPCs.Entity import check_collisions, touching_blocks_y, touching_blocks_x
 from NPCs.EntityHandler import EntityHandler
 from Objects.DroppedItem import DroppedItem
 
@@ -52,12 +52,20 @@ class Player:
         self.pos = [0, 0]
         self.v = [0., 0.]
         self.a = [0, 1]
+        # Distance fallen
+        self.fall_dist = 0
+        # Attack immunity
         self.immunity = 0
+        # Respawn counter
+        self.respawn_counter = 0
+        # Whether we can move or not
         self.can_move = True
-        # Stores an active ui
+        # Stores an active ui and position of source block if applicable
         self.active_ui = None
-        # Position of block with ui
         self.active_block = [0, 0]
+        # List of damage text boxes [[surface, center, duration], ...]
+        self.dmg_text = []
+        # If the world map is open or not
         self.map_open = False
         # Crafting UI
         self.crafting_ui = CraftingUI(self)
@@ -76,16 +84,7 @@ class Player:
         return [(p + r) // BLOCK_W for p, r in zip(pos, rect.topleft)]
 
     def run(self, events):
-        world = o.world
-
-        mouse = list(pg.mouse.get_pressed())
-        keys = list(pg.key.get_pressed())
-
-        global pos, global_pos, rect
-        rect = o.world.get_view_rect(self.rect.center)
-        pos = pg.mouse.get_pos()
-        global_pos = (pos[0] + rect.x, pos[1] + rect.y)
-
+        # Check for quitting and resizing
         for e in events:
             if e.type == QUIT:
                 return False
@@ -94,106 +93,122 @@ class Player:
                 if self.active_ui is not None:
                     self.active_ui.on_resize()
                 events.remove(e)
-
-        if self.map_open:
-            for e in events:
-                if e.type == MOUSEBUTTONUP:
-                    if e.button == BUTTON_RIGHT:
-                        dim = pg.display.get_surface().get_size()
-                        center = (dim[0] / 2, dim[1] / 2)
-                        delta = [(pos[i] - center[i]) / world.map_zoom for i in (0, 1)]
-                        new_pos = [world.map_off[i] + delta[i] for i in (0, 1)]
-                        for i in (0, 1):
-                            if new_pos[i] < 0:
-                                new_pos[i] = 0
-                            elif new_pos[i] >= world.dim[i]:
-                                new_pos[i] = world.dim[i] - 1
-                            new_pos[i] *= BLOCK_W
-                        self.set_pos(new_pos)
-                        self.map_open = False
-                    elif e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN:
-                        up = e.button == BUTTON_WHEELUP
-                        if up and world.map_zoom < 10:
-                            world.map_zoom += .5
-                        elif not up and world.map_zoom > 1:
-                            world.map_zoom -= .5
-                elif e.type == KEYUP:
-                    if e.key == K_ESCAPE:
-                        self.map_open = False
-            world.move_map(keys)
+        # If wer are dead, decrement respawn counter
+        if self.respawn_counter > 0:
+            self.respawn_counter -= o.dt
+            if self.respawn_counter <= 0:
+                self.respawn()
+        # Otherwise interperet events
         else:
-            # Check if we need to open or close the crafting menu
-            if self.inventory.open:
-                if self.active_ui is None:
-                    self.active_ui = self.crafting_ui
+            mouse = list(pg.mouse.get_pressed())
+            keys = list(pg.key.get_pressed())
+
+            global pos, global_pos, rect
+            rect = o.world.get_view_rect(self.rect.center)
+            pos = pg.mouse.get_pos()
+            global_pos = (pos[0] + rect.x, pos[1] + rect.y)
+
+            if self.map_open:
+                for e in events:
+                    if e.type == MOUSEBUTTONUP:
+                        if e.button == BUTTON_RIGHT:
+                            dim = pg.display.get_surface().get_size()
+                            center = (dim[0] / 2, dim[1] / 2)
+                            delta = [(pos[i] - center[i]) / o.world.map_zoom for i in (0, 1)]
+                            new_pos = [o.world.map_off[i] + delta[i] for i in (0, 1)]
+                            for i in (0, 1):
+                                if new_pos[i] < 0:
+                                    new_pos[i] = 0
+                                elif new_pos[i] >= o.world.dim[i]:
+                                    new_pos[i] = o.world.dim[i] - 1
+                                new_pos[i] *= BLOCK_W
+                            self.set_pos(new_pos)
+                            self.map_open = False
+                        elif e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN:
+                            up = e.button == BUTTON_WHEELUP
+                            if up and o.world.map_zoom < 10:
+                                o.world.map_zoom += .5
+                            elif not up and o.world.map_zoom > 1:
+                                o.world.map_zoom -= .5
+                    elif e.type == KEYUP:
+                        if e.key == K_ESCAPE:
+                            self.map_open = False
+                o.world.move_map(keys)
             else:
-                if self.active_ui is self.crafting_ui:
-                    self.active_ui = None
-            # Send the events to the current active UI
-            if self.active_ui is not None:
-                self.active_ui.process_events(events, mouse, keys)
-
-            for e in events:
-                if self.use_time <= 0 and e.type == MOUSEBUTTONUP and \
-                        (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
-                    up = e.button == BUTTON_WHEELUP
-                    self.inventory.scroll(up)
-                    if up and world.minimap_zoom < 5:
-                        world.minimap_zoom += .5
-                    elif not up and world.minimap_zoom > 1:
-                        world.minimap_zoom -= .5
-                elif e.type == KEYUP or e.type == KEYDOWN:
-                    up = e.type == KEYUP
-                    # Try to jump
-                    if e.key == K_SPACE and self.can_move:
-                        if up:
-                            self.a[1] = 1
-                        else:
-                            if touching_blocks_y(self.pos, self.dim, False):
-                                self.v[1] = -15
-                    elif up and e.key == K_m:
-                        self.map_open = True
-                        world.map_off = [p / BLOCK_W for p in self.rect.center]
-                    elif self.use_time <= 0 or e.key in [K_ESCAPE]:
-                        self.inventory.key_pressed(e.key, up)
-
-            # Item not in use and not touching tile ui
-            if self.use_time <= 0 and \
-                    (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
-                # Mouse click events
-                if mouse[BUTTON_LEFT - 1]:
-                    self.left_click()
+                # Check if we need to open or close the crafting menu
+                if self.inventory.open:
+                    if self.active_ui is None:
+                        self.active_ui = self.crafting_ui
                 else:
-                    self.first_swing = True
-                    if mouse[BUTTON_RIGHT - 1]:
-                        self.right_click()
+                    if self.active_ui is self.crafting_ui:
+                        self.active_ui = None
+                # Send the events to the current active UI
+                if self.active_ui is not None:
+                    self.active_ui.process_events(events, mouse, keys)
+
+                for e in events:
+                    if self.use_time <= 0 and e.type == MOUSEBUTTONUP and \
+                            (e.button == BUTTON_WHEELUP or e.button == BUTTON_WHEELDOWN):
+                        up = e.button == BUTTON_WHEELUP
+                        self.inventory.scroll(up)
+                        if up and o.world.minimap_zoom < 5:
+                            o.world.minimap_zoom += .5
+                        elif not up and o.world.minimap_zoom > 1:
+                            o.world.minimap_zoom -= .5
+                    elif e.type == KEYUP or e.type == KEYDOWN:
+                        up = e.type == KEYUP
+                        # Try to jump
+                        if e.key == K_SPACE and self.can_move:
+                            if up:
+                                self.a[1] = 1
+                            else:
+                                if touching_blocks_y(self.pos, self.dim, False):
+                                    self.v[1] = -15
+                        elif up and e.key == K_m:
+                            self.map_open = True
+                            o.world.map_off = [p / BLOCK_W for p in self.rect.center]
+                        elif self.use_time <= 0 or e.key in [K_ESCAPE]:
+                            self.inventory.key_pressed(e.key, up)
+
+                # Item not in use and not touching tile ui
+                if self.use_time <= 0 and \
+                        (self.active_ui is None or not self.active_ui.rect.collidepoint(*pos)):
+                    # Mouse click events
+                    if mouse[BUTTON_LEFT - 1]:
+                        self.left_click()
                     else:
-                        self.inventory.holding_r = 0
+                        self.first_swing = True
+                        if mouse[BUTTON_RIGHT - 1]:
+                            self.right_click()
+                        else:
+                            self.inventory.holding_r = 0
 
-            # Key pressed events
+                # Key pressed events
+                if self.can_move:
+                    self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
+                        else 1
+                    if keys[K_SPACE]:
+                        self.v[1] = -15
+
+            # If we are using an item, let it handle the use time
+            if self.item_used is not None:
+                self.item_used.on_tick()
+                # Check if we are done using the item
+                if self.use_time <= 0:
+                    self.item_used = None
+            # Otherwise decrement the use time
+            elif self.use_time >= 0:
+                self.use_time -= o.dt
+
+            # Update player and all entities/items/projectiles
             if self.can_move:
-                self.a[0] = 0 if not keys[K_a] ^ keys[K_d] else -1 if keys[K_a] \
-                    else 1
-                if keys[K_SPACE]:
-                    self.v[1] = -15
+                self.move()
 
-        # If we are using an item, let it handle the use time
-        if self.item_used is not None:
-            self.item_used.on_tick()
-            # Check if we are done using the item
-            if self.use_time <= 0:
-                self.item_used = None
-        # Otherwise decrement the use time
-        elif self.use_time >= 0:
-            self.use_time -= o.dt
-
+        # Update enitities
         self.handler.spawn()
-        # Update player and all entities/items/projectiles
-        if self.can_move:
-            self.move()
         self.handler.move()
         # Check if anything hit the player
-        if self.immunity <= 0:
+        if self.immunity <= 0 and self.respawn_counter <= 0:
             dmg, entity_x = self.handler.check_hit_player(self.rect)
             if dmg > 0:
                 self.hit(dmg, entity_x)
@@ -203,7 +218,7 @@ class Player:
             display = pg.display.get_surface()
             display.fill(c.BACKGROUND)
             sprites = {(i / BLOCK_W for i in self.rect.center): self.sprite}
-            map_ = world.get_map(display.get_size(), sprites=sprites)
+            map_ = o.world.get_map(display.get_size(), sprites=sprites)
             map_rect = map_.get_rect(center=display.get_rect().center)
             display.blit(map_, map_rect)
         else:
@@ -237,11 +252,28 @@ class Player:
                 self.v[i] += copysign(dt * 20, self.a[i])
                 self.v[i] = copysign(min(abs(self.v[i]), self.stats.spd[i]), self.v[i])
 
+        # Check for collisions and set new position
+        temp = self.pos.copy()
         check_collisions(self.pos, self.dim, d)
         self.set_pos(self.pos)
+        d = [self.pos[0] - temp[0], self.pos[1] - temp[1]]
 
-        # if touching_blocks_y(self.pos, self.rect, True):
-        #    self.v[1] = 1
+        # Check if we are touching the ground
+        if not touching_blocks_y(self.pos, self.dim, False):
+            # If we are falling, add to our fall distance
+            if self.v[1] > 0:
+                self.fall_dist += d[1]
+            else:
+                self.fall_dist = 0
+        else:
+            # If we are touching the gruond and had a fall distance, do fall damage
+            if self.fall_dist > 7 * BLOCK_W:
+                self.hit(int(self.fall_dist / BLOCK_W) - 7, None)
+            self.fall_dist = 0
+
+        # Check if we hit a block above use and stop our upwards movement
+        if touching_blocks_y(self.pos, self.dim, True):
+            self.v[1] = 1
 
     def set_pos(self, topleft):
         self.pos = list(topleft)
@@ -369,11 +401,33 @@ class Player:
                 img_pos = [(int(m / BLOCK_W) * BLOCK_W) - p for m, p in zip(global_pos, rect.topleft)]
                 display.blit(img, img_pos)
         # Draw all entities/projectiles/items, in that order
-        self.handler.get_display(rect)
+        self.handler.draw_display(rect)
 
-        # Draw player and inventory
+        # Draw player
         display.blit(self.surface, (self.pos[0] - rect.x, self.pos[1] - rect.y))
+
+        # Draw damage text
+        i = 0
+        for arr in self.dmg_text:
+            # Decrement the duration
+            arr[2] -= o.dt
+            # Check if the text is finished
+            if arr[2] <= 0:
+                del self.dmg_text[i]
+            else:
+                # Move the text up
+                arr[1][1] -= BLOCK_W * 1.5 * o.dt / 1000
+                # Check if we need to blit it
+                r = arr[0].get_rect(center=arr[1])
+                if r.colliderect(rect):
+                    display.blit(arr[0], (r.x - rect.x, r.y - rect.y))
+                i += 1
+
+        # Draw inventory
         display.blit(self.inventory.surface, (0, 0), area=self.inventory.rect)
+        if self.inventory.rect.collidepoint(*pos):
+            pos_ = [pos[0] - self.inventory.rect.x, pos[1] - self.inventory.rect.y]
+            self.inventory.draw_hover_item(pos_)
 
         # Draw item being used
         if self.item_used is not None:
@@ -395,12 +449,6 @@ class Player:
         # Get minimap
         player_c = [i / BLOCK_W for i in self.rect.center]
         minimap = o.world.get_minimap(player_c, sprites={tuple(player_c): self.sprite})
-        # Figure out where to place the player
-        # x_frac = (self.rect.left - rect.left) / rect.w
-        # y_frac = (self.rect.top - rect.top) / rect.h
-        # img = pg.transform.scale(self.surface, (c.MAP_W // 15, c.MAP_W // 15))
-        # Draw everything
-        # minimap.blit(img, (int(c.MAP_W * x_frac), int(c.MAP_W * y_frac)))
         display.blit(minimap, (dim[0] - c.MAP_W, text_rect.h))
 
         # Draw selected item under cursor if there is one
@@ -408,13 +456,23 @@ class Player:
         if cursor is not None:
             display.blit(cursor, pos)
 
+        # Draw 'You Died' text
+        if self.respawn_counter > 0:
+            font = c.get_scaled_font(c.MIN_W // 2, -1, "You Died")
+            text = font.render("You Died", 1, (0, 0, 0))
+            display.blit(text, text.get_rect(center=(dim[0] // 2, dim[1] // 2)))
+
     def hit(self, dmg, centerx):
         self.stats.hp -= dmg
+        text = c.ui_font.render(str(dmg), 1, (255, 0, 128))
+        self.dmg_text.append([text, list(self.rect.center), 1000])
         if self.stats.hp <= 0:
-            self.respawn()
+            self.respawn_counter = 5000
+            self.map_open = False
         else:
             self.immunity = 1000
-            self.v = [copysign(3, self.rect.centerx - centerx), -3]
+            if centerx is not None:
+                self.v = [copysign(3, self.rect.centerx - centerx), -3]
 
     def attack(self, damage, polygon):
         # Change damage based on stats
@@ -423,6 +481,7 @@ class Player:
     def respawn(self):
         self.stats.hp = self.stats.max_hp
         self.immunity = 5000
+        self.v = [0, 0]
         self.spawn()
 
 

@@ -23,7 +23,7 @@ class Forest(Biome):
             fill_chunk(world.blocks, x + i, 1, land_h, stone_h - land_h, tiles.DIRT)
             fill_chunk(world.blocks, x + i, 1, stone_h, world.dim[1] - stone_h, tiles.STONE)
             surface[x + i] = land_h
-            if free <= i and randint(1, 15) == 1:
+            if free <= i and randint(1, 10) == 1:
                 free = i + self.tree(world.blocks, x + i, land_h)
 
     # Tree

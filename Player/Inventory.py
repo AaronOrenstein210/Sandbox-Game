@@ -4,9 +4,7 @@
 from sys import byteorder
 from numpy import full, int16
 from math import ceil
-from pygame import Surface
-from pygame.draw import rect as draw_rect
-from pygame.time import get_ticks
+import pygame as pg
 from pygame.locals import *
 from Tools.constants import INV_W, INV_IMG_W
 from Tools import constants as c
@@ -21,7 +19,7 @@ class Inventory:
         self.items_list = items_list
         self.max_stack = max_stack
         self.rect = Rect(0, 0, INV_W * self.dim[0], INV_W * self.dim[1])
-        self.surface = Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
+        self.surface = pg.Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
         self.surface.fill(BKGROUND)
         # Contains all items in the inventory
         self.inv_items = full((self.dim[1], self.dim[0]), -1, dtype=int16)
@@ -68,13 +66,13 @@ class Inventory:
                 # Update item
                 self.update_item(y, x)
                 # Draw black border
-                draw_rect(self.surface, SRCALPHA,
-                          (x * INV_W, y * INV_W, INV_W, INV_W), (INV_W - INV_IMG_W) // 2)
+                pg.draw.rect(self.surface, SRCALPHA,
+                             (x * INV_W, y * INV_W, INV_W, INV_W), (INV_W - INV_IMG_W) // 2)
 
     def update_item(self, y, x):
         rect = Rect(0, 0, INV_IMG_W, INV_IMG_W)
         rect.center = ((x + .5) * INV_W, (y + .5) * INV_W)
-        draw_rect(self.surface, BKGROUND, rect)
+        pg.draw.rect(self.surface, BKGROUND, rect)
         val = self.inv_items[y][x]
         if val != -1:
             img = o.items[val].inv_img
@@ -84,6 +82,16 @@ class Inventory:
             text_rect = text.get_rect()
             text_rect.bottomright = rect.bottomright
             self.surface.blit(text, text_rect)
+
+    # Draws the description for the item under the given position
+    def draw_hover_item(self, pos):
+        x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
+        # Make sure were are over  legitimate position
+        if 0 <= x < self.inv_items.shape[1] and 0 <= y < self.inv_items.shape[0]:
+            # Make sure there is an item there
+            item = self.inv_items[y][x]
+            if item != -1:
+                o.items[item].draw_description()
 
     def left_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
@@ -124,7 +132,7 @@ class Inventory:
         inv = o.player.inventory
         if amnt > 0 and (inv.selected_amnt == 0 or inv.selected_item == item):
             # Calculate wait time
-            time = get_ticks()
+            time = pg.time.get_ticks()
             wait_time = (time - self.holding_r) * 19 // 20
             if wait_time > 1000:
                 wait_time = 1000

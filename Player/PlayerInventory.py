@@ -12,7 +12,7 @@ hotbar_controls = {
 
 class PlayerInventory(Inventory):
     def __init__(self):
-        Inventory.__init__(self, (10, 5))
+        super().__init__((10, 5))
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
         # Defines current hotbar item
@@ -29,6 +29,10 @@ class PlayerInventory(Inventory):
         self.open = not self.open
         self.rect.h = INV_W * (self.dim[1] if self.open else 1)
 
+    def draw_hover_item(self, pos):
+        if self.open:
+            super().draw_hover_item(pos)
+
     def left_click(self, pos):
         if self.open:
             Inventory.left_click(self, pos)
@@ -42,9 +46,9 @@ class PlayerInventory(Inventory):
     def select_hotbar(self, idx):
         if idx != self.hot_bar_item:
             if self.hot_bar_item != -1:
-                draw_rect(self.surface, BKGROUND, (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
+                pg.draw.rect(self.surface, BKGROUND, (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
             self.hot_bar_item = idx
-            draw_rect(self.surface, (128, 128, 0), (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
+            pg.draw.rect(self.surface, (128, 128, 0), (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
 
     def get_cursor_display(self):
         return o.items[self.selected_item].image if self.selected_item != -1 else None
@@ -193,12 +197,8 @@ class PlayerInventory(Inventory):
                         i += 1
 
     def new_inventory(self):
+        from Tools.item_ids import BASIC_PICKAXE
         data = bytearray(4 * self.dim[0] * self.dim[1])
-        i = 0
-        for i, idx in enumerate(o.items.keys()):
-            byte = i * 4
-            data[byte: byte + 2] = o.items[idx].max_stack.to_bytes(2, byteorder)
-            data[byte + 2: byte + 4] = idx.to_bytes(2, byteorder)
-        byte = (i + 1) * 4
-        data[byte:] = (0).to_bytes(len(data) - byte, byteorder)
+        data[:2] = (1).to_bytes(2, byteorder)
+        data[2:4] = BASIC_PICKAXE.to_bytes(2, byteorder)
         return data
