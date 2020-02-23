@@ -4,8 +4,7 @@
 import math
 import pygame as pg
 from Tools import objects as o
-from Tools.constants import BLOCK_W, ITEM_W, MAX_FALL_SPEED
-from NPCs.Entity import check_collisions
+from Tools.constants import BLOCK_W, MAX_FALL_SPEED
 
 X_SPEED = 15
 
@@ -37,14 +36,14 @@ class DroppedItem:
             self.v[0] = math.copysign(max(abs(self.v[0]) - 1, 0), self.v[0])
             self.v[1] += MAX_FALL_SPEED * dt / 2
             self.v[1] = min(self.v[1], MAX_FALL_SPEED / 2)
-            check_collisions(self.pos, self.ratio, d)
+            o.check_collisions(self.pos, self.ratio, d)
         else:
             self.pos = [self.pos[0] + d[0], self.pos[1] + d[1]]
         self.rect.topleft = self.pos
 
-    def drop(self, human_center, left):
+    def drop(self, pos, left):
         self.pulled_in = False
-        self.rect.center = human_center
+        self.rect.center = pos
         self.pos = [self.rect.left, self.rect.top]
         self.v = [0 if left is None else -X_SPEED if left else X_SPEED, 0]
         self.pick_up_immunity = 1500 if left is not None else 0

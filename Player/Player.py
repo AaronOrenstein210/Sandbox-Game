@@ -11,7 +11,6 @@ from Tools.tile_ids import AIR
 from Player.PlayerInventory import PlayerInventory
 from Player.CraftingUI import CraftingUI
 from Player.Stats import Stats
-from NPCs.Entity import check_collisions, touching_blocks_y, touching_blocks_x
 from NPCs.EntityHandler import EntityHandler
 from Objects.DroppedItem import DroppedItem
 
@@ -162,7 +161,7 @@ class Player:
                             if up:
                                 self.a[1] = 1
                             else:
-                                if touching_blocks_y(self.pos, self.dim, False):
+                                if o.touching_blocks_y(self.pos, self.dim, False):
                                     self.v[1] = -15
                         elif up and e.key == K_m:
                             self.map_open = True
@@ -254,12 +253,12 @@ class Player:
 
         # Check for collisions and set new position
         temp = self.pos.copy()
-        check_collisions(self.pos, self.dim, d)
+        o.check_collisions(self.pos, self.dim, d)
         self.set_pos(self.pos)
         d = [self.pos[0] - temp[0], self.pos[1] - temp[1]]
 
         # Check if we are touching the ground
-        if not touching_blocks_y(self.pos, self.dim, False):
+        if not o.touching_blocks_y(self.pos, self.dim, False):
             # If we are falling, add to our fall distance
             if self.v[1] > 0:
                 self.fall_dist += d[1]
@@ -272,7 +271,7 @@ class Player:
             self.fall_dist = 0
 
         # Check if we hit a block above use and stop our upwards movement
-        if touching_blocks_y(self.pos, self.dim, True):
+        if o.touching_blocks_y(self.pos, self.dim, True):
             self.v[1] = 1
 
     def set_pos(self, topleft):

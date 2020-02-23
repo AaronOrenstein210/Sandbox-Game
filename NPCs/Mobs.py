@@ -7,6 +7,7 @@ from NPCs.Entity import *
 from NPCs.conditions import *
 from Player.Stats import Stats
 from Tools.constants import BLOCK_W, scale_to_fit
+from Tools import item_ids as items
 from Tools import objects as o
 
 
@@ -66,6 +67,12 @@ class Helicopter(Entity):
     def can_spawn(self, conditions):
         return True
 
+    def get_drops(self):
+        drops = [[items.LEAVES, randint(1, 5)]]
+        if randint(1, 10) <= 7:
+            drops.append([items.WOOD, randint(1, 5)])
+        return drops
+
 
 class Dragon(Entity):
     def __init__(self):
@@ -110,3 +117,10 @@ class Dragon(Entity):
             if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
                 self.surface = self.rising_img
                 self.stage = 0
+
+    def get_drops(self):
+        drops = [[items.SHINY_STONE_1, randint(5, 15)],
+                 [items.SHINY_STONE_2, randint(5, 10)]]
+        if randint(0, 5) == 1:
+            drops.append([items.SHINY_STONE_3, randint(1, 5)])
+        return drops
