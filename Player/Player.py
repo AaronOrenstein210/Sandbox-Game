@@ -14,9 +14,6 @@ from Player.Stats import Stats
 from NPCs.EntityHandler import EntityHandler
 from Objects.DroppedItem import DroppedItem
 
-# Mouse pos relative to the screen and to the world and viewing rect, updated every frame
-pos, global_pos, rect = [0, 0], [0, 0], pg.Rect(0, 0, 0, 0)
-
 
 class Player:
     def __init__(self, name):
@@ -79,10 +76,20 @@ class Player:
         with open("saves/players/" + self.name + ".plr", "wb+") as file:
             file.write(self.inventory.write())
 
+    def get_global_cursor_pos(self):
+        pos = pg.mouse.get_pos()
+        rect = o.world.get_view_rect(self.rect.center)
+        return [pos[0] + rect.x, pos[1] + rect.y]
+
     def get_cursor_block_pos(self):
-        return [(p + r) // BLOCK_W for p, r in zip(pos, rect.topleft)]
+        return [p // BLOCK_W for p in self.get_global_cursor_pos()]
 
     def run(self, events):
+        # Update mouse position
+        rect = o.world.get_view_rect(self.rect.center)
+        pos = pg.mouse.get_pos()
+        global_pos = self.get_global_cursor_pos()
+
         # Check for quitting and resizing
         for e in events:
             if e.type == QUIT:
@@ -101,11 +108,6 @@ class Player:
         else:
             mouse = list(pg.mouse.get_pressed())
             keys = list(pg.key.get_pressed())
-
-            global pos, global_pos, rect
-            rect = o.world.get_view_rect(self.rect.center)
-            pos = pg.mouse.get_pos()
-            global_pos = (pos[0] + rect.x, pos[1] + rect.y)
 
             if self.map_open:
                 for e in events:
@@ -281,13 +283,14 @@ class Player:
         self.collection_range.center = self.rect.center
 
     def left_click(self):
+        pos = pg.mouse.get_pos()
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
             self.inventory.left_click(pos)
         else:
             idx = self.inventory.get_held_item()
             if idx != -1:
                 item = o.items[idx]
-                self.used_left = global_pos[0] < self.rect.centerx
+                self.used_left = self.get_global_cursor_pos()[0] < self.rect.centerx
                 if item.left_click and (self.first_swing or item.auto_use):
                     self.first_swing = False
                     # Use item
@@ -298,6 +301,8 @@ class Player:
                         self.active_ui = item.UI()
 
     def right_click(self):
+        pos = pg.mouse.get_pos()
+        global_pos = self.get_global_cursor_pos()
         if self.inventory.rect.collidepoint(pos[0], pos[1]):
             self.inventory.right_click(pos)
         else:
@@ -352,7 +357,7 @@ class Player:
         # Calculate block rectangle
         block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[0])
         # Check if we can place the block
-        if self.placement_range.collidepoint(*global_pos):
+        if self.placement_range.collidepoint(*self.get_global_cursor_pos()):
             if not self.rect.colliderect(block_rect) and \
                     not self.handler.collides_with_entity(block_rect) and \
                     tile.can_place((block_x, block_y)):
@@ -381,8 +386,9 @@ class Player:
         return False
 
     def draw_ui(self):
-        global rect
         rect = o.world.get_view_rect(self.rect.center)
+        pos = pg.mouse.get_pos()
+        global_pos = self.get_global_cursor_pos()
         display = pg.display.get_surface()
         display.fill(o.get_sky_color())
         dim = display.get_size()

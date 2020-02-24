@@ -3,6 +3,7 @@
 
 # NO IMPORTING FROM INSIDE THIS PROJECT!!!!!!
 import pygame as pg
+import math
 from random import randint
 
 # Dimension Constants
@@ -52,6 +53,19 @@ def load_fonts():
 
 def resize(w, h):
     pg.display.set_mode((max(w, MIN_W), max(h, MIN_H)), pg.RESIZABLE).fill(BACKGROUND)
+
+
+# Returns angle from start to end
+def get_angle(start, end):
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    r = math.sqrt(dx * dx + dy * dy)
+    if r == 0:
+        return 0
+    else:
+        theta = math.asin(dy/r)
+        if dx < 0:
+            theta = math.pi - theta
+        return theta
 
 
 # Resizes surface to fit within desired dimensions, keeping surface's w:h ratio

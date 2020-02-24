@@ -20,6 +20,7 @@ dt = 0
 
 
 def init():
+    print("Wrapper for world and player")
     from inspect import getmembers, isclass
     from Player.Player import Player
     from Objects import ItemObjects, TileObjects

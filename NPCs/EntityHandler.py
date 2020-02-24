@@ -13,48 +13,80 @@ class EntityHandler:
     def __init__(self):
         self.entities = []
         self.items = []
+        self.mob_projectiles = []
+        self.player_projectiles = []
 
     def reset(self):
         self.entities.clear()
         self.items.clear()
 
     def move(self):
-        for entity in self.entities:
-            entity.move()
         for item in self.items:
             item.move()
             if item.pick_up_immunity <= 0 and o.player.pick_up(item):
                 self.items.remove(item)
+        for entity in self.entities:
+            # Check if a player projectile hit the enemy
+            for p in self.player_projectiles:
+                if entity.rect.colliderect(p.rect):
+                    self.player_projectiles.remove(p)
+                    if entity.hit(p.dmg, p.rect.centerx):
+                        self.entities.remove(entity)
+                        continue
+            entity.move()
+        for arr in [self.mob_projectiles, self.player_projectiles]:
+            for p in arr:
+                if p.move():
+                    arr.remove(p)
 
     def check_hit_entities(self, player_x, polygon, damage):
         for entity in self.entities:
-            # Check if we are swinging a weapon and the entity can be hit
-            # and our sword collides with the entity
+            # Check if we hit an enemy
             if entity.immunity <= 0 and polygon.collides_polygon(entity.rect):
                 # Check if we killed the entity
                 if entity.hit(damage, player_x):
                     self.entities.remove(entity)
+        for p in self.mob_projectiles:
+            if polygon.collides_polygon(p.rect):
+                self.mob_projectiles.remove(p)
 
+    # Returns the damage done and the location of the attack
     def check_hit_player(self, player_rect):
         for entity in self.entities:
             if player_rect.colliderect(entity.rect):
                 return entity.stats.dmg, entity.rect.centerx
+        for p in self.mob_projectiles:
+            if player_rect.colliderect(p.rect):
+                # Remove the projectile
+                self.mob_projectiles.remove(p)
+                return p.dmg, p.rect.centerx
         return 0, 0
 
     def draw_display(self, rect):
         display = get_surface()
         for entity in self.entities:
             if rect.colliderect(entity.rect):
-                display.blit(entity.surface, (entity.pos[0] - rect.x, entity.pos[1] - rect.y))
+                display.blit(entity.img, (entity.pos[0] - rect.x, entity.pos[1] - rect.y))
         for item in self.items:
             if rect.colliderect(item.rect):
                 display.blit(item.item.image, (item.pos[0] - rect.x, item.pos[1] - rect.y))
+        for arr in [self.mob_projectiles, self.player_projectiles]:
+            for p in arr:
+                if rect.colliderect(p.rect):
+                    display.blit(p.img, (p.pos[0] - rect.x, p.pos[1] - rect.y))
 
     def collides_with_entity(self, rect):
         for entity in self.entities:
             if entity.rect.colliderect(rect):
                 return True
         return False
+
+    # Adds a projectile, sorting it into player and mob projectiles
+    def add_projectile(self, p):
+        if p.hurts_mobs:
+            self.player_projectiles.append(p)
+        else:
+            self.mob_projectiles.append(p)
 
     def spawn(self):
         conditions = SpawnConditions()

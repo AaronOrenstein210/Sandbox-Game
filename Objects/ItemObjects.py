@@ -1,10 +1,12 @@
 # Created on 3 December 2019
 
+import pygame as pg
 from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
 from Tools.constants import *
 from Tools import objects as o, item_ids as i, tile_ids as t
+from NPCs.Entity import Projectile
 from NPCs.Mobs import Dragon
 
 
@@ -16,9 +18,21 @@ class SnowBall(Item):
     def __init__(self):
         super().__init__(i.SNOW_BALL, img=INV + "snow_ball.png", name="Snow Ball")
         self.max_stack = 99
+        self.auto_use = True
+        self.consumable = True
+
+    def on_left_click(self):
+        super().on_left_click()
+        o.player.handler.add_projectile(self.P1(o.player.rect.center, o.player.get_global_cursor_pos()))
 
     def get_description(self):
         return "Fun to throw!"
+
+    class P1(Projectile):
+        def __init__(self, pos, target):
+            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=5)
+            self.hurts_mobs = True
+            self.bounce = True
 
 
 class DragonClaw(Item):
@@ -179,8 +193,16 @@ class TestSword(Weapon):
         super().__init__(i.BASIC_SWORD, damage=7, damage_type=MELEE,
                          img=INV + "basic_sword.png", name="Basic Sword")
 
+    def on_left_click(self):
+        o.player.handler.add_projectile(self.P1(o.player.rect.center, o.player.get_global_cursor_pos()))
+
     def get_description(self):
         return "Your basic sword\nIt has so much potential"
+
+    class P1(Projectile):
+        def __init__(self, pos, target):
+            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=5)
+            self.hurts_mobs = True
 
 
 class TestPickaxe(Weapon):

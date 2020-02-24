@@ -131,7 +131,8 @@ class WorkTable(CraftingStation):
                 [[i.BASIC_SWORD, 1], [i.WOOD, 10], [i.STONE, 20]],
                 [[i.CRUSHER, 1], [i.STONE, 15], [i.SHINY_STONE_1, 10]],
                 [[i.CHEST, 1], [i.WOOD, 15], [i.STONE, 5]],
-                [[i.WORLD_BUILDER, 1], [i.STONE, 25], [i.OBSIDIAN, 5]]]
+                [[i.WORLD_BUILDER, 1], [i.STONE, 25], [i.OBSIDIAN, 5]],
+                [[i.SNOW_BALL, 1]]]
 
 
 # Spawners

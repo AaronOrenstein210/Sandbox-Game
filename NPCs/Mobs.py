@@ -78,7 +78,7 @@ class Dragon(Entity):
     def __init__(self):
         Entity.__init__(self, name="Dragon", aggressive=True, w=5, img=MOB + "dragon_0.png",
                         rarity=3, stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
-        self.rising_img = self.surface
+        self.rising_img = self.img
         self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_1.png"), w=5 * BLOCK_W)
         self.zero_gravity = True
         self.hits_blocks = False
@@ -105,17 +105,14 @@ class Dragon(Entity):
                     if d[0] < 0:
                         theta = math.pi - theta
                     self.v = [15 * math.cos(theta), -15 * math.sin(theta)]
-                if orig_vx < 0:
-                    self.surface = self.attacking_img
-                else:
-                    self.surface = pg.transform.flip(self.attacking_img, True, False)
+                self.set_image(self.attacking_img)
                 self.stage = 1
         # If we get too far away, switch modes
         else:
             dx = self.pos[0] - o.player.pos[0]
             dy = self.pos[1] - o.player.pos[1]
             if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
-                self.surface = self.rising_img
+                self.set_image(self.rising_img)
                 self.stage = 0
 
     def get_drops(self):
