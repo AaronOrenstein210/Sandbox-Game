@@ -2,7 +2,7 @@
 # All mobs need to be defined here to create spawners for them
 
 import math
-from Objects import MOB
+from Objects import MOB, PROJ
 from NPCs.Entity import *
 from NPCs.conditions import *
 from Player.Stats import Stats
@@ -89,33 +89,59 @@ class Dragon(Boss):
     def ai(self):
         pos = game_vars.player_pos()
         if self.stage == 0:
-            orig_vx = self.v[0]
             self.v[1] = -15
             dx = self.rect.centerx - pos[0]
             if abs(dx) > 10 * BLOCK_W:
                 self.v[0] = math.copysign(15, -dx)
             else:
                 self.v[0] = 0
-            # When we get high enough, switch modes
+            # When we get high enough and close enough, switch modes
             if self.pos[1] < pos[1] - 10 * BLOCK_W:
-                d = [pos[0] - self.pos[0], self.pos[1] - pos[1]]
-                r = math.sqrt((d[0] * d[0]) + (d[1] * d[1]))
-                if r == 0:
-                    self.v = [0, 15]
+                # 60% chance to go to stage one (diving)
+                if randint(1, 5) > 2:
+                    self.start_diving()
+                # 40% chance to go to stage two (shoot fireballs)
                 else:
-                    theta = math.asin(d[1] / r)
-                    if d[0] < 0:
-                        theta = math.pi - theta
-                    self.v = [15 * math.cos(theta), -15 * math.sin(theta)]
-                self.set_image(self.attacking_img)
-                self.stage = 1
+                    self.time = 0
+                    self.stage = 2
         # If we get too far away, switch modes
-        else:
+        elif self.stage == 1:
             dx = self.pos[0] - pos[0]
             dy = self.pos[1] - pos[1]
             if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
                 self.set_image(self.rising_img)
                 self.stage = 0
+        elif self.stage == 2:
+            num_shot_i = int(self.time)
+            self.time += game_vars.dt
+            num_shot_f = int(self.time)
+            # Shoot fire balls!
+            for i in range(num_shot_f - num_shot_i):
+                game_vars.shoot_projectile(self.FireBall(self.rect.center, game_vars.player_pos(False)))
+
+            if num_shot_f >= 9:
+                self.start_diving()
+            else:
+                # Get distance to 8 blocks above and to the side of the player
+                dy = pos[1] - BLOCK_W * 8 - self.rect.centery
+                dx = pos[0] - self.rect.centerx
+                dx -= math.copysign(BLOCK_W * 8, dx)
+                self.v[0] = math.copysign(8, dx) if dx != 0 else 0
+                self.v[1] = math.copysign(8, dy) if dy != 0 else 0
+
+    def start_diving(self):
+        pos = game_vars.player_pos()
+        d = [pos[0] - self.pos[0], self.pos[1] - pos[1]]
+        r = math.sqrt((d[0] * d[0]) + (d[1] * d[1]))
+        if r == 0:
+            self.v = [0, 15]
+        else:
+            theta = math.asin(d[1] / r)
+            if d[0] < 0:
+                theta = math.pi - theta
+            self.v = [15 * math.cos(theta), -15 * math.sin(theta)]
+        self.set_image(self.attacking_img)
+        self.stage = 1
 
     def get_drops(self):
         drops = [[items.SHINY_STONE_1, randint(5, 15)],
@@ -123,3 +149,8 @@ class Dragon(Boss):
         if randint(0, 5) == 1:
             drops.append([items.SHINY_STONE_3, randint(1, 5)])
         return drops
+
+    class FireBall(Projectile):
+        def __init__(self, pos, target):
+            super().__init__(pos, target, w=1.25, img=PROJ + "fire_ball.png", speed=15, damage=8)
+            self.hurts_mobs = self.gravity = self.hits_blocks = False

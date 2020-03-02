@@ -3,7 +3,7 @@
 
 from os.path import isfile
 import math
-from random import randint
+from random import randint, uniform
 import pygame as pg
 from Tools.constants import BLOCK_W, SPRITE_W, scale_to_fit, random_sign, get_angle
 from Tools.game_vars import touching_blocks_x, touching_blocks_y
@@ -21,17 +21,17 @@ def random_movement(entity):
             # We were stopped
             if entity.a[0] == 0:
                 entity.a[0] = random_sign()
-                entity.time = randint(2500, 5000)
+                entity.time = uniform(2.5, 5)
             # We were moving
             else:
                 entity.a[0] = 0
-                entity.time = randint(1000, 3000)
+                entity.time = uniform(1, 3)
         # Check if we need to jump
         if entity.a[0] != 0:
             if (entity.a[0] < 0 and touching_blocks_x(entity.pos, entity.dim, True)) or \
                     (entity.a[0] > 0 and touching_blocks_x(entity.pos, entity.dim, False)):
                 entity.v[1] = -12
-                entity.time = randint(1000, 3000)
+                entity.time = uniform(1, 3)
 
 
 def follow_player(entity):
@@ -58,7 +58,7 @@ def jump(entity, follow):
                 entity.a[0] = 1 if randint(0, 1) == 0 else -1
             entity.v[0] = entity.stats.spd[0] * entity.a[0]
             entity.v[1] = randint(-15, -5)
-            entity.time = randint(1000, 2000)
+            entity.time = uniform(1, 2)
 
 
 def fly_random(entity):
@@ -75,7 +75,7 @@ def fly_random(entity):
             entity.a[1] = -1 if randint(1, 5) >= 4 else 1
             # Random x speed
             entity.a[0] = random_sign()
-            entity.time = randint(700, 1400)
+            entity.time = uniform(.7, 1.4)
 
 
 def fly_follow(entity):
@@ -105,9 +105,18 @@ class Entity:
         # Is a boss
         self.boss = False
 
+        # Movement variables
+        self.pos = [0., 0.]
+        self.v = [0., 0.]
+        self.a = [0, 10]
+        # Direction of image
+        self.direction = math.copysign(1, self.v[0])
+        self.time = 0
+        self.immunity = 0
+
         # Load image
         if isfile(img):
-            self.img = scale_to_fit(pg.image.load(img), w=w * BLOCK_W)
+            self.set_image(scale_to_fit(pg.image.load(img), w=w * BLOCK_W))
         else:
             self.img = pg.Surface((int(w * BLOCK_W), int(w * BLOCK_W)))
         self.dim = (w, self.img.get_size()[1] / BLOCK_W)
@@ -120,14 +129,6 @@ class Entity:
             self.sprite = pg.Surface((SPRITE_W, SPRITE_W))
         # Hit box
         self.rect = pg.Rect((0, 0), self.img.get_size())
-        # Movement variables
-        self.pos = [0., 0.]
-        self.v = [0., 0.]
-        self.a = [0, 1]
-        # Assume facing left
-        self.direction = -1
-        self.time = 0
-        self.immunity = 0
 
     def get_block_pos(self):
         return [p / BLOCK_W for p in self.rect.center]
@@ -145,12 +146,10 @@ class Entity:
         for i in range(2):
             d[i] = self.v[i] * game_vars.dt * BLOCK_W
             if not self.zero_gravity:
-                if self.a[i] == 0:
-                    if self.v[i] != 0:
-                        self.v[i] += math.copysign(min(self.v[0] + (game_vars.dt * 1), abs(self.v[i])), -self.v[i])
-                else:
-                    self.v[i] += math.copysign(game_vars.dt * 20, self.a[i])
-                    self.v[i] = math.copysign(min(abs(self.v[i]), self.stats.spd[i]), self.v[i])
+                # Calculate velocity
+                self.v[i] += self.a[i] * game_vars.dt
+                if abs(self.v[i]) > self.stats.spd[i]:
+                    self.v[i] = math.copysign(self.stats.spd[i], self.v[i])
         if self.direction * self.v[0] < 0:
             self.img = pg.transform.flip(self.img, True, False)
             self.direction *= -1
@@ -173,7 +172,7 @@ class Entity:
         random_movement(self)
 
     def set_image(self, new_img):
-        if self.v[0] < 0:
+        if self.direction == -1:
             self.img = new_img
         else:
             self.img = pg.transform.flip(new_img, True, False)
@@ -183,7 +182,6 @@ class Entity:
         self.stats.hp -= damage
         game_vars.add_damage_text(damage, self.rect.center)
         self.immunity = .5
-        self.time = 0
         if not self.no_knockback:
             self.v = [math.copysign(5, self.rect.centerx - centerx), -5]
         if self.stats.hp < 0:
@@ -209,10 +207,13 @@ class Boss(Entity):
 
 class Projectile:
     def __init__(self, pos, target, w=1, img="", speed=1, damage=1):
-        self.pos = list(pos)
         angle = get_angle(pos, target)
 
+        self.pos = list(pos)
+        self.max_speed = speed
         self.v = [speed * math.cos(angle), speed * math.sin(angle)]
+        self.a = [0, 10]
+
         self.dmg = damage
 
         if isfile(img) and (img.endswith(".png") or img.endswith(".jpg")):
@@ -241,9 +242,11 @@ class Projectile:
         if self.homing:
             print("Recalculate v")
 
-        # Apply gravity
-        if self.gravity:
-            self.v[1] += game_vars.dt
+        # Update velocity
+        self.v = [v + a * game_vars.dt for v, a in zip(self.v, self.a)]
+        factor = self.max_speed / math.sqrt(self.v[0] ** 2 + self.v[1] ** 2)
+        if factor < 1:
+            self.v = [v * factor for v in self.v]
 
         # Calculate displacement
         d = [v * game_vars.dt * BLOCK_W for v in self.v]

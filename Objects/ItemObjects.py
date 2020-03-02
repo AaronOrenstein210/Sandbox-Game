@@ -22,14 +22,14 @@ class SnowBall(Item):
 
     def on_left_click(self):
         super().on_left_click()
-        game_vars.shoot_projectile(self.P1(game_vars.player_pos, game_vars.global_mouse_pos()))
+        game_vars.shoot_projectile(self.P1(game_vars.player_pos(), game_vars.global_mouse_pos()))
 
     def get_description(self):
         return "Fun to throw!"
 
     class P1(Projectile):
         def __init__(self, pos, target):
-            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=5)
+            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=15)
             self.hurts_mobs = True
             self.bounce = True
 
@@ -199,7 +199,7 @@ class TestSword(Weapon):
 
     class P1(Projectile):
         def __init__(self, pos, target):
-            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=5)
+            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=6)
             self.hurts_mobs = True
 
 

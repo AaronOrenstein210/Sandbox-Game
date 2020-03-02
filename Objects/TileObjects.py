@@ -523,8 +523,7 @@ class Crusher(FunctionalTile):
                             # Make sure we don't drop more than max stack
                             while amnt > 0:
                                 transfer = min(max_stack, amnt)
-                                item_obj = DroppedItem(idx, transfer)
-                                game_vars.player.drop_item(item_obj, choice([True, False]), block_pos)
+                                game_vars.drop_item(idx, transfer, choice([True, False]), block_pos)
                                 amnt -= transfer
                         game_vars.write_block_data(self.block_pos, self.invs[0].write())
                         self.invs[0].update_item(0, 0)
