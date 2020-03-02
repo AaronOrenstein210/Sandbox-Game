@@ -1,9 +1,10 @@
 # Created on 15 February 2020
+
 from random import randint, uniform
 import math
 from pygame import Rect
 from Tools import tile_ids as tiles, item_ids as items
-from Tools import objects as o
+from Tools import game_vars
 from Tools.constants import random_sign
 from World.WorldObjects import Biome, Structure, generate_noise, fill_chunk
 
@@ -118,7 +119,7 @@ class Valley(Biome):
                 while w < 2 and i + w + 1 < len(land) and val1 == land[i + w + 1]:
                     w += 1
                 idx = self.BOULDERS[randint(0, w)]
-                w, h = o.tiles[idx].dim
+                w, h = game_vars.tiles[idx].dim
                 fill_chunk(world.blocks, x + i, w, land_h, -h, tiles.AIR)
                 world.blocks[land_h - h, x + i] = idx
                 free = i + w

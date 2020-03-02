@@ -4,7 +4,7 @@ import pygame as pg
 from pygame.locals import *
 from math import ceil
 from Tools.constants import BLOCK_W, INV_W
-from Tools import objects as o, constants as c, item_ids as items
+from Tools import game_vars, constants as c, item_ids as items
 from Player.ActiveUI import ActiveUI
 
 
@@ -45,11 +45,11 @@ class CraftingUI(ActiveUI):
         return 0 if rows <= 4 else (4 - rows) * INV_W
 
     def i_can_craft(self, pos):
-        return self.craft_rect.collidepoint(*pos) and o.player.use_time <= 0 and \
+        return self.craft_rect.collidepoint(*pos) and self.player.use_time <= 0 and \
                self.selected != []
 
     def update_blocks(self):
-        crafters = o.world.crafters
+        crafters = game_vars.world.crafters
         # Get all crafting blocks in the area and load their recipes
         rect = self.player.placement_range
         blocks = []
@@ -57,7 +57,7 @@ class CraftingUI(ActiveUI):
         self.recipes += self.HAND_CRAFTS
         for x in crafters.keys():
             for y in crafters[x].keys():
-                tile = o.tiles[crafters[x][y]]
+                tile = game_vars.tiles[crafters[x][y]]
                 if tile.idx not in blocks:
                     r = (x * BLOCK_W, y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
                     if rect.colliderect(r):
@@ -66,7 +66,7 @@ class CraftingUI(ActiveUI):
         self.recipes.sort(key=lambda arr: arr[0][0])
         # Check which items we can craft
         self.can_craft.clear(), self.cant_craft.clear()
-        resources = o.player.inventory.get_all_items()
+        resources = self.player.inventory.get_all_items()
         for j, r in enumerate(self.recipes):
             r = r[1:]
             i = 0
@@ -127,7 +127,7 @@ class CraftingUI(ActiveUI):
             # Get the recipe
             r = self.recipes[idx]
             # Draw the result item's image
-            img = o.items[r[0][0]].inv_img
+            img = game_vars.items[r[0][0]].inv_img
             surface.blit(img, img.get_rect(center=rect.center))
             # Draw result amount
             text = c.inv_font.render(str(r[0][1]), 1, (255, 255, 255))
@@ -135,6 +135,7 @@ class CraftingUI(ActiveUI):
         if self.selected_ui is not None:
             surface.blit(self.selected_ui, self.recipe_rect.topleft,
                          area=(-self.selected_scroll, 0, *self.recipe_rect.size))
+            pg.draw.rect(surface, (200, 200, 0), self.recipe_rect, 2)
         surface.blit(self.craft, self.craft_rect)
         pg.display.get_surface().blit(surface, self.rect)
         del surface
@@ -152,7 +153,7 @@ class CraftingUI(ActiveUI):
                 idx = y * 10 + x
                 if idx < len(self.can_craft):
                     item = self.recipes[self.can_craft[idx]][0][0]
-                    o.items[item].draw_description()
+                    game_vars.items[item].draw_description()
             # Draw description for recipe item
             elif self.recipe_rect.collidepoint(*pos):
                 # Get index of recipe item we are hovering over
@@ -160,7 +161,7 @@ class CraftingUI(ActiveUI):
                 idx = (pos[0] - self.selected_scroll) // INV_W + 1
                 if idx < len(self.selected):
                     item = self.selected[idx][0]
-                    o.items[item].draw_description()
+                    game_vars.items[item].draw_description()
 
     def process_events(self, events, mouse, keys):
         pos = pg.mouse.get_pos()
@@ -181,10 +182,10 @@ class CraftingUI(ActiveUI):
         # Check events
         elif self.rect.collidepoint(*pos):
             pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
-            inv = o.player.inventory
+            inv = self.player.inventory
             if mouse[BUTTON_RIGHT - 1] and self.i_can_craft(pos):
                 inv.craft(self.selected)
-                o.player.use_time = 500
+                self.player.use_time = .5
             else:
                 # Check for clicking
                 for e in events:
@@ -194,7 +195,7 @@ class CraftingUI(ActiveUI):
                             if self.i_can_craft(pos):
                                 # Use up ingredients
                                 inv.craft(self.selected)
-                                o.player.use_time = 500
+                                self.player.use_time = .5
                                 return
                             # Select a new recipe
                             elif pos[1] < self.recipe_rect.y:
@@ -209,7 +210,7 @@ class CraftingUI(ActiveUI):
                                     self.selected_ui = pg.Surface((w, INV_W), pg.SRCALPHA)
                                     for i, (item, amnt) in enumerate(parts):
                                         rect = pg.Rect(i * INV_W, 0, INV_W, INV_W)
-                                        img = o.items[item].inv_img
+                                        img = game_vars.items[item].inv_img
                                         self.selected_ui.blit(img, img.get_rect(center=rect.center))
                                         text = c.inv_font.render(str(amnt), 1, (255, 255, 255))
                                         self.selected_ui.blit(text, text.get_rect(bottomright=rect.bottomright))

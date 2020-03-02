@@ -4,7 +4,7 @@
 from random import uniform, choice
 from Tools import item_ids as items
 from UI.Operations import CompleteTask, loading_bar
-from Tools import objects as o
+from Tools import game_vars
 
 WORLD_DIMS = {items.SMALL_WORLD: [500, 250], items.MED_WORLD: [750, 375], items.LARGE_WORLD: [1000, 500]}
 NUM_STRUCTURES = {items.SMALL_WORLD: 1, items.MED_WORLD: 1, items.LARGE_WORLD: 2}
@@ -15,7 +15,7 @@ NUM_STRUCTURES = {items.SMALL_WORLD: 1, items.MED_WORLD: 1, items.LARGE_WORLD: 2
 # And a list of items that modify the world
 def generate_world(world, modifiers=()):
     num_structs = 0
-    biomes = dict.fromkeys(o.biomes.keys(), 0)
+    biomes = dict.fromkeys(game_vars.biomes.keys(), 0)
     chance_sum = 0
     # This lets us know if the world size was set
     world.num_blocks = -1
@@ -29,7 +29,7 @@ def generate_world(world, modifiers=()):
             world.new_world(WORLD_DIMS[item])
             num_structs += NUM_STRUCTURES[item]
         # Add biome
-        elif item in o.biomes.keys():
+        elif item in game_vars.biomes.keys():
             biomes[item] += 1
             chance_sum += 1
     # Make sure world size was set, default small world
@@ -59,7 +59,7 @@ def generate_world(world, modifiers=()):
                 # Generate the biome or add to its length
                 if biome != key:
                     if biome != -1:
-                        o.biomes[biome].generate(world, surface_heights, x - w, w)
+                        game_vars.biomes[biome].generate(world, surface_heights, x - w, w)
                     biome = key
                     w = biome_w
                     if biome not in biome_list:
@@ -68,16 +68,16 @@ def generate_world(world, modifiers=()):
                     w += biome_w
                 x += biome_w
                 break
-    o.biomes[biome].generate(world, surface_heights, x - w, w)
+    game_vars.biomes[biome].generate(world, surface_heights, x - w, w)
     # Generate structures
     structure_list = []
-    for key in o.structures:
-        if o.structures[key].can_spawn(biome_list):
+    for key in game_vars.structures:
+        if game_vars.structures[key].can_spawn(biome_list):
             structure_list.append(key)
     if len(structure_list) > 0:
         structure_rects = []
         for i in range(num_structs):
-            o.structures[choice(structure_list)].generate(world, surface_heights, structure_rects)
+            game_vars.structures[choice(structure_list)].generate(world, surface_heights, structure_rects)
     world.spawn = [world.dim[0] // 2, min(surface_heights[world.dim[0] // 2:world.dim[0] // 2 + 2]) - 2]
     # Save world
     CompleteTask(world.save_part, [1], loading_bar, ["Saving World"], can_exit=False).run_now()

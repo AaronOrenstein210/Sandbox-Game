@@ -6,7 +6,7 @@ import math
 import pygame as pg
 from Tools.constants import ITEM_W, INV_IMG_W, scale_to_fit
 from Tools.collision import Polygon
-from Tools import objects as o, constants as c
+from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
 
 
@@ -14,7 +14,8 @@ class Item:
     def __init__(self, idx, img="", name=""):
         self.idx, self.name = idx, name
         self.max_stack = 999
-        self.use_time = 300
+        # Use time in seconds
+        self.use_time = .3
 
         # Information booleans
         # Is consumable (will decrease item amount)
@@ -51,7 +52,7 @@ class Item:
         # Attack box, if applicable
         self.polygon = None
 
-        o.items[self.idx] = self
+        game_vars.items[self.idx] = self
 
     def use_anim(self, time_used, arm, left, player_center, rect):
         if self.swing:
@@ -102,13 +103,13 @@ class Item:
     # Override this for special functionality and custom item consumption
     def on_left_click(self):
         if self.consumable:
-            o.player.inventory.use_item()
+            game_vars.player.inventory.use_item()
 
     def on_right_click(self):
         pass
 
     def on_tick(self):
-        o.player.use_time -= o.dt
+        game_vars.player.use_time -= game_vars.dt
 
     # Returns a description of the item, each item class should override this
     def get_description(self):
@@ -178,8 +179,10 @@ class Block(Item):
         self.placeable = True
 
     def on_left_click(self):
-        if o.player.place_block(*o.player.get_cursor_block_pos(), self.block_id) and self.consumable:
-            o.player.inventory.use_item()
+        pos = game_vars.global_mouse_pos()
+        pos = [p // c.BLOCK_W for p in pos]
+        if game_vars.player.place_block(*pos, self.block_id) and self.consumable:
+            game_vars.player.inventory.use_item()
 
 
 class Weapon(Item):
@@ -197,16 +200,14 @@ class Weapon(Item):
         self.inv_img = scale(rotate(self.image, 45), (INV_IMG_W, INV_IMG_W))
 
     def on_left_click(self):
+        pos = game_vars.global_mouse_pos()
+        pos = [p // c.BLOCK_W for p in pos]
         # Break blocks if necessary
         if self.breaks_blocks:
-            if o.player.break_block(*o.player.get_cursor_block_pos()) and self.consumable:
-                o.player.inventory.use_item()
+            if game_vars.player.break_block(*pos) and self.consumable:
+                game_vars.player.inventory.use_item()
         elif self.consumable:
-            o.player.inventory.use_item()
-
-    def use_anim(self, time_used, arm, left, player_center, rect):
-        Item.use_anim(self, time_used, arm, left, player_center, rect)
-        o.player.attack(self.damage, self.polygon)
+            game_vars.player.inventory.use_item()
 
     def get_full_description(self):
         text = super().get_full_description()

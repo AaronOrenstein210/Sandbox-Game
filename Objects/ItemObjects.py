@@ -1,11 +1,10 @@
 # Created on 3 December 2019
 
-import pygame as pg
 from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
 from Tools.constants import *
-from Tools import objects as o, item_ids as i, tile_ids as t
+from Tools import game_vars, item_ids as i, tile_ids as t
 from NPCs.Entity import Projectile
 from NPCs.Mobs import Dragon
 
@@ -23,7 +22,7 @@ class SnowBall(Item):
 
     def on_left_click(self):
         super().on_left_click()
-        o.player.handler.add_projectile(self.P1(o.player.rect.center, o.player.get_global_cursor_pos()))
+        game_vars.shoot_projectile(self.P1(game_vars.player_pos, game_vars.global_mouse_pos()))
 
     def get_description(self):
         return "Fun to throw!"
@@ -41,10 +40,8 @@ class DragonClaw(Item):
         self.consumable = True
 
     def on_left_click(self):
-        d = Dragon()
-        d.set_pos(o.player.pos[0] + randint(15, 30) * BLOCK_W * random_sign(),
-                  o.player.pos[1] + randint(15, 30) * BLOCK_W * random_sign())
-        o.player.handler.entities.append(d)
+        game_vars.spawn_entity(Dragon(),
+                               [p + randint(15, 30) * BLOCK_W * random_sign() for p in game_vars.player_pos()])
 
     def get_description(self):
         return "A claw, torn from a defeated dragon\nIt holds many magical properties"
@@ -54,24 +51,24 @@ class Dematerializer(Item):
     def __init__(self):
         super().__init__(i.DEMATERIALIZER, img=INV + "dematerializer.png",
                          name="Dematerializer")
-        self.use_time = 1000
+        self.use_time = 1
 
     def on_left_click(self):
-        o.player.can_move = False
+        game_vars.player.can_move = False
 
     def on_tick(self):
-        time_i = o.player.use_time
+        time_i = game_vars.player.use_time
         Item.on_tick(self)
-        progress = o.player.use_time / time_i
-        spawn = [s * BLOCK_W for s in o.world.spawn]
-        delta = [s - p for p, s in zip(o.player.pos, spawn)]
+        progress = game_vars.player.use_time / time_i
+        spawn = [s * BLOCK_W for s in game_vars.world.spawn]
+        delta = [s - p for p, s in zip(game_vars.player.pos, spawn)]
         if progress <= 0 or delta.count(0) == 2:
-            o.player.can_move = True
-            o.player.spawn()
+            game_vars.player.can_move = True
+            game_vars.player.spawn()
         else:
             # Get distance from spawn (distance left to go) and move player to that point
             pos = [s + progress * -d for s, d in zip(spawn, delta)]
-            o.player.set_pos(pos)
+            game_vars.player.set_pos(pos)
 
     def get_description(self):
         return "Teleports the user back to spawn"
@@ -84,12 +81,13 @@ class TimeWarp(Item):
 
     def on_tick(self):
         mouse = pg.mouse.get_pressed()
+        w = game_vars.world
         if mouse[BUTTON_LEFT - 1]:
-            o.world_time = (o.world_time + (40 * o.dt)) % MS_PER_DAY
+            w.world_time = (w.world_time + (40 * game_vars.dt)) % MS_PER_DAY
         elif mouse[BUTTON_RIGHT - 1]:
-            o.world_time = (o.world_time - (60 * o.dt)) % MS_PER_DAY
+            w.world_time = (w.world_time - (60 * game_vars.dt)) % MS_PER_DAY
         else:
-            o.player.use_time = 0
+            game_vars.player.use_time = 0
 
     def get_description(self):
         return "Left click to move time forwards, right click to move time backwards"
@@ -194,7 +192,7 @@ class TestSword(Weapon):
                          img=INV + "basic_sword.png", name="Basic Sword")
 
     def on_left_click(self):
-        o.player.handler.add_projectile(self.P1(o.player.rect.center, o.player.get_global_cursor_pos()))
+        game_vars.shoot_projectile(self.P1(game_vars.player.rect.center, game_vars.global_mouse_pos()))
 
     def get_description(self):
         return "Your basic sword\nIt has so much potential"

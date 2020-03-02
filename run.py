@@ -4,7 +4,7 @@ import pygame as pg
 from traceback import print_exc
 import os
 from sys import exit
-from Tools import objects as o
+from Tools import game_vars
 from Tools.constants import load_fonts, resize, MIN_W, MIN_H, get_scaled_font
 
 # Make sure all necessary folders exist
@@ -20,9 +20,7 @@ load_fonts()
 fps_font = get_scaled_font(50, 20, "000 FPS", "Times New Roman")
 resize(MIN_W, MIN_H)
 
-o.init()
-
-o.load_world()
+game_vars.init()
 
 next_save = 30000
 save_progress = 0
@@ -31,10 +29,9 @@ time = pg.time.get_ticks()
 while True:
     dt = pg.time.get_ticks() - time
     time = pg.time.get_ticks()
-    o.tick(dt)
 
     if saving:
-        save_progress = o.world.save_part(save_progress, 1)
+        save_progress = game_vars.world.save_part(save_progress, 1)
         if save_progress >= 1:
             saving = False
             save_progress = 0
@@ -42,16 +39,17 @@ while True:
     else:
         next_save -= dt
         if next_save <= 0:
-            o.player.write()
+            game_vars.player.write()
             saving = True
 
     result = False
     try:
-        result = o.player.run(pg.event.get())
+        result = game_vars.tick()
     except:
         print("Crashed", print_exc())
+
     if not result:
-        o.close_world()
+        game_vars.close_world()
         pg.quit()
         exit(0)
 

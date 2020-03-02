@@ -12,6 +12,8 @@ MIN_W, MIN_H = 800, 600
 BLOCK_W = 16
 # Width of the minimap
 MAP_W = min(MIN_W // 4, MIN_H // 3)
+# Max dimension of map sprites
+SPRITE_W = MAP_W // 15
 # Width of an item on the ground
 ITEM_W = BLOCK_W * 3 // 4
 # Width of an inventory slot
@@ -38,8 +40,6 @@ MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 # Ai types
 RANDOM, FOLLOW, FLY = 0, 1, 2
 
-# Fonts
-pg.init()
 # Inventory font, Loading screen font, UI font
 inv_font = load_font = ui_font = None
 
@@ -62,7 +62,7 @@ def get_angle(start, end):
     if r == 0:
         return 0
     else:
-        theta = math.asin(dy/r)
+        theta = math.asin(dy / r)
         if dx < 0:
             theta = math.pi - theta
         return theta

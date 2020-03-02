@@ -4,7 +4,6 @@
 from os import listdir, remove, mkdir
 from os.path import isfile, isdir
 from shutil import rmtree
-from sys import exit
 import pygame as pg
 from pygame.locals import *
 from Tools.constants import MIN_W, MIN_H

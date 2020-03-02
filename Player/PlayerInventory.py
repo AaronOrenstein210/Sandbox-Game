@@ -2,6 +2,7 @@
 
 from Player.Inventory import *
 from Objects.DroppedItem import DroppedItem
+from Tools import game_vars
 
 hotbar_controls = {
     K_1: 0, K_2: 1, K_3: 2, K_4: 3,
@@ -51,7 +52,7 @@ class PlayerInventory(Inventory):
             pg.draw.rect(self.surface, (128, 128, 0), (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
 
     def get_cursor_display(self):
-        return o.items[self.selected_item].image if self.selected_item != -1 else None
+        return game_vars.items[self.selected_item].image if self.selected_item != -1 else None
 
     def get_held_item(self):
         return self.selected_item if self.selected_item != -1 else self.inv_items[0][self.hot_bar_item]
@@ -71,9 +72,8 @@ class PlayerInventory(Inventory):
                 self.inv_items[0][self.hot_bar_item] = -1
             self.update_item(0, self.hot_bar_item)
 
-    def key_pressed(self, key, up):
-        global hotbar_controls
-        if not up and key == K_ESCAPE:
+    def key_pressed(self, key):
+        if key == K_ESCAPE:
             self.toggle()
         elif key in hotbar_controls.keys():
             self.select_hotbar(hotbar_controls[key])
@@ -161,7 +161,7 @@ class PlayerInventory(Inventory):
             self.selected_amnt = amnt
         # Then try to add it to whatever the player is holding
         elif self.selected_item == item:
-            grab = min(amnt, o.items[item].max_stack - self.selected_amnt)
+            grab = min(amnt, game_vars.items[item].max_stack - self.selected_amnt)
             self.selected_amnt += grab
             amnt -= grab
         else:
@@ -169,7 +169,7 @@ class PlayerInventory(Inventory):
             item_obj = DroppedItem(item, amnt)
             if not self.pick_up_item(item_obj):
                 # Drop whatever is left
-                o.player.drop_item(item_obj, True)
+                game_vars.drop_item(item, item_obj.amnt, True)
         # Get the amounts of ingredients that are required
         parts = [r.copy() for r in recipe[1:]]
         # Remove ingredients

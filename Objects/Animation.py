@@ -4,12 +4,12 @@ from os import listdir
 from os.path import isdir
 import pygame as pg
 from Tools.constants import scale_to_fit
-from Tools import objects as o
+from Tools import game_vars
 
 
 # Generic animations, goes through list of frames
 class Animation:
-    def __init__(self, folder, dim, delay=100):
+    def __init__(self, folder, dim, delay=.1):
         self.frames = []
         # Load frames
         if isdir(folder):
@@ -21,9 +21,9 @@ class Animation:
         self.time = 0
 
     def update(self):
-        self.time += o.dt
+        self.time += game_vars.dt
         if self.time >= self.frame_delay:
-            self.idx = (self.idx + self.time // self.frame_delay) % len(self.frames)
+            self.idx = int((self.idx + self.time / self.frame_delay) % len(self.frames))
             self.time %= self.frame_delay
 
     def get_frame(self):
@@ -37,7 +37,7 @@ class OscillateAnimation(Animation):
         self.forwards = True
 
     def update(self):
-        self.time += o.dt
+        self.time += game_vars.dt
         if self.time >= self.frame_delay:
             self.idx += 1 if self.forwards else -1
             if (self.idx == len(self.frames) - 1 and self.forwards) or \

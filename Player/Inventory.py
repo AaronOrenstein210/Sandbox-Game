@@ -2,13 +2,14 @@
 # Defines functions and variables for handling items
 
 from sys import byteorder
+from time import time
 from numpy import full, int16
 from math import ceil
 import pygame as pg
 from pygame.locals import *
 from Tools.constants import INV_W, INV_IMG_W
 from Tools import constants as c
-from Tools import objects as o
+from Tools import game_vars
 
 BKGROUND = (0, 255, 0, 64)
 
@@ -36,7 +37,7 @@ class Inventory:
             for x in range(self.dim[0]):
                 val = int.from_bytes(data[2:4], byteorder)
                 # Item defaults to nothing if it doesn't exist
-                if val not in o.items.keys():
+                if val not in game_vars.items.keys():
                     self.inv_amnts[y][x] = 0
                     self.inv_items[y][x] = -1
                 else:
@@ -75,7 +76,7 @@ class Inventory:
         pg.draw.rect(self.surface, BKGROUND, rect)
         val = self.inv_items[y][x]
         if val != -1:
-            img = o.items[val].inv_img
+            img = game_vars.items[val].inv_img
             img_rect = img.get_rect(center=rect.center)
             self.surface.blit(img, img_rect)
             text = c.inv_font.render(str(self.inv_amnts[y][x]), 1, (255, 255, 255))
@@ -91,11 +92,11 @@ class Inventory:
             # Make sure there is an item there
             item = self.inv_items[y][x]
             if item != -1:
-                o.items[item].draw_description()
+                game_vars.items[item].draw_description()
 
     def left_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
-        inv = o.player.inventory
+        inv = game_vars.player.inventory
         item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
         if inv.selected_amnt == 0 and amnt == 0:
             return
@@ -110,7 +111,7 @@ class Inventory:
                 if amnt == 0:
                     max_stack = self.max_stack
                 else:
-                    max_stack = min(o.items[item].max_stack, self.max_stack)
+                    max_stack = min(game_vars.items[item].max_stack, self.max_stack)
                 amnt_ = min(max_stack, amnt + inv.selected_amnt)
                 self.inv_amnts[y][x] = amnt_
                 self.inv_items[y][x] = inv.selected_item
@@ -123,25 +124,25 @@ class Inventory:
                 inv.selected_item, inv.selected_amnt = item, amnt
         if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
             self.update_item(y, x)
-            o.player.use_time = 300
+            game_vars.player.use_time = .3
 
     def right_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
         item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
         # Make sure we clicked on an item
-        inv = o.player.inventory
+        inv = game_vars.player.inventory
         if amnt > 0 and (inv.selected_amnt == 0 or inv.selected_item == item):
             # Calculate wait time
-            time = pg.time.get_ticks()
-            wait_time = (time - self.holding_r) * 19 // 20
-            if wait_time > 1000:
-                wait_time = 1000
-            elif wait_time < 10:
-                wait_time = 10
-            self.holding_r = time
+            t = time()
+            wait_time = (t - self.holding_r) * 19 // 20
+            if wait_time > 1:
+                wait_time = 1
+            elif wait_time < .01:
+                wait_time = .01
+            self.holding_r = t
             # Do click
-            ideal_grab = ceil(o.dt / wait_time)
-            max_grab = o.items[item].max_stack - inv.selected_amnt
+            ideal_grab = ceil(game_vars.dt / wait_time)
+            max_grab = game_vars.items[item].max_stack - inv.selected_amnt
             grab_amnt = min(ideal_grab, max_grab, amnt)
             if grab_amnt > 0:
                 inv.selected_item = item
@@ -150,7 +151,7 @@ class Inventory:
                 if self.inv_amnts[y][x] == 0:
                     self.inv_items[y][x] = -1
                 self.update_item(y, x)
-                o.player.use_time = wait_time
+                game_vars.player.use_time = wait_time
 
     def is_empty(self):
         for amnt in self.inv_amnts.flatten():

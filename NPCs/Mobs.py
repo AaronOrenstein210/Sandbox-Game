@@ -8,7 +8,7 @@ from NPCs.conditions import *
 from Player.Stats import Stats
 from Tools.constants import BLOCK_W, scale_to_fit
 from Tools import item_ids as items
-from Tools import objects as o
+from Tools import game_vars
 
 
 class Cat(Entity):
@@ -50,7 +50,7 @@ class DoomBunny(Entity):
                         rarity=3, stats=Stats(hp=5, damage=100, defense=1, max_speed=(5, 20)))
 
     def ai(self):
-        jump(self, abs(o.player.rect.centerx - self.rect.centerx) // BLOCK_W <= 10)
+        jump(self, abs(game_vars.player_pos()[0] - self.rect.centerx) // BLOCK_W <= 10)
 
     def can_spawn(self, conditions):
         return True
@@ -74,10 +74,11 @@ class Helicopter(Entity):
         return drops
 
 
-class Dragon(Entity):
+class Dragon(Boss):
     def __init__(self):
-        Entity.__init__(self, name="Dragon", aggressive=True, w=5, img=MOB + "dragon_0.png",
-                        rarity=3, stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
+        Entity.__init__(self, name="Dragon", aggressive=True, w=5, rarity=3,
+                        img=MOB + "dragon_0.png", sprite=MOB + "dragon_0.png",
+                        stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
         self.rising_img = self.img
         self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_1.png"), w=5 * BLOCK_W)
         self.zero_gravity = True
@@ -86,17 +87,18 @@ class Dragon(Entity):
         self.stage = 0
 
     def ai(self):
+        pos = game_vars.player_pos()
         if self.stage == 0:
             orig_vx = self.v[0]
             self.v[1] = -15
-            dx = self.pos[0] - o.player.pos[0]
+            dx = self.rect.centerx - pos[0]
             if abs(dx) > 10 * BLOCK_W:
-                self.v[0] = copysign(15, -dx)
+                self.v[0] = math.copysign(15, -dx)
             else:
                 self.v[0] = 0
             # When we get high enough, switch modes
-            if self.pos[1] < o.player.pos[1] - 10 * BLOCK_W:
-                d = [o.player.pos[0] - self.pos[0], self.pos[1] - o.player.pos[1]]
+            if self.pos[1] < pos[1] - 10 * BLOCK_W:
+                d = [pos[0] - self.pos[0], self.pos[1] - pos[1]]
                 r = math.sqrt((d[0] * d[0]) + (d[1] * d[1]))
                 if r == 0:
                     self.v = [0, 15]
@@ -109,8 +111,8 @@ class Dragon(Entity):
                 self.stage = 1
         # If we get too far away, switch modes
         else:
-            dx = self.pos[0] - o.player.pos[0]
-            dy = self.pos[1] - o.player.pos[1]
+            dx = self.pos[0] - pos[0]
+            dy = self.pos[1] - pos[1]
             if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
                 self.set_image(self.rising_img)
                 self.stage = 0

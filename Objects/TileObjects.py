@@ -10,7 +10,7 @@ from NPCs import Mobs as mobs
 from Player.ActiveUI import ActiveUI
 from Player.Inventory import Inventory
 from Tools import constants as c, item_ids as i, tile_ids as t
-from Tools import objects as o
+from Tools import game_vars
 from World import WorldGenerator
 from World.World import World
 
@@ -53,7 +53,7 @@ class Leaves(Tile):
     def __init__(self):
         super().__init__(t.LEAVES, hardness=0, img=INV + "leaves.png")
         self.add_drop(i.LEAVES, 1)
-        self.map_color = (0, 0, 100)
+        self.map_color = (0, 150, 0)
 
 
 class Boulder1(Tile):
@@ -105,10 +105,8 @@ class DragonEgg(Tile):
         self.map_color = (64, 200, 0)
 
     def on_break(self, pos):
-        d = mobs.Dragon()
-        d.set_pos((pos[0] + c.random_sign() * randint(10, 20)) * BLOCK_W,
-                  (pos[1] + c.random_sign() * randint(10, 20)) * BLOCK_W)
-        o.player.handler.entities.append(d)
+        game_vars.spawn_entity(mobs.Dragon(),
+                               [p + randint(10, 20) * BLOCK_W * c.random_sign() for p in game_vars.player_pos()])
         return False
 
 
@@ -138,32 +136,32 @@ class WorkTable(CraftingStation):
 # Spawners
 class CatSpawner(SpawnTile):
     def __init__(self):
-        super().__init__(t.CAT, mobs.Cat, item_id=i.CAT)
+        super().__init__(t.CAT, mobs.Cat(), item_id=i.CAT)
         self.add_drop(i.CAT, 1)
 
 
 class ZombieSpawner(SpawnTile):
     def __init__(self):
-        super().__init__(t.ZOMBIE, mobs.Zombie, item_id=i.ZOMBIE)
+        super().__init__(t.ZOMBIE, mobs.Zombie(), item_id=i.ZOMBIE)
         self.add_drop(i.ZOMBIE, 1)
 
 
 class DoomBunnySpawner(SpawnTile):
     def __init__(self):
-        super().__init__(t.DOOM_BUNNY, mobs.DoomBunny, item_id=i.DOOM_BUNNY)
+        super().__init__(t.DOOM_BUNNY, mobs.DoomBunny(), item_id=i.DOOM_BUNNY)
         self.add_drop(i.DOOM_BUNNY, 1)
 
 
 class HelicopterSpawner(SpawnTile):
     def __init__(self):
-        super().__init__(t.HELICOPTER, mobs.Helicopter, item_id=i.HELICOPTER)
+        super().__init__(t.HELICOPTER, mobs.Helicopter(), item_id=i.HELICOPTER)
         self.add_drop(i.HELICOPTER, 1)
         self.map_color = (0, 0, 80)
 
 
 class BirdieSpawner(SpawnTile):
     def __init__(self):
-        super().__init__(t.BIRDIE, mobs.Birdie, item_id=i.BIRDIE)
+        super().__init__(t.BIRDIE, mobs.Birdie(), item_id=i.BIRDIE)
         self.add_drop(i.BIRDIE, 1)
         self.map_color = (0, 0, 80)
 
@@ -180,7 +178,7 @@ class DimensionHopper(FunctionalTile):
         self.map_color = (0, 0, 0)
 
     def activate(self, pos):
-        o.player.active_ui = self.UI(pos)
+        game_vars.set_active_ui(self.UI(pos))
 
     class UI(ActiveUI):
         def __init__(self, pos):
@@ -194,7 +192,7 @@ class DimensionHopper(FunctionalTile):
             self.scroller = VerticalScroller(self.rect.size, background=(0, 200, 128))
 
             font = c.get_scaled_font(self.rect.w, int(self.rect.h / 8), "_" * 25, "Times New Roman")
-            for file in listdir("saves/universes/" + o.world.universe):
+            for file in listdir("saves/universes/" + game_vars.world.universe):
                 if file.endswith(".wld"):
                     name = file[:-4]
                     text = font.render(name, 1, (255, 255, 255))
@@ -216,13 +214,13 @@ class DimensionHopper(FunctionalTile):
                         pos = (pos[0] - self.rect.x, pos[1] - self.rect.y)
                         world = self.scroller.click(pos)
                         if world != "":
-                            o.change_world(world)
-                            o.player.active_ui = None
+                            game_vars.change_world(world)
+                            game_vars.set_active_ui(None)
                     else:
                         continue
                 elif e.type == KEYUP and e.key == K_ESCAPE:
                     keys[K_ESCAPE] = False
-                    o.player.active_ui = None
+                    game_vars.set_active_ui(None)
                 else:
                     continue
 
@@ -240,23 +238,23 @@ class WorldBuilder(FunctionalTile):
         self.map_color = (0, 0, 0)
 
     def activate(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
-            o.player.active_ui = self.UI(pos, data)
+            game_vars.set_active_ui(self.UI(pos, data))
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
-        c.update_dict(*pos, new_inventory((1, self.INV_SPOTS)), o.world.block_data)
+        game_vars.write_block_data(pos, new_inventory((1, self.INV_SPOTS)))
 
     def on_break(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
             # Check if we have any i
             for byte in data:
                 if byte != 0:
                     return False
             # If not, remove our data
-            c.remove_from_dict(*pos, o.world.block_data)
+            c.remove_from_dict(*pos, game_vars.world.block_data)
         return True
 
     class UI(ActiveUI):
@@ -267,7 +265,7 @@ class WorldBuilder(FunctionalTile):
             self.name = ""
             self.cursor = False
             # Load inventories
-            invs = {self.BIOME: Inventory((2, 2), max_stack=1, items_list=o.biomes.keys()),
+            invs = {self.BIOME: Inventory((2, 2), max_stack=1, items_list=game_vars.biomes.keys()),
                     self.STRUCTURE: Inventory((1, 1), max_stack=4, items_list=[i.BONUS_STRUCTURE]),
                     self.SIZE: Inventory((1, 1), max_stack=1, items_list=WorldGenerator.WORLD_DIMS.keys())}
             for idx in self.INV_ORDER:
@@ -316,8 +314,8 @@ class WorldBuilder(FunctionalTile):
             super().__init__(s, s.get_rect(), pos=pos, invs=invs)
             self.on_resize()
 
-            if not o.player.inventory.open:
-                o.player.inventory.toggle()
+            if not game_vars.player.inventory.open:
+                game_vars.player.inventory.toggle()
 
         @property
         def data(self):
@@ -332,7 +330,7 @@ class WorldBuilder(FunctionalTile):
             if temp != self.cursor:
                 self.draw_name()
             pos = pg.mouse.get_pos()
-            if self.rect.collidepoint(*pos) and o.player.use_time <= 0:
+            if self.rect.collidepoint(*pos) and game_vars.player.use_time <= 0:
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                 # Clicked create
                 if self.create_rect.collidepoint(*pos):
@@ -340,16 +338,15 @@ class WorldBuilder(FunctionalTile):
                         for e in events:
                             if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
                                 events.remove(e)
-                                new = World(o.world.universe, self.name)
+                                new = World(game_vars.world.universe, self.name)
                                 items = self.invs["Biome"].inv_items.flatten().tolist()
                                 items += [self.invs["Size"].inv_items[0][0]]
                                 items += [i.BONUS_STRUCTURE] * self.invs["Structure"].inv_amnts[0][0]
                                 WorldGenerator.generate_world(new, modifiers=items)
                                 del new
                                 from Player.Inventory import new_inventory
-                                c.update_dict(*self.block_pos, new_inventory((1, WorldBuilder.INV_SPOTS)),
-                                              o.world.block_data)
-                                o.player.active_ui = None
+                                game_vars.write_block_data(self.block_pos, new_inventory((1, WorldBuilder.INV_SPOTS)))
+                                game_vars.set_active_ui(None)
                 # Clicked inventories
                 else:
                     for inv in self.invs.values():
@@ -361,10 +358,10 @@ class WorldBuilder(FunctionalTile):
                                 inv.right_click(pos)
                             self.ui.fill((0, 0, 0), inv.rect)
                             self.ui.blit(inv.surface, inv.rect)
-                            c.update_dict(*self.block_pos, self.data, o.world.block_data)
+                            game_vars.write_block_data(self.block_pos, self.data)
                             break
             if keys[K_ESCAPE]:
-                o.player.active_ui = None
+                game_vars.set_active_ui(None)
                 keys[K_ESCAPE] = False
             for e in events:
                 if e.type == KEYDOWN:
@@ -401,23 +398,23 @@ class Chest(FunctionalTile):
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
-        c.update_dict(*pos, new_inventory(self.INV_DIM), o.world.block_data)
+        game_vars.write_block_data(pos, new_inventory(self.INV_DIM))
 
     def on_break(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
             # Check if we have any i
             for byte in data:
                 if byte != 0:
                     return False
             # If not, remove our data
-            c.remove_from_dict(*pos, o.world.block_data)
+            c.remove_from_dict(*pos, game_vars.world.block_data)
         return True
 
     def activate(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
-            o.player.active_ui = self.UI(pos, data)
+            game_vars.set_active_ui(self.UI(pos, data))
 
     class UI(ActiveUI):
         def __init__(self, pos, data):
@@ -426,21 +423,21 @@ class Chest(FunctionalTile):
                               pos=pos, invs={0: inventory})
             self.invs[0].load(data)
 
-            if not o.player.inventory.open:
-                o.player.inventory.toggle()
+            if not game_vars.player.inventory.open:
+                game_vars.player.inventory.toggle()
 
         def process_events(self, events, mouse, keys):
             pos = pg.mouse.get_pos()
             if self.rect.collidepoint(*pos):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
-                if o.player.use_time <= 0:
+                if game_vars.player.use_time <= 0:
                     if mouse[BUTTON_LEFT - 1]:
                         self.invs[0].left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
                         self.invs[0].right_click(pos)
-                    c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
+                    game_vars.write_block_data(self.block_pos, self.invs[0].write())
             if keys[K_ESCAPE]:
-                o.player.active_ui = None
+                game_vars.set_active_ui(None)
                 keys[K_ESCAPE] = False
 
 
@@ -452,27 +449,27 @@ class Crusher(FunctionalTile):
         self.map_color = (64, 64, 64)
 
     def on_place(self, pos):
-        c.update_dict(*pos, (0).to_bytes(4, byteorder), o.world.block_data)
+        game_vars.write_block_data(pos, bytearray(4))
 
     def on_break(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
             amnt = int.from_bytes(data[:2], byteorder)
             if amnt != 0:
                 # Drop contents
                 from random import choice
                 item = int.from_bytes(data[2:4], byteorder)
-                o.player.drop_item(DroppedItem(item, amnt), choice([True, False]),
-                                   [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
-        c.remove_from_dict(*pos, o.world.block_data)
+                game_vars.player.drop_item(DroppedItem(item, amnt), choice([True, False]),
+                                           [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
+        game_vars.write_block_data(pos, None)
         return True
 
     def activate(self, pos):
-        data = c.get_from_dict(*pos, o.world.block_data)
+        data = game_vars.get_block_data(pos)
         if data is not None:
-            o.player.active_ui = self.UI(pos, data, 9)
-            if not o.player.inventory.open:
-                o.player.inventory.toggle()
+            game_vars.set_active_ui(self.UI(pos, data, 9))
+            if not game_vars.player.inventory.open:
+                game_vars.player.inventory.toggle()
 
     class UI(ActiveUI):
         ITEMS = [i.SHINY_STONE_1, i.SHINY_STONE_2, i.SHINY_STONE_3]
@@ -522,29 +519,27 @@ class Crusher(FunctionalTile):
                         # Drop the results
                         block_pos = [self.block_pos[0] * BLOCK_W, self.block_pos[1] * BLOCK_W]
                         for idx, amnt in zip(items.keys(), items.values()):
-                            max_stack = o.items[idx].max_stack
+                            max_stack = game_vars.items[idx].max_stack
                             # Make sure we don't drop more than max stack
                             while amnt > 0:
                                 transfer = min(max_stack, amnt)
                                 item_obj = DroppedItem(idx, transfer)
-                                o.player.drop_item(item_obj, choice([True, False]), block_pos)
+                                game_vars.player.drop_item(item_obj, choice([True, False]), block_pos)
                                 amnt -= transfer
-                        c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
+                        game_vars.write_block_data(self.block_pos, self.invs[0].write())
                         self.invs[0].update_item(0, 0)
 
-                if o.player.use_time <= 0 and self.invs[0].rect.collidepoint(*pos):
+                if game_vars.player.use_time <= 0 and self.invs[0].rect.collidepoint(*pos):
                     pos = [pos[0] - self.invs[0].rect.x, pos[1] - self.invs[0].rect.y]
                     if mouse[BUTTON_LEFT - 1]:
                         self.invs[0].left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
                         self.invs[0].right_click(pos)
-                    c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
+                    game_vars.write_block_data(self.block_pos, self.invs[0].write())
 
                 self.ui.fill((0, 0, 0), self.invs[0].rect)
                 self.ui.blit(self.invs[0].surface, self.invs[0].rect)
 
             if keys[K_ESCAPE]:
-                c.update_dict(*self.block_pos, self.invs[0].write(), o.world.block_data)
-                o.player.active_ui = None
-
-# End
+                game_vars.write_block_data(self.block_pos, self.invs[0].write())
+                game_vars.set_active_ui(None)

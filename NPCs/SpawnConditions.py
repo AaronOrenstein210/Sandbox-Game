@@ -3,7 +3,7 @@
 
 from NPCs import conditions as con
 from Tools.constants import DAY_START, NIGHT_START
-from Tools import objects as o
+from Tools import game_vars
 
 
 class SpawnConditions:
@@ -11,7 +11,7 @@ class SpawnConditions:
         self.conditions = {}
 
     def check_world(self):
-        self.conditions[con.DAY] = DAY_START <= o.world_time < NIGHT_START
+        self.conditions[con.DAY] = DAY_START <= game_vars.world.world_time < NIGHT_START
         self.conditions[con.NIGHT] = not self.conditions[con.DAY]
 
     def check_area(self, pos, r):

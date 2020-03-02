@@ -6,7 +6,7 @@ from pygame.display import get_surface
 from NPCs.SpawnConditions import SpawnConditions
 from Tools.constants import BLOCK_W
 from Tools.tile_ids import AIR
-from Tools import objects as o
+from Tools import game_vars
 
 
 class EntityHandler:
@@ -20,47 +20,48 @@ class EntityHandler:
         self.entities.clear()
         self.items.clear()
 
-    def move(self):
+    def move(self, player):
         for item in self.items:
             item.move()
-            if item.pick_up_immunity <= 0 and o.player.pick_up(item):
+            if item.pick_up_immunity <= 0 and player.pick_up(item):
                 self.items.remove(item)
         for entity in self.entities:
-            # Check if a player projectile hit the enemy
+            # Check if a player projectile hit the entity
             for p in self.player_projectiles:
+                # If the projectile hit the enemy, delete it
                 if entity.rect.colliderect(p.rect):
                     self.player_projectiles.remove(p)
+                    # If the enemy died, delete it
                     if entity.hit(p.dmg, p.rect.centerx):
                         self.entities.remove(entity)
                         continue
-            entity.move()
-        for arr in [self.mob_projectiles, self.player_projectiles]:
-            for p in arr:
-                if p.move():
-                    arr.remove(p)
-
-    def check_hit_entities(self, player_x, polygon, damage):
-        for entity in self.entities:
-            # Check if we hit an enemy
-            if entity.immunity <= 0 and polygon.collides_polygon(entity.rect):
+            # Check if the player is swinging a weapon and it hit the entity
+            if entity.immunity <= 0 and player.hit_target(entity.rect):
                 # Check if we killed the entity
-                if entity.hit(damage, player_x):
+                if entity.hit(player.damage, player.rect.centerx):
                     self.entities.remove(entity)
-        for p in self.mob_projectiles:
-            if polygon.collides_polygon(p.rect):
-                self.mob_projectiles.remove(p)
-
-    # Returns the damage done and the location of the attack
-    def check_hit_player(self, player_rect):
-        for entity in self.entities:
-            if player_rect.colliderect(entity.rect):
-                return entity.stats.dmg, entity.rect.centerx
-        for p in self.mob_projectiles:
-            if player_rect.colliderect(p.rect):
-                # Remove the projectile
-                self.mob_projectiles.remove(p)
-                return p.dmg, p.rect.centerx
-        return 0, 0
+                    continue
+            # If the player is not immune, check if the entity hit the player
+            if not player.immune:
+                if player.rect.colliderect(entity.rect):
+                    player.hit(entity.stats.dmg, entity.rect.centerx)
+            # If the entity is still alive, move it
+            entity.move()
+        for projectile in self.mob_projectiles:
+            # Move the projectile and check if it is still active
+            if projectile.move():
+                self.mob_projectiles.remove(projectile)
+            # Check if the player is swinging a weapon and it hit the projectile
+            elif player.hit_target(projectile.rect):
+                self.mob_projectiles.remove(projectile)
+            # Check if the projectile hit the player
+            elif not player.immune and player.rect.colliderect(projectile.rect):
+                player.hit(projectile.dmg, projectile.rect.centerx)
+                self.mob_projectiles.remove(projectile)
+        for projectile in self.player_projectiles:
+            # Move the projectile and check if it is still active
+            if projectile.move():
+                self.player_projectiles.remove(projectile)
 
     def draw_display(self, rect):
         display = get_surface()
@@ -81,24 +82,18 @@ class EntityHandler:
                 return True
         return False
 
-    # Adds a projectile, sorting it into player and mob projectiles
-    def add_projectile(self, p):
-        if p.hurts_mobs:
-            self.player_projectiles.append(p)
-        else:
-            self.mob_projectiles.append(p)
-
     def spawn(self):
         conditions = SpawnConditions()
         conditions.check_world()
-        player_pos = [i // BLOCK_W for i in o.player.rect.center]
-        spawners = o.world.spawners
-        for x in range(max(0, player_pos[0] - 50), min(o.world.dim[0], player_pos[0] + 50)):
+        player_pos = [i // BLOCK_W for i in game_vars.player_pos()]
+        spawners = game_vars.world.spawners
+        world_dim = game_vars.world_dim()
+        for x in range(max(0, player_pos[0] - 50), min(world_dim[0], player_pos[0] + 50)):
             if x in spawners.keys():
-                for y in range(max(0, player_pos[1] - 50, min(o.world.dim[1], player_pos[1] + 50))):
+                for y in range(max(0, player_pos[1] - 50, min(world_dim[1], player_pos[1] + 50))):
                     if y in spawners[x].keys():
                         if randint(1, 10000) == 1:
-                            entity = o.tiles[spawners[x][y]].spawn((x, y), conditions)
+                            entity = game_vars.tiles[spawners[x][y]].spawn((x, y), conditions)
                             if entity is not None:
                                 self.entities.append(entity)
 
@@ -106,11 +101,12 @@ class EntityHandler:
 # Maybe used in future
 def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
     # X range
-    v1_min, v1_max = max(0, center[0] - r_outer), min(o.world.dim[0], center[0] + r_outer)
+    v1_min, v1_max = max(0, center[0] - r_outer), min(game_vars.world_dim()[0], center[0] + r_outer)
     # Y bounds
     v2_min1, v2_max1 = max(0, center[1] - r_outer), max(0, center[1] - r_inner)
-    v2_min2, v2_max2 = min(o.world.dim[1], center[1] + r_inner), min(o.world.dim[1],
-                                                                     center[1] + r_outer)
+    v2_min2 = min(game_vars.world_dim()[1], center[1] + r_inner)
+    v2_max2 = min(game_vars.world_dim()[1], center[1] + r_outer)
+
     v2_range_full = (range(v2_min1, v2_max2))
     v2_range_parts = (range(v2_min1, v2_max1), range(v2_min2, v2_max2))
     air = {}
@@ -120,7 +116,6 @@ def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
             air[v1_] = {}
         air[v1_][v2_] = val
 
-    blocks = o.world.blocks
     for v1 in range(v1_min, v1_max):
         for v2_range in v2_range_full if abs(v1 - center[1]) <= r_inner else \
                 v2_range_parts:
@@ -128,7 +123,7 @@ def get_spawn_spaces_with_hole(center, r_inner, r_outer, walking):
             hit_block = False
             v2 = 0
             for v2 in v2_range:
-                block = blocks[v2][v1] if walking else blocks[v1][v2]
+                block = game_vars.get_block_at(*(v1, v2) if walking else (v2, v1))
                 if block != AIR:
                     hit_block = True
                     if air_count > 0:

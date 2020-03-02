@@ -4,7 +4,7 @@ from random import randint, uniform
 from pygame import Rect
 from Tools import tile_ids as tiles
 from Tools.constants import random_sign
-from Tools import objects as o
+from Tools import game_vars
 
 
 class Biome:
@@ -17,7 +17,7 @@ class Biome:
         self.ore_w_range = self.ore_h_range = [2, 5]
         # Number of blocks per ore spawn
         self.ore_freq = 1000
-        o.biomes[idx] = self
+        game_vars.biomes[idx] = self
 
     # Calls all generate functions
     def generate(self, world, surface, x, dx):
@@ -77,7 +77,7 @@ class Biome:
 class Structure:
     def __init__(self, idx):
         self.biome_reqs = []
-        o.structures[idx] = self
+        game_vars.structures[idx] = self
 
     def generate(self, world, surface, rects):
         for i in range(10):

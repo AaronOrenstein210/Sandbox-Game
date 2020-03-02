@@ -3,7 +3,7 @@
 
 import math
 import pygame as pg
-from Tools import objects as o
+from Tools import game_vars
 from Tools.constants import BLOCK_W, MAX_FALL_SPEED
 
 X_SPEED = 15
@@ -12,7 +12,7 @@ X_SPEED = 15
 class DroppedItem:
     def __init__(self, item_id, amnt):
         self.idx = item_id
-        self.item = o.items[item_id]
+        self.item = game_vars.items[item_id]
         self.max_stack = self.item.max_stack
         self.amnt = amnt
         self.rect = pg.Rect((0, 0), self.item.image.get_size())
@@ -26,17 +26,16 @@ class DroppedItem:
         self.pulled_in = False
 
     def move(self):
-        if o.dt == 0:
+        if game_vars.dt == 0:
             return
-        self.pick_up_immunity = max(self.pick_up_immunity - o.dt, 0)
-        dt = o.dt / 1000
-        d = [self.v[0] * dt * BLOCK_W, self.v[1] * dt * BLOCK_W]
+        self.pick_up_immunity = max(self.pick_up_immunity - game_vars.dt, 0)
+        d = [v * game_vars.dt * BLOCK_W for v in self.v]
         if not self.pulled_in:
             # Update vertical position and velocity
             self.v[0] = math.copysign(max(abs(self.v[0]) - 1, 0), self.v[0])
-            self.v[1] += MAX_FALL_SPEED * dt / 2
+            self.v[1] += MAX_FALL_SPEED * game_vars.dt / 2
             self.v[1] = min(self.v[1], MAX_FALL_SPEED / 2)
-            o.check_collisions(self.pos, self.ratio, d)
+            game_vars.check_collisions(self.pos, self.ratio, d)
         else:
             self.pos = [self.pos[0] + d[0], self.pos[1] + d[1]]
         self.rect.topleft = self.pos
@@ -46,7 +45,7 @@ class DroppedItem:
         self.rect.center = pos
         self.pos = [self.rect.left, self.rect.top]
         self.v = [0 if left is None else -X_SPEED if left else X_SPEED, 0]
-        self.pick_up_immunity = 1500 if left is not None else 0
+        self.pick_up_immunity = 1.5 if left is not None else 0
 
     def attract(self, point):
         # Calculate velocities
