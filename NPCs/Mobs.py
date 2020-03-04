@@ -9,6 +9,7 @@ from Player.Stats import Stats
 from Tools.constants import BLOCK_W, scale_to_fit
 from Tools import item_ids as items
 from Tools import game_vars
+from Objects.Animation import Animation, OscillateAnimation
 
 
 class Cat(Entity):
@@ -77,10 +78,10 @@ class Helicopter(Entity):
 class Dragon(Boss):
     def __init__(self):
         Entity.__init__(self, name="Dragon", aggressive=True, w=5, rarity=3,
-                        img=MOB + "dragon_0.png", sprite=MOB + "dragon_0.png",
+                        img=MOB + "dragon/dragon_0.png", sprite=MOB + "dragon/dragon_0.png",
                         stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
-        self.rising_img = self.img
-        self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_1.png"), w=5 * BLOCK_W)
+        self.rising_anim = OscillateAnimation(folder=MOB + "dragon/", dim=self.img.get_size(), delay=.1)
+        self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_attack.png"), w=5 * BLOCK_W)
         self.zero_gravity = True
         self.hits_blocks = False
         self.no_knockback = True
@@ -109,7 +110,7 @@ class Dragon(Boss):
             dx = self.pos[0] - pos[0]
             dy = self.pos[1] - pos[1]
             if dy > 10 * BLOCK_W or (dy >= 0 and abs(dx) > 10 * BLOCK_W):
-                self.set_image(self.rising_img)
+                self.set_image(self.rising_anim.get_frame())
                 self.stage = 0
         elif self.stage == 2:
             num_shot_i = int(self.time)
@@ -118,7 +119,6 @@ class Dragon(Boss):
             # Shoot fire balls!
             for i in range(num_shot_f - num_shot_i):
                 game_vars.shoot_projectile(self.FireBall(self.rect.center, game_vars.player_pos(False)))
-
             if num_shot_f >= 9:
                 self.start_diving()
             else:
@@ -126,10 +126,17 @@ class Dragon(Boss):
                 dy = pos[1] - BLOCK_W * 8 - self.rect.centery
                 dx = pos[0] - self.rect.centerx
                 dx -= math.copysign(BLOCK_W * 8, dx)
-                self.v[0] = math.copysign(8, dx) if dx != 0 else 0
-                self.v[1] = math.copysign(8, dy) if dy != 0 else 0
+                self.v[0] = math.copysign(7, dx) if dx != 0 else 0
+                self.v[1] = math.copysign(7, dy) if dy != 0 else 0
+        # Update animation
+        if self.stage == 0 or self.stage == 2:
+            i = self.rising_anim.idx
+            self.rising_anim.update()
+            if i != self.rising_anim.idx:
+                self.set_image(self.rising_anim.get_frame())
 
     def start_diving(self):
+        self.rising_anim.reset()
         pos = game_vars.player_pos()
         d = [pos[0] - self.pos[0], self.pos[1] - pos[1]]
         r = math.sqrt((d[0] * d[0]) + (d[1] * d[1]))

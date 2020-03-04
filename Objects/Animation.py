@@ -17,8 +17,7 @@ class Animation:
                 if file.endswith(".png") or file.endswith(".jpg"):
                     self.frames.append(scale_to_fit(pg.image.load(folder + file), *dim))
         self.frame_delay = delay
-        self.idx = 0
-        self.time = 0
+        self.idx = self.time = 0
 
     def update(self):
         self.time += game_vars.dt
@@ -28,6 +27,9 @@ class Animation:
 
     def get_frame(self):
         return self.frames[self.idx]
+
+    def reset(self):
+        self.idx = self.time = 0
 
 
 # This animations goes forwards and backwards through the list of frames
@@ -44,3 +46,7 @@ class OscillateAnimation(Animation):
                     (self.idx == 0 and not self.forwards):
                 self.forwards = not self.forwards
             self.time %= self.frame_delay
+
+    def reset(self):
+        super().reset()
+        self.forwards = True
