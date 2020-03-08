@@ -483,7 +483,7 @@ def load_world():
 def change_world(new_world):
     def screen_goes_white(progress):
         display = pg.display.get_surface()
-        player.draw_ui()
+        draw()
         overlay = pg.Surface(display.get_size())
         overlay.fill((255 * progress, 255 * progress, 255))
         overlay.set_alpha(255 * progress)

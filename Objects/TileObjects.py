@@ -334,14 +334,14 @@ class WorldBuilder(FunctionalTile):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                 # Clicked create
                 if self.create_rect.collidepoint(*pos):
-                    if not self.invs["Biome"].is_empty() and not self.invs["Size"].is_empty() and self.name != "":
+                    if not self.invs[self.BIOME].is_empty() and not self.invs[self.SIZE].is_empty() and self.name != "":
                         for e in events:
                             if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
                                 events.remove(e)
                                 new = World(game_vars.world.universe, self.name)
-                                items = self.invs["Biome"].inv_items.flatten().tolist()
-                                items += [self.invs["Size"].inv_items[0][0]]
-                                items += [i.BONUS_STRUCTURE] * self.invs["Structure"].inv_amnts[0][0]
+                                items = self.invs[self.BIOME].inv_items.flatten().tolist()
+                                items += [self.invs[self.SIZE].inv_items[0][0]]
+                                items += [i.BONUS_STRUCTURE] * self.invs[self.STRUCTURE].inv_amnts[0][0]
                                 WorldGenerator.generate_world(new, modifiers=items)
                                 del new
                                 from Player.Inventory import new_inventory

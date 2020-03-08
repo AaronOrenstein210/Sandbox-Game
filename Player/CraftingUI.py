@@ -11,6 +11,8 @@ from Player.ActiveUI import ActiveUI
 class CraftingUI(ActiveUI):
     # Recipes that don't need a crafting station
     HAND_CRAFTS = [[[items.WORK_TABLE, 1], [items.WOOD, 10]]]
+    for item in game_vars.items:
+        HAND_CRAFTS.append([[item, 1]])
 
     def __init__(self, player):
         self.player = player

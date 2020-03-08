@@ -30,7 +30,7 @@ class World:
         # File variables
         self.universe = universe
         self.name = name
-        self.f_obj = open(self.file, 'r')
+        self.f_obj = open(self.file, 'a+')
         self.f_obj.close()
 
     @property
@@ -62,7 +62,7 @@ class World:
         # If we are just opening the file, get world info
         if self.f_obj.closed or not self.f_obj.readable():
             self.f_obj.close()
-            self.f_obj = open(self.file, 'rb+')
+            self.f_obj = open(self.file, 'rb')
             # Reset world data
             self.spawners.clear()
             self.block_data.clear()
@@ -120,7 +120,9 @@ class World:
                 row += 1
                 # Check if we hit the end of the map
                 if row >= self.dim[1]:
+                    self.f_obj.close()
                     return 1
+        # If we are done, close the file
         return (row * self.dim[0] + col) / self.num_blocks
 
     # Save world
@@ -132,10 +134,8 @@ class World:
         if self.f_obj.closed or not self.f_obj.writable():
             self.f_obj.close()
             self.f_obj = open(self.file, 'wb+')
-            self.f_obj.write(self.dim[0].to_bytes(2, byteorder))
-            self.f_obj.write(self.dim[1].to_bytes(2, byteorder))
-            self.f_obj.write(self.spawn[0].to_bytes(2, byteorder))
-            self.f_obj.write(self.spawn[1].to_bytes(2, byteorder))
+            for val in self.dim + self.spawn:
+                self.f_obj.write(val.to_bytes(2, byteorder))
             # Get current block along with rows and columns to save
         block_num = int(progress * self.num_blocks)
         col, row = block_num % self.dim[0], block_num // self.dim[0]
@@ -182,6 +182,7 @@ class World:
                 row += 1
                 # Check if we hit the end of the map
                 if row >= self.dim[1]:
+                    self.f_obj.close()
                     return 1
         return (row * self.dim[0] + col) / self.num_blocks
 
