@@ -143,6 +143,14 @@ def player_pos(in_blocks=False):
         return [p / BLOCK_W for p in player.rect.center]
 
 
+# Top left of the player rectangle, see above for in_blocks
+def player_topleft(in_blocks = False):
+    if not in_blocks:
+        return player.pos
+    else:
+        return [p / BLOCK_W for p in player.pos]
+
+
 # World dimensions in blocks
 def world_dim():
     return world.dim
@@ -251,6 +259,16 @@ def add_damage_text(dmg, pos):
 # Sets player's active ui
 def set_active_ui(ui):
     player.active_ui = ui
+
+
+# Sets the item data for the current held item
+def set_current_item_data(data):
+    player.inventory.set_item_data(data)
+
+
+# Gets the item data for the current held item
+def get_current_item_data():
+    return player.inventory.get_item_data()
 
 
 # Functions that check the world blocks

@@ -166,9 +166,6 @@ class BirdieSpawner(SpawnTile):
         self.map_color = (0, 0, 80)
 
 
-# End
-
-
 # Tiles that do stuff
 class DimensionHopper(FunctionalTile):
     def __init__(self):
@@ -269,10 +266,7 @@ class WorldBuilder(FunctionalTile):
                     self.STRUCTURE: Inventory((1, 1), max_stack=4, items_list=[i.BONUS_STRUCTURE]),
                     self.SIZE: Inventory((1, 1), max_stack=1, items_list=WorldGenerator.WORLD_DIMS.keys())}
             for idx in self.INV_ORDER:
-                # Load data
-                num_bytes = invs[idx].num_bytes
-                invs[idx].load(data[:num_bytes])
-                data = data[num_bytes:]
+                data = invs[idx].load(data)
             # Set text height
             text_h = c.INV_W // 2
             # Text

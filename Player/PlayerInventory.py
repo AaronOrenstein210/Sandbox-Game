@@ -16,6 +16,7 @@ class PlayerInventory(Inventory):
         super().__init__((10, 5))
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
+        self.selected_data = None
         # Defines current hotbar item
         self.hot_bar_item = -1
         # Checks if the inventory is open or not
@@ -23,8 +24,22 @@ class PlayerInventory(Inventory):
         self.toggle()
 
     def load(self, data):
-        Inventory.load(self, data)
+        super().load(data)
         self.select_hotbar(0)
+
+    # Sets the data of the item currently being used
+    def set_item_data(self, data):
+        if self.selected_amnt == 0 or self.selected_item == -1:
+            self.inv_data[(self.hot_bar_item, 0)] = data
+        else:
+            self.selected_data = data
+
+    # Gets the data of teh item currently being used
+    def get_item_data(self):
+        if self.selected_amnt == 0 or self.selected_item == -1:
+            return self.inv_data.get((self.hot_bar_item, 0))
+        else:
+            return self.selected_data
 
     def toggle(self):
         self.open = not self.open
@@ -64,12 +79,14 @@ class PlayerInventory(Inventory):
             self.selected_amnt -= 1
             if self.selected_amnt == 0:
                 self.selected_item = -1
+                self.selected_data = None
         # Using an item from our hot bar
         else:
             # Reduce its amount and check if we have any left
             self.inv_amnts[0][self.hot_bar_item] -= 1
             if self.inv_amnts[0][self.hot_bar_item] == 0:
                 self.inv_items[0][self.hot_bar_item] = -1
+                self.inv_data[(self.hot_bar_item, 0)] = None
             self.update_item(0, self.hot_bar_item)
 
     def key_pressed(self, key):

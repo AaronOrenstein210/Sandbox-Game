@@ -18,6 +18,8 @@ class Item:
         self.use_time = .3
 
         # Information booleans
+        # Stores extra data
+        self.has_data = False
         # Is consumable (will decrease item amount)
         self.consumable = False
         # Will automatically start using again
@@ -112,16 +114,16 @@ class Item:
         game_vars.player.use_time -= game_vars.dt
 
     # Returns a description of the item, each item class should override this
-    def get_description(self):
+    def get_description(self, data):
         return ""
 
     # Returns the full item description, this should only be overridden by
     # items types that add extra information to the description, like damage for weapons
-    def get_full_description(self):
+    def get_full_description(self, data):
         # Start with item name
         text = [self.name]
         # Add the description
-        desc = self.get_description()
+        desc = self.get_description(data)
         for i in range(desc.count("\n")):
             idx = desc.index("\n")
             text.append(desc[:idx])
@@ -133,8 +135,8 @@ class Item:
         return text
 
     # Returns a surface containing this object's description
-    def draw_description(self):
-        text = [string for string in self.get_full_description() if string != ""]
+    def draw_description(self, data):
+        text = [string for string in self.get_full_description(data) if string != ""]
         font = c.ui_font
         # Figure out surface dimensions
         text_h = font.size("|")[1]
@@ -209,8 +211,8 @@ class Weapon(Item):
         elif self.consumable:
             game_vars.player.inventory.use_item()
 
-    def get_full_description(self):
-        text = super().get_full_description()
+    def get_full_description(self, data):
+        text = super().get_full_description(data)
         # Add damage string
         text.insert(1, "{} Damage".format(self.damage))
         return text

@@ -155,7 +155,7 @@ class CraftingUI(ActiveUI):
                 idx = y * 10 + x
                 if idx < len(self.can_craft):
                     item = self.recipes[self.can_craft[idx]][0][0]
-                    game_vars.items[item].draw_description()
+                    game_vars.items[item].draw_description(None)
             # Draw description for recipe item
             elif self.recipe_rect.collidepoint(*pos):
                 # Get index of recipe item we are hovering over
@@ -163,7 +163,7 @@ class CraftingUI(ActiveUI):
                 idx = (pos[0] - self.selected_scroll) // INV_W + 1
                 if idx < len(self.selected):
                     item = self.selected[idx][0]
-                    game_vars.items[item].draw_description()
+                    game_vars.items[item].draw_description(None)
 
     def process_events(self, events, mouse, keys):
         pos = pg.mouse.get_pos()

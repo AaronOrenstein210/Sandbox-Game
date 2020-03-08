@@ -1,5 +1,6 @@
 # Created on 3 December 2019
 
+from sys import byteorder
 from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
@@ -24,7 +25,7 @@ class SnowBall(Item):
         super().on_left_click()
         game_vars.shoot_projectile(self.P1(game_vars.player_pos(), game_vars.global_mouse_pos()))
 
-    def get_description(self):
+    def get_description(self, data):
         return "Fun to throw!"
 
     class P1(Projectile):
@@ -43,7 +44,7 @@ class DragonClaw(Item):
         game_vars.spawn_entity(Dragon(),
                                [p + randint(15, 30) * BLOCK_W * random_sign() for p in game_vars.player_pos()])
 
-    def get_description(self):
+    def get_description(self, data):
         return "A claw, torn from a defeated dragon\nIt holds many magical properties"
 
 
@@ -70,27 +71,54 @@ class Dematerializer(Item):
             pos = [s + progress * -d for s, d in zip(spawn, delta)]
             game_vars.player.set_pos(pos)
 
-    def get_description(self):
+    def get_description(self, data):
         return "Teleports the user back to spawn"
 
 
-class TimeWarp(Item):
+class Waypoint(Item):
     def __init__(self):
-        super().__init__(i.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
+        super().__init__(i.WAYPOINT, img=INV + 'waypoint.png', name="Waypoint")
         self.right_click = True
+        self.has_data = True
 
-    def on_tick(self):
-        mouse = pg.mouse.get_pressed()
-        w = game_vars.world
-        if mouse[BUTTON_LEFT - 1]:
-            w.world_time = (w.world_time + (40 * game_vars.dt)) % MS_PER_DAY
-        elif mouse[BUTTON_RIGHT - 1]:
-            w.world_time = (w.world_time - (60 * game_vars.dt)) % MS_PER_DAY
+    def on_left_click(self):
+        data = game_vars.get_current_item_data()
+        if data:
+            pos = [int.from_bytes(data[2 * j:2 * (j + 1)], byteorder) * BLOCK_W for j in range(2)]
+            game_vars.player.set_pos(pos)
+
+    def on_right_click(self):
+        pos = game_vars.player_topleft(True)
+        data = int(pos[0]).to_bytes(2, byteorder)
+        data += int(pos[1]).to_bytes(2, byteorder)
+        game_vars.set_current_item_data(data)
+
+    def get_description(self, data):
+        if data:
+            waypoint = "({}, {})".format(int.from_bytes(data[:2], byteorder),
+                                         int.from_bytes(data[2: 4], byteorder))
         else:
-            game_vars.player.use_time = 0
+            waypoint = "Not Set"
+        return "Right click to set waypoint\nLeft click to teleport" \
+               "to waypoint\nCurrent Waypoint: {}".format(waypoint)
 
-    def get_description(self):
-        return "Left click to move time forwards, right click to move time backwards"
+    class TimeWarp(Item):
+        def __init__(self):
+            super().__init__(i.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
+            self.right_click = True
+
+        def on_tick(self):
+            mouse = pg.mouse.get_pressed()
+            w = game_vars.world
+            if mouse[BUTTON_LEFT - 1]:
+                w.world_time = (w.world_time + (40 * game_vars.dt)) % MS_PER_DAY
+            elif mouse[BUTTON_RIGHT - 1]:
+                w.world_time = (w.world_time - (60 * game_vars.dt)) % MS_PER_DAY
+            else:
+                game_vars.player.use_time = 0
+
+        def get_description(self, data):
+            return "Left click to move time forwards, right click to move time backwards"
 
 
 # Biome Items
@@ -98,7 +126,7 @@ class ForestBiome(Item):
     def __init__(self):
         super().__init__(i.FOREST, img=INV + "forest.png", name="Forest Biome")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Contains the essence of the Forest"
 
 
@@ -106,7 +134,7 @@ class MountainBiome(Item):
     def __init__(self):
         super().__init__(i.MOUNTAIN, img=INV + "mountain.png", name="Mountain Biome")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Holds the secret of the Mountains"
 
 
@@ -114,7 +142,7 @@ class ValleyBiome(Item):
     def __init__(self):
         super().__init__(i.VALLEY, img=INV + "valley.png", name="Valley Biome")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Reveals the mysteries of the Valley"
 
 
@@ -122,7 +150,7 @@ class SmallWorld(Item):
     def __init__(self):
         super().__init__(i.SMALL_WORLD, img=INV + "small_world.png", name="Small World")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Holds the power to create a small world"
 
 
@@ -130,7 +158,7 @@ class MedWorld(Item):
     def __init__(self):
         super().__init__(i.MED_WORLD, img=INV + "med_world.png", name="Medium World")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Holds the power to create a medium-sized world"
 
 
@@ -138,7 +166,7 @@ class LargeWorld(Item):
     def __init__(self):
         super().__init__(i.LARGE_WORLD, img=INV + "large_world.png", name="Large World")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Holds the power to bring a large world into existence"
 
 
@@ -146,7 +174,7 @@ class BonusStructure(Item):
     def __init__(self):
         super().__init__(i.BONUS_STRUCTURE, img=INV + "bonus_structure.png", name="Bonus Structure")
 
-    def get_description(self):
+    def get_description(self, data):
         return "With this item, new worlds can hold one more structure"
 
 
@@ -165,7 +193,7 @@ class Pyrite(Item):
     def __init__(self):
         super().__init__(i.PYRITE, img=INV + "pyrite.png", name="Pyrite Chunk")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Oooh, shiny!"
 
 
@@ -173,7 +201,7 @@ class Sphalerite(Item):
     def __init__(self):
         super().__init__(i.SPHALERITE, img=INV + "sphalerite.png", name="Sphalerite Crystal")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Sphaler-what?"
 
 
@@ -181,7 +209,7 @@ class Obsidian(Item):
     def __init__(self):
         super().__init__(i.OBSIDIAN, img=INV + "obsidian.png", name="Obsidian Shard")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Obtained from the nether regions of the world"
 
 
@@ -194,7 +222,7 @@ class TestSword(Weapon):
     def on_left_click(self):
         game_vars.shoot_projectile(self.P1(game_vars.player.rect.center, game_vars.global_mouse_pos()))
 
-    def get_description(self):
+    def get_description(self, data):
         return "Your basic sword\nIt has so much potential"
 
     class P1(Projectile):
@@ -210,7 +238,7 @@ class TestPickaxe(Weapon):
         self.auto_use = True
         self.breaks_blocks = True
 
-    def get_description(self):
+    def get_description(self, data):
         return "Your basic pickaxe\nIt has so much potential"
 
 
@@ -245,7 +273,7 @@ class ShinyStone1(Block):
         super().__init__(i.SHINY_STONE_1, t.SHINY_STONE_1, name="Shiny Stone: Tier 1",
                          img=INV + "shiny_stone_1.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "You can kind of see something shiny inside"
 
 
@@ -254,7 +282,7 @@ class ShinyStone2(Block):
         super().__init__(i.SHINY_STONE_2, t.SHINY_STONE_2, name="Shiny Stone: Tier 2",
                          img=INV + "shiny_stone_2.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Ooh, this rock is pretty"
 
 
@@ -263,7 +291,7 @@ class ShinyStone3(Block):
         super().__init__(i.SHINY_STONE_3, t.SHINY_STONE_3, name="Shiny Stone: Tier 3",
                          img=INV + "shiny_stone_3.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "The glow of untold riches within tempts your greed"
 
 
@@ -271,7 +299,7 @@ class DragonEgg(Block):
     def __init__(self):
         super().__init__(i.DRAGON_EGG, t.DRAGON_EGG, name="Dragon Egg", img=INV + "dragon_egg.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "There's definitely something alive in here"
 
 
@@ -279,7 +307,7 @@ class WorkTable(Block):
     def __init__(self):
         super().__init__(i.WORK_TABLE, t.WORK_TABLE, name="Work Table", img=INV + "work_table.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Now you can make pretty furniture!"
 
 
@@ -288,7 +316,7 @@ class DimensionHopper(Block):
         super().__init__(i.DIMENSION_HOPPER, t.DIMENSION_HOPPER, name="Dimension Hopper",
                          img=INV + "dimension_hopper.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "A mysterious portal that calls to your adventurous spirit"
 
 
@@ -296,7 +324,7 @@ class Chest(Block):
     def __init__(self):
         super().__init__(i.CHEST, t.CHEST, name="Chest", img=INV + "chest.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Challenge idea: this block is only unlocked after beating the final boss"
 
 
@@ -305,7 +333,7 @@ class WorldBuilder(Block):
         super().__init__(i.WORLD_BUILDER, t.WORLD_BUILDER, name="World Builder",
                          img=INV + "world_builder/world_builder_0.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "Channels the energy of biomes to create entire worlds\n" + \
                "Legend says that the presence of certain biome combinations will allow rare creatures to spawn"
 
@@ -314,5 +342,5 @@ class Crusher(Block):
     def __init__(self):
         super().__init__(i.CRUSHER, t.CRUSHER, name="Crusher", img=INV + "crusher/crusher_0.png")
 
-    def get_description(self):
+    def get_description(self, data):
         return "This machine looks powerful enough to crush those shiny stones that you found"
