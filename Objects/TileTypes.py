@@ -18,6 +18,8 @@ class Tile:
         self.hardness = hardness
         self.dim = dim
 
+        # Tile stores data
+        self.has_data = False
         # Tile spawns enemies
         self.spawner = False
         # Tile is interactable
@@ -43,8 +45,7 @@ class Tile:
             self.image = game_vars.animations[-1].frames[0]
         else:
             self.image = pg.Surface(img_dim)
-        # Number of bytes of data
-        self.data_bytes = 0
+
         # List of drops, each drop is a item/amnt pair
         self.drops = []
         # Recipes for crafting blocks
@@ -133,11 +134,11 @@ class CraftingStation(Tile):
 
 
 class FunctionalTile(Tile):
-    def __init__(self, idx, data_bytes, **kwargs):
+    def __init__(self, idx, **kwargs):
         Tile.__init__(self, idx, **kwargs)
         self.clickable = True
         self.has_ui = True
-        self.data_bytes = data_bytes
+        self.has_data = True
 
 
 # SpawnBlocks are blocks that spawn enemies

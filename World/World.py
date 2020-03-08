@@ -1,6 +1,5 @@
 # Created on 21 December 2019
 
-from os.path import isfile
 from sys import byteorder
 from numpy import full, int16
 import math
@@ -31,7 +30,8 @@ class World:
         # File variables
         self.universe = universe
         self.name = name
-        self.current_byte = 0
+        self.f_obj = open(self.file, 'r')
+        self.f_obj.close()
 
     @property
     def surface_h(self):
@@ -59,147 +59,131 @@ class World:
 
     # Load world
     def load_part(self, progress):
-        if isfile(self.file):
-            # Open file
-            with open(self.file, "rb") as file:
-                data = file.read()
-                # If it's the first time, read dimensions
-                if progress == 0:
-                    # Reset world data
-                    self.spawners.clear()
-                    self.block_data.clear()
-                    self.animations.clear()
-                    self.dim = [int.from_bytes(data[:2], byteorder), int.from_bytes(data[2:4], byteorder)]
-                    self.num_blocks = self.dim[0] * self.dim[1]
-                    self.spawn = (int.from_bytes(data[4:6], byteorder), int.from_bytes(data[6:8], byteorder))
-                    self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
-                    self.current_byte = 8
-                data = data[self.current_byte:]
-                # Get current row and column and the blocks left to load
-                current_block = int(progress * self.num_blocks)
-                col, row = current_block % self.dim[0], current_block // self.dim[0]
-                blocks_left = math.ceil(self.num_blocks / 100)
-                # Write data to array
-                while blocks_left > 0:
-                    # Extract tile id and number of tiles
-                    val = int.from_bytes(data[:2], byteorder)
-                    num = int.from_bytes(data[2:4], byteorder)
-                    data = data[4:]
-                    self.current_byte += 4
-                    # Tile defaults to air if it doesn't exist
-                    if val not in game_vars.tiles.keys():
-                        val = AIR
-                    # Make sure we don't go over the row
-                    if col + num > self.dim[0]:
-                        num = self.dim[0] - col
-                    if val != AIR:
-                        tile = game_vars.tiles[val]
-                        # If the block has a width > 1, there is automatically only one block in this strip
-                        if tile.dim[0] != 1:
-                            # Save multiblock parts
-                            for dr in range(tile.dim[1]):
-                                for dc in range(tile.dim[0]):
-                                    self.blocks[row + dr][col + dc] = -(dc * 100 + dr)
-                            self.blocks[row][col] = val
-                        # Otherwise, it is either a single block, or a vertical multiblock
-                        else:
-                            # Save single block
-                            self.blocks[row][col:col + num] = [val] * num
-                            # Save vertical multiblock
-                            for i in range(1, tile.dim[1]):
-                                self.blocks[row + i][col + num] = [-i] * num
-                        # Check if we should be loading extra data
-                        num_bytes = tile.data_bytes
-                        has_bytes = num_bytes > 0
-                        # Loop through every block
-                        for col1 in range(col, col + num):
-                            # Add the block to applicable lists
-                            self.add_block(col1, row, val)
-                            # Load extra data if the block has any
-                            if has_bytes:
-                                c.update_dict(col1, row, data[:num_bytes], self.block_data)
-                                data = data[num_bytes:]
-                                self.current_byte += num_bytes
-                    # Update our column and blocks left
-                    blocks_left -= num
-                    col += num
-                    # Check if we made it to the next row
-                    if col >= self.dim[0]:
-                        col %= self.dim[0]
-                        row += 1
-                        # Check if we hit the end of the map
-                        if row >= self.dim[1]:
-                            return 1
-                return (row * self.dim[0] + col) / self.num_blocks
-        return
+        # If we are just opening the file, get world info
+        if self.f_obj.closed or not self.f_obj.readable():
+            self.f_obj.close()
+            self.f_obj = open(self.file, 'rb+')
+            # Reset world data
+            self.spawners.clear()
+            self.block_data.clear()
+            self.animations.clear()
+            # Load world info
+            self.dim = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
+            self.num_blocks = self.dim[0] * self.dim[1]
+            self.spawn = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
+            self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
+        # Get current row and column and the blocks left to load
+        current_block = int(progress * self.num_blocks)
+        col, row = current_block % self.dim[0], current_block // self.dim[0]
+        blocks_left = math.ceil(self.num_blocks / 100)
+        # Write data to array
+        while blocks_left > 0:
+            # Extract tile id and number of tiles
+            val = int.from_bytes(self.f_obj.read(2), byteorder)
+            num = int.from_bytes(self.f_obj.read(2), byteorder)
+            # Tile defaults to air if it doesn't exist
+            if val not in game_vars.tiles.keys():
+                val = AIR
+            # Make sure we don't go over the row
+            if col + num > self.dim[0]:
+                num = self.dim[0] - col
+            if val != AIR:
+                tile = game_vars.tiles[val]
+                # If the block has a width > 1, there is automatically only one block in this strip
+                if tile.dim[0] != 1:
+                    # Save multiblock parts
+                    for dr in range(tile.dim[1]):
+                        for dc in range(tile.dim[0]):
+                            self.blocks[row + dr][col + dc] = -(dc * 100 + dr)
+                    self.blocks[row][col] = val
+                # Otherwise, it is either a single block, or a vertical multiblock
+                else:
+                    # Save single block
+                    self.blocks[row][col:col + num] = [val] * num
+                    # Save vertical multiblock
+                    for i in range(1, tile.dim[1]):
+                        self.blocks[row + i][col + num] = [-i] * num
+                # Loop through every block
+                for col1 in range(col, col + num):
+                    # Add the block to applicable lists
+                    self.add_block(col1, row, val)
+                    # Load extra data if the block has any
+                    if tile.has_data:
+                        amnt = int.from_bytes(self.f_obj.read(2), byteorder)
+                        c.update_dict(col1, row, self.f_obj.read(amnt), self.block_data)
+            # Update our column and blocks left
+            blocks_left -= num
+            col += num
+            # Check if we made it to the next row
+            if col >= self.dim[0]:
+                col %= self.dim[0]
+                row += 1
+                # Check if we hit the end of the map
+                if row >= self.dim[1]:
+                    return 1
+        return (row * self.dim[0] + col) / self.num_blocks
 
     # Save world
     def save_part(self, progress, num_rows):
-        if self.blocks is not None:
-            code = "wb+" if progress == 0 else "ab+"
-            with open(self.file, code) as file:
-                # If this is the first call, save world dimensions and spawn
-                if progress == 0:
-                    file.write(self.dim[0].to_bytes(2, byteorder))
-                    file.write(self.dim[1].to_bytes(2, byteorder))
-                    file.write(self.spawn[0].to_bytes(2, byteorder))
-                    file.write(self.spawn[1].to_bytes(2, byteorder))
-                # Get current block along with rows and columns to save
-                block_num = int(progress * self.num_blocks)
-                col, row = block_num % self.dim[0], block_num // self.dim[0]
-                blocks_left = int(num_rows * self.dim[0])
-                while blocks_left > 0:
-                    # Save the tile id
-                    val = int(self.blocks[row][col])
-                    col1 = col + 1
-                    # Keep going until we hit a new tile or the end of the row
-                    # This ignores blocks_left so we can store the entire strip of this block type
-                    while col1 < self.dim[0]:
-                        val1 = self.blocks[row][col1]
-                        if val != val1 and (val > 0 or val1 > 0):
-                            break
-                        col1 += 1
-                    num_byte = (col1 - col).to_bytes(2, byteorder)
-                    # Need to skip checking bytes in case val < 0
-                    if val < 0 or val == AIR:
-                        file.write(AIR.to_bytes(2, byteorder))
-                        file.write(num_byte)
-                    else:
-                        # Write data
-                        file.write(val.to_bytes(2, byteorder))
-                        file.write(num_byte)
-                        # Write any extra data
-                        num_extra = game_vars.tiles[val].data_bytes
-                        if num_extra > 0:
-                            # Write it for each block
-                            for x in range(col, col1):
-                                # We have to write the correct number of bytes no matter what
-                                # Bad block data is better than bad world data
-                                bytes_ = c.get_from_dict(x, row, self.block_data)
-                                # Create a new bytearray
-                                if bytes_ is None:
-                                    bytes_ = bytearray(num_extra)
-                                else:
-                                    length = len(bytes_)
-                                    # Cut off extra bytes
-                                    if length > num_extra:
-                                        bytes_ = bytes_[:num_extra]
-                                    # Add extra bytes
-                                    elif length < num_extra:
-                                        bytes_ += (0).to_bytes(num_extra - length, byteorder)
-                                file.write(bytes_)
-                    # Now that we are done, update our column and blocks left
-                    blocks_left -= col1 - col
-                    col = col1
-                    # Check if we made it to the next row
-                    if col >= self.dim[0]:
-                        col %= self.dim[0]
-                        row += 1
-                        # Check if we hit the end of the map
-                        if row >= self.dim[1]:
-                            return 1
-                return (row * self.dim[0] + col) / self.num_blocks
-        return 1
+        # If there is no data, just end the process
+        if self.blocks is None:
+            return 1
+        # If we are just opening the file, save world info
+        if self.f_obj.closed or not self.f_obj.writable():
+            self.f_obj.close()
+            self.f_obj = open(self.file, 'wb+')
+            self.f_obj.write(self.dim[0].to_bytes(2, byteorder))
+            self.f_obj.write(self.dim[1].to_bytes(2, byteorder))
+            self.f_obj.write(self.spawn[0].to_bytes(2, byteorder))
+            self.f_obj.write(self.spawn[1].to_bytes(2, byteorder))
+            # Get current block along with rows and columns to save
+        block_num = int(progress * self.num_blocks)
+        col, row = block_num % self.dim[0], block_num // self.dim[0]
+        blocks_left = int(num_rows * self.dim[0])
+        while blocks_left > 0:
+            # Save the tile id
+            val = int(self.blocks[row][col])
+            col1 = col + 1
+            # Keep going until we hit a new tile or the end of the row
+            # This ignores blocks_left so we can store the entire strip of this block type
+            while col1 < self.dim[0]:
+                val1 = self.blocks[row][col1]
+                if val != val1 and (val > 0 or val1 > 0):
+                    break
+                col1 += 1
+            num_byte = (col1 - col).to_bytes(2, byteorder)
+            # Need to skip checking bytes in case val < 0
+            if val < 0 or val == AIR:
+                self.f_obj.write(AIR.to_bytes(2, byteorder))
+                self.f_obj.write(num_byte)
+            else:
+                # Write data
+                self.f_obj.write(val.to_bytes(2, byteorder))
+                self.f_obj.write(num_byte)
+                # Write any extra data
+                if game_vars.tiles[val].has_data:
+                    # Write it for each block
+                    for x in range(col, col1):
+                        # We have to write the correct number of bytes no matter what
+                        # Bad block data is better than bad world data
+                        bytes_ = c.get_from_dict(x, row, self.block_data)
+                        # Create a new bytearray
+                        if bytes_ is None:
+                            self.f_obj.write(bytearray(2))
+                        else:
+                            self.f_obj.write(len(bytes_).to_bytes(2, byteorder))
+                            self.f_obj.write(bytes_)
+            # Now that we are done, update our column and blocks left
+            blocks_left -= col1 - col
+            col = col1
+            # Check if we made it to the next row
+            if col >= self.dim[0]:
+                col %= self.dim[0]
+                row += 1
+                # Check if we hit the end of the map
+                if row >= self.dim[1]:
+                    return 1
+        return (row * self.dim[0] + col) / self.num_blocks
 
     # Update block
     def place_block(self, x, y, block):

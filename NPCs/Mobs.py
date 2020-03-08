@@ -9,7 +9,7 @@ from Player.Stats import Stats
 from Tools.constants import BLOCK_W, scale_to_fit
 from Tools import item_ids as items
 from Tools import game_vars
-from Objects.Animation import Animation, OscillateAnimation
+from Objects.Animation import OscillateAnimation
 
 
 class Cat(Entity):

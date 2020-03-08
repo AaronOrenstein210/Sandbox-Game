@@ -172,7 +172,7 @@ class BirdieSpawner(SpawnTile):
 # Tiles that do stuff
 class DimensionHopper(FunctionalTile):
     def __init__(self):
-        super().__init__(t.DIMENSION_HOPPER, 0, hardness=2, img=INV + "dimension_hopper.png")
+        super().__init__(t.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png")
         self.scroller = None
         self.add_drop(i.DIMENSION_HOPPER, 1)
         self.map_color = (0, 0, 0)
@@ -232,7 +232,7 @@ class WorldBuilder(FunctionalTile):
     INV_SPOTS = 6
 
     def __init__(self):
-        super().__init__(t.WORLD_BUILDER, 4 * self.INV_SPOTS, img=INV + "world_builder/")
+        super().__init__(t.WORLD_BUILDER, img=INV + "world_builder/")
         self.on_surface = True
         self.add_drop(i.WORLD_BUILDER, 1)
         self.map_color = (0, 0, 0)
@@ -390,7 +390,7 @@ class Chest(FunctionalTile):
     INV_DIM = (10, 5)
 
     def __init__(self):
-        super().__init__(t.CHEST, 4 * self.INV_DIM[0] * self.INV_DIM[1], hardness=1, img=INV + "chest.png",
+        super().__init__(t.CHEST, hardness=1, img=INV + "chest.png",
                          dim=(2, 2))
         self.on_surface = True
         self.add_drop(i.CHEST, 1)
@@ -443,7 +443,7 @@ class Chest(FunctionalTile):
 
 class Crusher(FunctionalTile):
     def __init__(self):
-        super().__init__(t.CRUSHER, 4, img=INV + "crusher/", dim=(2, 2))
+        super().__init__(t.CRUSHER, img=INV + "crusher/", dim=(2, 2))
         self.on_surface = True
         self.add_drop(i.CRUSHER, 1)
         self.map_color = (64, 64, 64)
