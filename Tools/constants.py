@@ -26,14 +26,12 @@ MAX_FALL_SPEED = 10
 BACKGROUND = (0, 128, 128)
 
 # Time Constants
-# 1000 ms/s * 60 s/min
-MS_PER_MIN = 60000
-# 1000 ms/s * 60 s/min * 24 min/day
-MS_PER_DAY = MS_PER_MIN * 24
-NOON = MS_PER_DAY // 2
-# 1000 ms/s * 60 s/min * 18 min
-DAY_START = MS_PER_MIN * 6
-NIGHT_START = MS_PER_MIN * 18
+# 60 s/min * 24 min/day
+SEC_PER_DAY = 60 * 24
+NOON = SEC_PER_DAY // 2
+# 60 s/min * 18 min
+DAY_START = 60 * 6
+NIGHT_START = 60 * 18
 
 # Damage types
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4

@@ -10,18 +10,27 @@ from Tools import constants as c
 from Tools import game_vars
 from UI.Operations import CompleteTask, percent
 
+WORLD = 0
+
 
 class World:
     def __init__(self, universe, name):
         # Visual variables
         self.surface = None
         self.map = None
-        # World data
-        self.dim = [0, 0]
+        # World type
+        self.type = WORLD  # 1 bytes
+        # Can we delete the world
+        self.can_delete = False  # 1 bytes
+        # World time
+        self.time = c.SEC_PER_DAY * .4  # 2 bytes
+        # World spawn location
+        self.spawn = [0, 0]  # 4 bytes
+        # World dimensions and number of blocks
+        self.dim = [0, 0]  # 4 bytes
         self.num_blocks = 0
+        # 2D array of world blocks
         self.blocks = None
-        self.spawn = [0, 0]
-        self.world_time = c.MS_PER_DAY * .4
         # Special blocks, whose positions need to be stored
         self.spawners = {}
         self.animations = {}
@@ -47,30 +56,44 @@ class World:
 
     @property
     def sky_color(self):
-        return 0, 0, 255 * (1 - pow((self.world_time - c.NOON) / c.NOON, 2))
+        return 0, 0, 255 * (1 - pow((self.time - c.NOON) / c.NOON, 2))
 
     def tick(self):
-        self.world_time = (self.world_time + game_vars.dt) % c.MS_PER_DAY
+        self.time = (self.time + game_vars.dt) % c.SEC_PER_DAY
 
     def new_world(self, dim):
         self.dim = dim
         self.num_blocks = dim[0] * dim[1]
         self.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
 
+    # Load world information
+    # @param close_file: should we close the file when done
+    def load_info(self, close_file):
+        # Open the file
+        self.f_obj.close()
+        self.f_obj = open(self.file, 'rb')
+        # Load file data
+        self.type = int.from_bytes(self.f_obj.read(1), byteorder)
+        self.can_delete = bool.from_bytes(self.f_obj.read(1), byteorder)
+        self.time = int.from_bytes(self.f_obj.read(2), byteorder)
+        self.dim = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
+        self.spawn = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
+        # Calculate number of blocks
+        self.num_blocks = self.dim[0] * self.dim[1]
+        # Check if we should close the file
+        if close_file:
+            self.f_obj.close()
+
     # Load world
     def load_part(self, progress):
         # If we are just opening the file, get world info
         if self.f_obj.closed or not self.f_obj.readable():
-            self.f_obj.close()
-            self.f_obj = open(self.file, 'rb')
             # Reset world data
             self.spawners.clear()
             self.block_data.clear()
             self.animations.clear()
-            # Load world info
-            self.dim = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
-            self.num_blocks = self.dim[0] * self.dim[1]
-            self.spawn = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
+            # Load world info, automatically opens the file
+            self.load_info(False)
             self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
         # Get current row and column and the blocks left to load
         current_block = int(progress * self.num_blocks)
@@ -125,6 +148,22 @@ class World:
         # If we are done, close the file
         return (row * self.dim[0] + col) / self.num_blocks
 
+    # Saves world information
+    # @param close_file: should we close the file when done
+    def save_info(self, close_file):
+        # Open the file in write mode
+        self.f_obj.close()
+        self.f_obj = open(self.file, 'wb')
+        # Write data
+        self.f_obj.write(self.type.to_bytes(1, byteorder))
+        self.f_obj.write(self.can_delete.to_bytes(1, byteorder))
+        self.f_obj.write(int(self.time).to_bytes(2, byteorder))
+        for val in self.dim + self.spawn:
+            self.f_obj.write(val.to_bytes(2, byteorder))
+        # Check if we should close the file
+        if close_file:
+            self.f_obj.close()
+
     # Save world
     def save_part(self, progress, num_rows):
         # If there is no data, just end the process
@@ -132,11 +171,9 @@ class World:
             return 1
         # If we are just opening the file, save world info
         if self.f_obj.closed or not self.f_obj.writable():
-            self.f_obj.close()
-            self.f_obj = open(self.file, 'wb+')
-            for val in self.dim + self.spawn:
-                self.f_obj.write(val.to_bytes(2, byteorder))
-            # Get current block along with rows and columns to save
+            # Save world information, automatically opens the file
+            self.save_info(False)
+        # Get current block along with rows and columns to save
         block_num = int(progress * self.num_blocks)
         col, row = block_num % self.dim[0], block_num // self.dim[0]
         blocks_left = int(num_rows * self.dim[0])

@@ -11,8 +11,8 @@ NUM_STRUCTURES = {items.SMALL_WORLD: 1, items.MED_WORLD: 1, items.LARGE_WORLD: 2
 
 
 # Generates a new world
-# Takes in the world object to generate on, dimensions of world,
-# And a list of items that modify the world
+# Takes in the world object to generate on
+# and a list of items that modify the world
 def generate_world(world, modifiers=()):
     num_structs = 0
     biomes = dict.fromkeys(game_vars.biomes.keys(), 0)

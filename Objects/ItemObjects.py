@@ -102,23 +102,24 @@ class Waypoint(Item):
         return "Right click to set waypoint\nLeft click to teleport" \
                "to waypoint\nCurrent Waypoint: {}".format(waypoint)
 
-    class TimeWarp(Item):
-        def __init__(self):
-            super().__init__(i.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
-            self.right_click = True
 
-        def on_tick(self):
-            mouse = pg.mouse.get_pressed()
-            w = game_vars.world
-            if mouse[BUTTON_LEFT - 1]:
-                w.world_time = (w.world_time + (40 * game_vars.dt)) % MS_PER_DAY
-            elif mouse[BUTTON_RIGHT - 1]:
-                w.world_time = (w.world_time - (60 * game_vars.dt)) % MS_PER_DAY
-            else:
-                game_vars.player.use_time = 0
+class TimeWarp(Item):
+    def __init__(self):
+        super().__init__(i.TIME_WARP, img=INV + "time_warp.png", name="Time Warp")
+        self.right_click = True
 
-        def get_description(self, data):
-            return "Left click to move time forwards, right click to move time backwards"
+    def on_tick(self):
+        mouse = pg.mouse.get_pressed()
+        w = game_vars.world
+        if mouse[BUTTON_LEFT - 1]:
+            w.time = (w.time + (40 * game_vars.dt)) % SEC_PER_DAY
+        elif mouse[BUTTON_RIGHT - 1]:
+            w.time = (w.time - (60 * game_vars.dt)) % SEC_PER_DAY
+        else:
+            game_vars.player.use_time = 0
+
+    def get_description(self, data):
+        return "Left click to move time forwards, right click to move time backwards"
 
 
 # Biome Items

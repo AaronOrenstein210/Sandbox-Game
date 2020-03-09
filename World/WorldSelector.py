@@ -138,7 +138,9 @@ def run_selector(what):
                             create_new_player(result)
                         else:
                             mkdir(path + result)
+                            # Generate a new world
                             new = World(result, result)
+                            new.can_delete = False
                             generate_world(new)
                             del new
                         data = load_files(what)
