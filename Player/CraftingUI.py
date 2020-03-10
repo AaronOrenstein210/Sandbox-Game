@@ -9,11 +9,6 @@ from Player.ActiveUI import ActiveUI
 
 
 class CraftingUI(ActiveUI):
-    # Recipes that don't need a crafting station
-    HAND_CRAFTS = [[[items.WORK_TABLE, 1], [items.WOOD, 10]]]
-    for item in game_vars.items:
-        HAND_CRAFTS.append([[item, 1]])
-
     def __init__(self, player):
         self.player = player
         # Recipes that we can and can't craft
@@ -40,6 +35,12 @@ class CraftingUI(ActiveUI):
         self.craft_rect = self.craft.get_rect(centery=self.rect.h - INV_W // 2, right=self.rect.right - 2)
         self.recipe_rect = pg.Rect(0, self.craft_rect.y, self.craft_rect.x, INV_W)
         super().__init__(None, self.rect)
+
+        # Recipes that don't need a crafting station
+        self.HAND_CRAFTS = [[[items.WORK_TABLE, 1], [items.WOOD, 10]]]
+        for item in game_vars.items:
+            self.HAND_CRAFTS.append([[item, 1]])
+
 
     @property
     def max_scroll(self):

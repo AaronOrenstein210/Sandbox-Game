@@ -13,6 +13,7 @@ from Tools import constants as c, item_ids as i, tile_ids as t
 from Tools import game_vars
 from World import WorldGenerator
 from World.World import World
+from World.Selector import WorldSelector
 
 
 # Normal Tiles
@@ -179,50 +180,26 @@ class DimensionHopper(FunctionalTile):
 
     class UI(ActiveUI):
         def __init__(self, pos):
-            from os import listdir
-            from Tools.VerticalScroller import VerticalScroller
+            self.selector = WorldSelector(game_vars.universe())
 
-            dim = (c.MIN_W // 2, c.MIN_H * 3 // 4)
+            ActiveUI.__init__(self, None, None, pos=pos)
 
-            ActiveUI.__init__(self, pg.Surface(dim), pg.Rect((0, 0), dim), pos=pos)
             self.on_resize()
-            self.scroller = VerticalScroller(self.rect.size, background=(0, 200, 128))
-
-            font = c.get_scaled_font(self.rect.w, int(self.rect.h / 8), "_" * 25, "Times New Roman")
-            for file in listdir("saves/universes/" + game_vars.world.universe):
-                if file.endswith(".wld"):
-                    name = file[:-4]
-                    text = font.render(name, 1, (255, 255, 255))
-                    self.scroller.add_item(text, name)
-
-            self.ui.blit(self.scroller.surface, (0, 0))
-            pg.draw.rect(self.ui, (0, 0, 0), self.ui.get_rect(), 2)
 
         def process_events(self, events, mouse, keys):
             for e in events:
-                if e.type == BUTTON_WHEELUP or e.type == BUTTON_WHEELDOWN:
-                    self.scroller.do_scroll(e.type == BUTTON_WHEELUP)
-                    self.ui.blit(self.scroller.surface, (0, self.scroller.scroll))
-                    pg.draw.rect(self.ui, (0, 0, 0), self.ui.get_rect(), 2)
-                elif e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
-                    pos = pg.mouse.get_pos()
-                    if self.rect.collidepoint(*pos):
-                        mouse[BUTTON_LEFT - 1] = False
-                        pos = (pos[0] - self.rect.x, pos[1] - self.rect.y)
-                        world = self.scroller.click(pos)
-                        if world != "":
-                            game_vars.change_world(world)
-                            game_vars.set_active_ui(None)
-                    else:
-                        continue
-                elif e.type == KEYUP and e.key == K_ESCAPE:
-                    keys[K_ESCAPE] = False
+                if e.type == KEYUP and e.key == K_ESCAPE:
+                    events.remove(e)
                     game_vars.set_active_ui(None)
-                else:
-                    continue
+                    return
+            if self.selector.handle_events(events):
+                game_vars.set_active_ui(None)
 
         def on_resize(self):
-            self.rect.center = pg.display.get_surface().get_rect().center
+            r = pg.Rect(0, 0, c.MIN_W // 2, c.MIN_H * 3 // 4)
+            r.center = pg.display.get_surface().get_rect().center
+            self.selector.resize(rect=r)
+            self.ui, self.rect = self.selector.get_surface(), self.selector.get_rect()
 
 
 class WorldBuilder(FunctionalTile):
@@ -259,7 +236,7 @@ class WorldBuilder(FunctionalTile):
         INV_ORDER = [BIOME, STRUCTURE, SIZE]
 
         def __init__(self, pos, data):
-            self.name = ""
+            self.name = c.WorldFile(game_vars.universe())
             self.cursor = False
             # Load inventories
             invs = {self.BIOME: Inventory((2, 2), max_stack=1, items_list=game_vars.biomes.keys()),
@@ -328,11 +305,12 @@ class WorldBuilder(FunctionalTile):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                 # Clicked create
                 if self.create_rect.collidepoint(*pos):
-                    if not self.invs[self.BIOME].is_empty() and not self.invs[self.SIZE].is_empty() and self.name != "":
+                    if not self.invs[self.BIOME].is_empty() and not self.invs[self.SIZE].is_empty() and self.name.valid:
                         for e in events:
                             if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
                                 events.remove(e)
-                                new = World(game_vars.world.universe, self.name)
+                                new = World(self.name)
+                                new.can_delete = True
                                 items = self.invs[self.BIOME].inv_items.flatten().tolist()
                                 items += [self.invs[self.SIZE].inv_items[0][0]]
                                 items += [i.BONUS_STRUCTURE] * self.invs[self.STRUCTURE].inv_amnts[0][0]
@@ -359,19 +337,12 @@ class WorldBuilder(FunctionalTile):
                 keys[K_ESCAPE] = False
             for e in events:
                 if e.type == KEYDOWN:
-                    if e.key == K_BACKSPACE:
-                        self.name = self.name[:-1]
-                    elif e.key == K_SPACE:
-                        self.name += " "
-                    elif len(pg.key.name(e.key)) == 1:
-                        self.name += e.unicode
-                    else:
-                        continue
+                    self.name.type_char(e)
                     self.draw_name()
 
         def draw_name(self):
-            font = c.get_scaled_font(*self.name_rect.size, self.name + "|")
-            text = font.render(self.name + ("|" if self.cursor else ""), 1, (255, 255, 255))
+            font = c.get_scaled_font(*self.name_rect.size, self.name.name + "|")
+            text = font.render(self.name.name + ("|" if self.cursor else ""), 1, (255, 255, 255))
             text_rect = text.get_rect(center=self.name_rect.center)
             self.ui.fill((0, 0, 0), self.name_rect)
             self.ui.blit(text, text_rect)

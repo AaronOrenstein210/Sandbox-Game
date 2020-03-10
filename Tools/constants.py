@@ -2,6 +2,8 @@
 # Contains all constant values for the project
 
 # NO IMPORTING FROM INSIDE THIS PROJECT!!!!!!
+from os import listdir
+from os.path import isfile, isdir
 import pygame as pg
 import math
 from random import randint
@@ -37,6 +39,10 @@ NIGHT_START = 60 * 18
 MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
 # Ai types
 RANDOM, FOLLOW, FLY = 0, 1, 2
+
+# Save paths
+PLR = "save/player/"
+WLD = "save/universe/"
 
 # Inventory font, Loading screen font, UI font
 inv_font = load_font = ui_font = None
@@ -82,6 +88,12 @@ def scale_to_fit(s, w=-1, h=-1):
 
 def random_sign():
     return 1 if randint(0, 1) == 0 else -1
+
+
+def grey_scale(s):
+    arr = pg.surfarray.array3d(s)
+    arr = arr.dot([0.298, 0.587, 0.114])[:, :, None].repeat(3, axis=2)
+    return pg.surfarray.make_surface(arr)
 
 
 # Gets the biggest font size that fits the text within max_w and max_h
@@ -191,3 +203,65 @@ def update_dict(x, y, val, dictionary):
 def get_from_dict(x, y, dictionary):
     if x in dictionary.keys() and y in dictionary[x].keys():
         return dictionary[x][y]
+
+
+# Handles creating a player file name
+class PlayerFile:
+    def __init__(self, name=""):
+        self.name = name
+        self.extension = ".plr"
+        self.path = "saves/players/"
+
+    @property
+    def file_name(self):
+        return self.name.replace(" ", "_")
+
+    @property
+    def full_file(self):
+        return self.path + self.file_name + self.extension
+
+    @property
+    def valid(self):
+        return self.name.count(" ") != len(self.name) and not isfile(self.full_file)
+
+    def type_char(self, event):
+        if event.type == pg.KEYDOWN:
+            if event.key == pg.K_BACKSPACE:
+                self.name = self.name[:-1]
+            elif len(self.name) < 20:
+                if event.key == pg.K_SPACE:
+                    self.name += " "
+                else:
+                    char = pg.key.name(event.key)
+                    if char.isalpha():
+                        if pg.key.get_mods() & pg.KMOD_SHIFT:
+                            self.name += char.upper()
+                        else:
+                            self.name += char
+                    elif char.isnumeric():
+                        self.name += char
+
+
+# Handles creating a world file name
+class WorldFile(PlayerFile):
+    def __init__(self, universe, **kwargs):
+        super().__init__(**kwargs)
+        self.extension = ".wld"
+        self.path = "saves/universes/{}/".format(universe)
+        self.universe = universe
+
+
+# Handles creation of a new universe folder name
+class UniverseFolder(PlayerFile):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.extension = "/"
+        self.path = "saves/universes/"
+
+    @property
+    def file_name(self):
+        return self.name
+
+    @property
+    def valid(self):
+        return self.name.count(" ") != len(self.name) and not isdir(self.full_file)

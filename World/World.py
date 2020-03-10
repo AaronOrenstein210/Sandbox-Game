@@ -14,7 +14,7 @@ WORLD = 0
 
 
 class World:
-    def __init__(self, universe, name):
+    def __init__(self, world_file):
         # Visual variables
         self.surface = None
         self.map = None
@@ -37,9 +37,8 @@ class World:
         self.block_data = {}
         self.crafters = {}
         # File variables
-        self.universe = universe
-        self.name = name
-        self.f_obj = open(self.file, 'a+')
+        self.file = world_file
+        self.f_obj = open(self.file.full_file, 'a+')
         self.f_obj.close()
 
     @property
@@ -51,15 +50,17 @@ class World:
         return self.dim[1] * 2 // 3
 
     @property
-    def file(self):
-        return "saves/universes/" + self.universe + "/" + self.name + ".wld"
-
-    @property
     def sky_color(self):
         return 0, 0, 255 * (1 - pow((self.time - c.NOON) / c.NOON, 2))
 
     def tick(self):
         self.time = (self.time + game_vars.dt) % c.SEC_PER_DAY
+
+    def change_file(self, world_file):
+        # File variables
+        self.file = world_file
+        self.f_obj = open(self.file.full_file, 'a+')
+        self.f_obj.close()
 
     def new_world(self, dim):
         self.dim = dim
@@ -71,10 +72,10 @@ class World:
     def load_info(self, close_file):
         # Open the file
         self.f_obj.close()
-        self.f_obj = open(self.file, 'rb')
+        self.f_obj = open(self.file.full_file, 'rb')
         # Load file data
-        self.type = int.from_bytes(self.f_obj.read(1), byteorder)
         self.can_delete = bool.from_bytes(self.f_obj.read(1), byteorder)
+        self.type = int.from_bytes(self.f_obj.read(1), byteorder)
         self.time = int.from_bytes(self.f_obj.read(2), byteorder)
         self.dim = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
         self.spawn = [int.from_bytes(self.f_obj.read(2), byteorder) for i in range(2)]
@@ -153,10 +154,10 @@ class World:
     def save_info(self, close_file):
         # Open the file in write mode
         self.f_obj.close()
-        self.f_obj = open(self.file, 'wb')
+        self.f_obj = open(self.file.full_file, 'wb')
         # Write data
-        self.f_obj.write(self.type.to_bytes(1, byteorder))
         self.f_obj.write(self.can_delete.to_bytes(1, byteorder))
+        self.f_obj.write(self.type.to_bytes(1, byteorder))
         self.f_obj.write(int(self.time).to_bytes(2, byteorder))
         for val in self.dim + self.spawn:
             self.f_obj.write(val.to_bytes(2, byteorder))

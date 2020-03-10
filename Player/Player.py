@@ -16,8 +16,8 @@ from Objects.ItemTypes import Weapon
 
 
 class Player:
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, player_file):
+        self.file = player_file
         # Stats
         self.stats = Stats(hp=100, max_speed=[15, 20])
         # Inventory
@@ -68,13 +68,13 @@ class Player:
         return self.immunity > 0 or self.respawn_counter > 0
 
     def load(self):
-        with open("saves/players/" + self.name + ".plr", "rb+") as data_file:
+        with open(self.file.full_file, "rb+") as data_file:
             data = data_file.read()
             self.inventory.load(data)
 
     def write(self):
         # See load() for info order
-        with open("saves/players/" + self.name + ".plr", "wb+") as file:
+        with open(self.file.full_file, "wb+") as file:
             file.write(self.inventory.write())
 
     def set_map_source(self, surface):
@@ -487,6 +487,6 @@ class Player:
         self.spawn()
 
 
-def create_new_player(file_name):
-    with open("saves/players/" + file_name + ".plr", "wb+") as file:
+def create_new_player(player_file):
+    with open(player_file.full_file, "wb+") as file:
         file.write(PlayerInventory().new_inventory())

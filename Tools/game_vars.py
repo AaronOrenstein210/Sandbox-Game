@@ -42,19 +42,15 @@ def init():
                 obj()
 
     # Load world and player and initialize entity handler
-    from World.World import World
     from NPCs.EntityHandler import EntityHandler
-    from Player.Player import Player
-    from World.WorldSelector import run_selector, PLAYER, UNIVERSE
+    from World.Selector import MainSelector
 
-    global world, handler, player
-    universe = run_selector(UNIVERSE)
-    world = World(universe, universe)
+    global handler
     handler = EntityHandler()
-    player = Player(run_selector(PLAYER))
-    player.load()
-
-    load_world()
+    # Selects player, universe, and world
+    if not MainSelector().run():
+        pg.quit()
+        exit(0)
 
 
 def tick():
@@ -127,33 +123,23 @@ def draw():
         player.draw_ui(rect)
 
 
+# Functions that affect the world object
+# Current universe name
+def universe():
+    return world.file.universe
+
+
+# World dimensions in blocks
+def world_dim():
+    return world.dim
+
+
 # Returns position of mouse with respect to the entire world
 def global_mouse_pos():
     pos = pg.mouse.get_pos()
     screen_c = pg.display.get_surface().get_rect().center
     world_c = player.rect.center
     return [pos[i] + world_c[i] - screen_c[i] for i in range(2)]
-
-
-# Center of the player rectangle, if blocks = True, return in block coords
-def player_pos(in_blocks=False):
-    if not in_blocks:
-        return player.rect.center
-    else:
-        return [p / BLOCK_W for p in player.rect.center]
-
-
-# Top left of the player rectangle, see above for in_blocks
-def player_topleft(in_blocks = False):
-    if not in_blocks:
-        return player.pos
-    else:
-        return [p / BLOCK_W for p in player.pos]
-
-
-# World dimensions in blocks
-def world_dim():
-    return world.dim
 
 
 # Get block at position
@@ -164,7 +150,6 @@ def get_block_at(x, y):
     return 0
 
 
-# Functions that affect the world object
 # Returns the topleft coordinates of the block at x,y (for multiblocks)
 def get_topleft(x, y):
     if 0 <= x < world.dim[0] and 0 <= y < world.dim[1]:
@@ -256,6 +241,22 @@ def add_damage_text(dmg, pos):
 
 
 # Functions that affect the player object
+# Center of the player rectangle, if blocks = True, return in block coords
+def player_pos(in_blocks=False):
+    if not in_blocks:
+        return player.rect.center
+    else:
+        return [p / BLOCK_W for p in player.rect.center]
+
+
+# Top left of the player rectangle, see above for in_blocks
+def player_topleft(in_blocks=False):
+    if not in_blocks:
+        return player.pos
+    else:
+        return [p / BLOCK_W for p in player.pos]
+
+
 # Sets player's active ui
 def set_active_ui(ui):
     player.active_ui = ui
@@ -482,7 +483,13 @@ def close_world():
 
 
 # Loads a new world
-def load_world():
+def load_world(world_file):
+    from World.World import World
+    global world
+    if world:
+        world.change_file(world_file)
+    else:
+        world = World(world_file)
     # Load the world
     if not CompleteTask(world.load_part, [], percent, ["Loading World Blocks"]).run_now():
         pg.quit()
@@ -498,7 +505,7 @@ def load_world():
 
 
 # Changes world
-def change_world(new_world):
+def change_world(world_file):
     def screen_goes_white(progress):
         display = pg.display.get_surface()
         draw()
@@ -507,7 +514,8 @@ def change_world(new_world):
         overlay.set_alpha(255 * progress)
         display.blit(overlay, (0, 0))
 
-    CompleteTask(world.save_part, [10], screen_goes_white, [], can_exit=False).run_now()
+    # If the world exists, save it with a fade animation
+    if world:
+        CompleteTask(world.save_part, [10], screen_goes_white, [], can_exit=False).run_now()
     player.write()
-    world.name = new_world
-    load_world()
+    load_world(world_file)
