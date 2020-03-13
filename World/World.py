@@ -40,6 +40,9 @@ class World:
         self.file = world_file
         self.f_obj = open(self.file.full_file, 'a+')
         self.f_obj.close()
+        # Auto save variables
+        self.next_save = 30
+        self.save_progress = 0
 
     @property
     def surface_h(self):
@@ -55,6 +58,14 @@ class World:
 
     def tick(self):
         self.time = (self.time + game_vars.dt) % c.SEC_PER_DAY
+        # Run auto save
+        self.next_save -= game_vars.dt
+        if self.next_save <= 0:
+            self.save_progress = self.save_part(self.save_progress, 1)
+            if self.save_progress >= 1:
+                self.save_progress = 0
+                self.next_save = 30
+                game_vars.player.write()
 
     def change_file(self, world_file):
         # File variables
@@ -88,7 +99,7 @@ class World:
     # Load world
     def load_part(self, progress):
         # If we are just opening the file, get world info
-        if self.f_obj.closed or not self.f_obj.readable():
+        if progress == 0:
             # Reset world data
             self.spawners.clear()
             self.block_data.clear()
@@ -171,7 +182,7 @@ class World:
         if self.blocks is None:
             return 1
         # If we are just opening the file, save world info
-        if self.f_obj.closed or not self.f_obj.writable():
+        if progress == 0:
             # Save world information, automatically opens the file
             self.save_info(False)
         # Get current block along with rows and columns to save

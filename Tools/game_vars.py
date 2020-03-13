@@ -16,7 +16,7 @@ from UI.Operations import CompleteTask, loading_bar, percent
 items, tiles = {}, {}
 biomes, structures = {}, {}
 animations = []
-# Game objects
+# Game objects, each of these gets set ONCE
 world = handler = player = None
 # Game time and time since last update (seconds)
 game_time = dt = 0
@@ -121,6 +121,13 @@ def draw():
                     display.blit(arr[0], (r.x - rect.x, r.y - rect.y))
         # Draw player ui
         player.draw_ui(rect)
+
+    # Draw fps
+    fps = int(1 / dt)
+    print("\r" + str(fps), end=" ")
+    text = c.ui_font.render(str(fps) + " FPS", 1, (0, 0, 0))
+    text_rect = text.get_rect(bottom=pg.display.get_surface().get_size()[1])
+    pg.display.get_surface().blit(text, text_rect)
 
 
 # Functions that affect the world object
@@ -473,6 +480,14 @@ def touching_blocks_y(pos, dim, top):
             collide = world.blocks[next_y, x_range[0]:x_range[1]].tolist()
             return collide.count(AIR) < len(collide)
     return False
+
+
+# Checks if we are inside a block
+def in_block(pos, dim):
+    block_pos = [pos[0] / BLOCK_W, pos[1] / BLOCK_W]
+    left, top = int(block_pos[0]), int(block_pos[1])
+    right, bottom = math.ceil(block_pos[0] + dim[0]), math.ceil(block_pos[1] + dim[1])
+    return not (world.blocks[top:bottom, left:right] == AIR).all()
 
 
 # Functions that change the world

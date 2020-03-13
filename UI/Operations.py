@@ -68,16 +68,20 @@ class CompleteTask(UIOperation):
             elif e.type == VIDEORESIZE:
                 c.resize(e.w, e.h)
 
-            # Perform the task
+        # Perform the task
         self.progress = self.task(self.progress, *self.task_args)
         if self.progress is None:
             return False
 
-        # Update ui
-        self.draw_ui(self.progress, *self.draw_args)
+        if self.draw_ui:
+            # Update ui
+            self.draw_ui(self.progress, *self.draw_args)
 
         if self.progress >= 1:
             return True
+
+    def reset(self):
+        self.progress = 0
 
 
 class TextInput(UIOperation):

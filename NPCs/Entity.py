@@ -5,7 +5,7 @@ from os.path import isfile
 import math
 from random import randint, uniform
 import pygame as pg
-from Tools.constants import BLOCK_W, SPRITE_W, scale_to_fit, random_sign, get_angle
+from Tools.constants import BLOCK_W, SPRITE_W, scale_to_fit, random_sign, get_angle, ROUND_ERR
 from Tools.game_vars import touching_blocks_x, touching_blocks_y
 from Tools import game_vars
 from Player.Stats import Stats
@@ -113,6 +113,7 @@ class Entity:
         self.direction = math.copysign(1, self.v[0])
         self.time = 0
         self.immunity = 0
+        self.collisions = [0, 0]
 
         # Load image
         if isfile(img):
@@ -143,25 +144,41 @@ class Entity:
 
         # Figure out change in position
         d = [0, 0]
+        dt = game_vars.dt
         for i in range(2):
-            d[i] = self.v[i] * game_vars.dt * BLOCK_W
+            d[i] = (self.v[i] + self.a[i] * dt / 2) * dt * BLOCK_W
             if not self.zero_gravity:
                 # Calculate velocity
-                self.v[i] += self.a[i] * game_vars.dt
+                self.v[i] += self.a[i] * dt
                 if abs(self.v[i]) > self.stats.spd[i]:
                     self.v[i] = math.copysign(self.stats.spd[i], self.v[i])
         if self.direction * self.v[0] < 0:
             self.img = pg.transform.flip(self.img, True, False)
             self.direction *= -1
 
+        self.collisions = [0, 0]
         # Update position
         if self.hits_blocks:
+            prev_pos = self.pos.copy()
+            prev_d = d.copy()
             # Check for collisions
             game_vars.check_collisions(self.pos, self.dim, d)
+            self.set_pos(*self.pos)
+            # Get actual change in position
+            d = [self.pos[0] - prev_pos[0], self.pos[1] - prev_pos[1]]
+            # Check collisions in x and y, a collision occurred if we should have moved but didn't
+            for i in range(2):
+                # If we didn't move the full distance, we hit something
+                if abs(d[i] - prev_d[i]) > ROUND_ERR:
+                    self.collisions[i] = math.copysign(1, prev_d[i] - d[i])
+                # If we didn't move, set collision based on acceleration
+                elif d[i] == prev_d[i] == 0 and self.a[i] != 0:
+                    self.collisions[i] = math.copysign(1, self.a[i])
+                # Update velocity
+                if self.collisions[i] != 0:
+                    self.v[i] = 0
         else:
-            self.pos[0] += d[0]
-            self.pos[1] += d[1]
-        self.set_pos(*self.pos)
+            self.set_pos(self.pos[0] + d[0], self.pos[1] + d[1])
 
         # Run ai, ai affects acceleration and velocity
         self.ai()
@@ -212,7 +229,7 @@ class Projectile:
         self.pos = list(pos)
         self.max_speed = speed
         self.v = [speed * math.cos(angle), speed * math.sin(angle)]
-        self.a = [0, 10]
+        self.a = [0, 20]
 
         self.dmg = damage
 
@@ -234,44 +251,77 @@ class Projectile:
         # Hurts player or hurts mobs
         self.hurts_mobs = True
 
+        # Number of times the projectile can hit an object
+        self.num_hits = 1
+        # Number of bounces until the projectile is destroyed
+        self.max_bounces = 1
+        # Length of time until the projectile is destroyed
+        self.duration = -1
+        self.time = 0
+
     # Returns true if the projectile is dead, false otherwise
     def move(self):
         if game_vars.dt == 0:
-            return
+            return False
+
+        # Check time
+        if self.duration != -1:
+            self.time += game_vars.dt
+            if self.time >= self.duration:
+                return True
 
         if self.homing:
             print("Recalculate v")
 
+        # Calculate displacement
+        dt = game_vars.dt
+        d = [(self.v[i] + self.a[i] * dt / 2) * dt * BLOCK_W for i in range(2)]
+
         # Update velocity
-        self.v = [v + a * game_vars.dt for v, a in zip(self.v, self.a)]
+        self.v = [v + a * dt for v, a in zip(self.v, self.a)]
         factor = self.max_speed / math.sqrt(self.v[0] ** 2 + self.v[1] ** 2)
         if factor < 1:
             self.v = [v * factor for v in self.v]
 
-        # Calculate displacement
-        d = [v * game_vars.dt * BLOCK_W for v in self.v]
-
         # If we can hit blocks, check for collisions
         if self.hits_blocks:
+            prev_pos = self.pos.copy()
+            prev_d = d.copy()
             game_vars.check_collisions(self.pos, self.dim, d)
             # Check if we hit a surface and if we should bounce
-            if touching_blocks_x(self.pos, self.dim, True) or \
-                    touching_blocks_x(self.pos, self.dim, False):
-                if self.bounce:
-                    self.v[0] *= -1
-                else:
-                    return True
-            if touching_blocks_y(self.pos, self.dim, False) or \
-                    touching_blocks_y(self.pos, self.dim, True):
-                if self.bounce:
-                    self.v[1] *= -1
-                else:
-                    return True
             self.set_pos(*self.pos)
+            # Get actual change in position
+            d = [self.pos[0] - prev_pos[0], self.pos[1] - prev_pos[1]]
+            # Check collisions in x and y, a collision occurred if we should have moved but didn't
+            for i in range(2):
+                collision = 0
+                # If we didn't move the full distance, we hit something
+                if abs(d[i] - prev_d[i]) > ROUND_ERR:
+                    collision = math.copysign(1, prev_d[i] - d[i])
+                # If we didn't move, set collision based on acceleration
+                elif d[i] == prev_d[i] == 0 and self.a[i] != 0:
+                    collision = math.copysign(1, self.a[i])
+                # Update velocity
+                if collision != 0:
+                    if self.bounce:
+                        self.v[i] *= -1
+                        self.max_bounces -= 1
+                        if self.max_bounces <= 0:
+                            return True
+                    else:
+                        return True
         else:
             self.set_pos(self.pos[0] + d[0], self.pos[1] + d[1])
 
         return False
+
+    # Returns true if the projectile hit its last time, false otherwise
+    def hit(self):
+        if self.num_hits == -1:
+            return False
+        else:
+            self.num_hits -= 1
+            return self.num_hits <= 0
 
     def set_pos(self, x, y):
         self.pos = [x, y]

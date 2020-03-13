@@ -8,6 +8,9 @@ import pygame as pg
 import math
 from random import randint
 
+# Acceptable error due to rounding
+ROUND_ERR = 1e-10
+
 # Dimension Constants
 MIN_W, MIN_H = 800, 600
 # Width of a block
@@ -69,7 +72,7 @@ def get_angle(start, end):
         theta = math.asin(dy / r)
         if dx < 0:
             theta = math.pi - theta
-        return theta
+        return theta % (2 * math.pi)
 
 
 # Resizes surface to fit within desired dimensions, keeping surface's w:h ratio

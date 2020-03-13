@@ -331,14 +331,14 @@ class Player:
         game_vars.check_collisions(self.pos, self.dim, d)
         self.set_pos(self.pos)
 
-        # Get actual change in position
+        # Get actual change in position TODO: Fix collided
         d = [self.pos[0] - prev_pos[0], self.pos[1] - prev_pos[1]]
         # Check collisions in x and y, a collision occurred if we should have moved but didn't
         collided = [(copysign(1, self.v[i]) if d[i] == 0 and prev_v[i] != 0 else 0) for i in range(2)]
         # Stop our velocity if we hit something
-        if d[0] == 0 and prev_v[0] != 0:
+        if collided[0] != 0:
             self.v[0] = 0
-        if d[1] == 0 and prev_v[1] != 0:
+        if collided[1] != 0:
             self.v[1] = copysign(1, self.a[1])
 
         # Check if we are touching the ground

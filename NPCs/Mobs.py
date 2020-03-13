@@ -14,8 +14,8 @@ from Objects.Animation import OscillateAnimation
 
 class Cat(Entity):
     def __init__(self):
-        Entity.__init__(self, name="Cat", w=3, img=MOB + "cat.png", rarity=1,
-                        stats=Stats(hp=15, max_speed=(3, 10)))
+        super().__init__(name="Cat", w=3, img=MOB + "cat.png", rarity=1,
+                         stats=Stats(hp=15, max_speed=(3, 10)))
 
     def can_spawn(self, conditions):
         return conditions[SURFACE]
@@ -23,8 +23,8 @@ class Cat(Entity):
 
 class Birdie(Entity):
     def __init__(self):
-        Entity.__init__(self, name="Birdie", w=.75, aggressive=False, img=MOB + "birdie.png",
-                        rarity=1, stats=Stats(hp=5, max_speed=(5, 5)))
+        super().__init__(name="Birdie", w=.75, aggressive=False, img=MOB + "birdie.png",
+                         rarity=1, stats=Stats(hp=5, max_speed=(5, 5)))
 
     def ai(self):
         fly_random(self)
@@ -35,8 +35,8 @@ class Birdie(Entity):
 
 class Zombie(Entity):
     def __init__(self):
-        Entity.__init__(self, name="Zombie", w=1.5, aggressive=True, img=MOB + "zombie.png",
-                        rarity=2, stats=Stats(hp=50, damage=5, defense=5, max_speed=(5, 10)))
+        super().__init__(name="Zombie", w=1.5, aggressive=True, img=MOB + "zombie.png",
+                         rarity=2, stats=Stats(hp=50, damage=5, defense=5, max_speed=(5, 10)))
 
     def ai(self):
         follow_player(self)
@@ -47,8 +47,8 @@ class Zombie(Entity):
 
 class DoomBunny(Entity):
     def __init__(self):
-        Entity.__init__(self, name="Doom Bunny", w=1, aggressive=True, img=MOB + "doom_bunny.png",
-                        rarity=3, stats=Stats(hp=5, damage=100, defense=1, max_speed=(5, 20)))
+        super().__init__(name="Doom Bunny", w=1, aggressive=True, img=MOB + "doom_bunny.png",
+                         rarity=3, stats=Stats(hp=5, damage=100, defense=1, max_speed=(5, 20)))
 
     def ai(self):
         jump(self, abs(game_vars.player_pos()[0] - self.rect.centerx) // BLOCK_W <= 10)
@@ -59,8 +59,8 @@ class DoomBunny(Entity):
 
 class Helicopter(Entity):
     def __init__(self):
-        Entity.__init__(self, name="Helicopter", w=1.5, aggressive=True, img=MOB + "helicopter.png",
-                        rarity=1, stats=Stats(hp=5, damage=10, defense=1, max_speed=(10, 3)))
+        super().__init__(name="Helicopter", w=1.5, aggressive=True, img=MOB + "helicopter.png",
+                         rarity=1, stats=Stats(hp=5, damage=10, defense=1, max_speed=(10, 3)))
 
     def ai(self):
         fly_follow(self)
@@ -77,9 +77,9 @@ class Helicopter(Entity):
 
 class Dragon(Boss):
     def __init__(self):
-        Entity.__init__(self, name="Dragon", aggressive=True, w=5, rarity=3,
-                        img=MOB + "dragon/dragon_0.png", sprite=MOB + "dragon/dragon_0.png",
-                        stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
+        super().__init__(name="Dragon", aggressive=True, w=5, rarity=3,
+                         img=MOB + "dragon/dragon_0.png", sprite=MOB + "dragon/dragon_0.png",
+                         stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
         self.rising_anim = OscillateAnimation(folder=MOB + "dragon/", dim=self.img.get_size(), delay=.1)
         self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_attack.png"), w=5 * BLOCK_W)
         self.zero_gravity = True
@@ -161,3 +161,82 @@ class Dragon(Boss):
         def __init__(self, pos, target):
             super().__init__(pos, target, w=1.25, img=PROJ + "fire_ball.png", speed=15, damage=8)
             self.hurts_mobs = self.gravity = self.hits_blocks = False
+
+
+# TODO: Cat sprite, start in zoom mode
+class MainBoss(Boss):
+    def __init__(self):
+        super().__init__(name="Main Boss", aggressive=True, w=3, rarity=3,
+                         img=MOB + "main_boss/shadow_dude_0.png", sprite=MOB + "main_boss/shadow_dude_0.png",
+                         stats=Stats(hp=1000, damage=30, defense=25, max_speed=(20, 30)))
+        self.no_knockback = True
+        self.stage = self.jump_count = self.launch_angle = 0
+        self.launch_target = [0, 0]
+
+    def ai(self):
+        pos = game_vars.player_pos()
+        if self.stage == 0:
+            # If we aren't launching, move normally
+            if self.hits_blocks:
+                self.time += game_vars.dt
+                # Check if we are switching to jump stage
+                if self.time >= 7.75:
+                    self.a = [0, 20]
+                    if self.collisions[1] == 1:
+                        self.v = [0, 0]
+                        if self.time >= 8:
+                            self.time = 0
+                            self.stage = 1
+                            self.v[1] = -self.stats.spd[1]
+                            self.hits_blocks = True
+                    else:
+                        self.time = 7.75
+                else:
+                    dx = pos[0] - self.rect.centerx
+                    if dx != 0:
+                        self.a[0] = math.copysign(10, dx)
+                    if self.collisions[0] != 0 and self.collisions[1] == 1:
+                        self.v[1] = -10
+                        self.jump_count += 1
+                        if self.jump_count > 2:
+                            self.launch_angle = get_angle(self.rect.center, pos)
+                            self.launch_target = pos
+                            self.a = [0, 0]
+                            self.v[0] = 15 * math.cos(self.launch_angle)
+                            self.v[1] = 15 * math.sin(self.launch_angle)
+                            self.hits_blocks = False
+                    # Reset jumps if we aren't hitting something to the side
+                    if self.collisions[0] == 0:
+                        self.jump_count = 0
+            else:
+                # If we are in a block, keep launching
+                if game_vars.in_block(self.pos, self.dim):
+                    # If we went past out launch target, relaunch
+                    angle = get_angle(self.rect.center, self.launch_target)
+                    if abs(self.launch_angle - angle) > math.pi // 2:
+                        self.launch_target = pos
+                        self.launch_angle = get_angle(self.rect.center, pos)
+                    self.v[0] = 15 * math.cos(self.launch_angle)
+                    self.v[1] = 15 * math.sin(self.launch_angle)
+                # Stop launching
+                else:
+                    self.a[1] = 20
+                    self.v[1] = -5
+                    self.hits_blocks = True
+        elif self.stage == 1:
+            if self.v[1] > -3:
+                self.v[1] = 25
+            if self.collisions[1] == 1:
+                self.stage = 0
+                self.v[1] = 0
+                p = self.GroundP(self.pos)
+                p.set_pos(self.rect.centerx - p.dim[0] * BLOCK_W / 2, self.rect.bottom - p.dim[1] * BLOCK_W)
+                game_vars.shoot_projectile(p)
+
+    class GroundP(Projectile):
+        def __init__(self, pos):
+            super().__init__(pos, pos, img=MOB + "cat.png", w=7, speed=0, damage=10)
+            self.hurts_mobs = False
+            self.hits_blocks = False
+            self.num_hits = -1
+            self.duration = 3

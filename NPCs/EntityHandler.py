@@ -30,7 +30,8 @@ class EntityHandler:
             for p in self.player_projectiles:
                 # If the projectile hit the enemy, delete it
                 if entity.rect.colliderect(p.rect):
-                    self.player_projectiles.remove(p)
+                    if p.hit():
+                        self.player_projectiles.remove(p)
                     # If the enemy died, delete it
                     if entity.hit(p.dmg, p.rect.centerx):
                         self.entities.remove(entity)
@@ -52,12 +53,13 @@ class EntityHandler:
             if projectile.move():
                 self.mob_projectiles.remove(projectile)
             # Check if the player is swinging a weapon and it hit the projectile
-            elif player.hit_target(projectile.rect):
+            elif player.hit_target(projectile.rect) and projectile.hit():
                 self.mob_projectiles.remove(projectile)
             # Check if the projectile hit the player
             elif not player.immune and player.rect.colliderect(projectile.rect):
                 player.hit(projectile.dmg, projectile.rect.centerx)
-                self.mob_projectiles.remove(projectile)
+                if projectile.hit():
+                    self.mob_projectiles.remove(projectile)
         for projectile in self.player_projectiles:
             # Move the projectile and check if it is still active
             if projectile.move():

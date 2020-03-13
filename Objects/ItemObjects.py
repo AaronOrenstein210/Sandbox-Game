@@ -7,7 +7,7 @@ from Objects.ItemTypes import *
 from Tools.constants import *
 from Tools import game_vars, item_ids as i, tile_ids as t
 from NPCs.Entity import Projectile
-from NPCs.Mobs import Dragon
+from NPCs import Mobs
 
 
 # Don't create items that place blocks here, see the tile class
@@ -33,6 +33,7 @@ class SnowBall(Item):
             super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=15)
             self.hurts_mobs = True
             self.bounce = True
+            self.max_bounces = 3
 
 
 class DragonClaw(Item):
@@ -41,7 +42,7 @@ class DragonClaw(Item):
         self.consumable = True
 
     def on_left_click(self):
-        game_vars.spawn_entity(Dragon(),
+        game_vars.spawn_entity(Mobs.MainBoss(),
                                [p + randint(15, 30) * BLOCK_W * random_sign() for p in game_vars.player_pos()])
 
     def get_description(self, data):
