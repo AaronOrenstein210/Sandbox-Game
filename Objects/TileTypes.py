@@ -5,7 +5,7 @@ from os.path import isfile, isdir
 import pygame as pg
 from random import randint
 from Tools.constants import BLOCK_W, scale_to_fit, update_dict
-from Tools import game_vars
+from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
 from Objects import INV
 from Objects.ItemTypes import Block
@@ -13,10 +13,15 @@ from Objects.Animation import Animation
 
 
 class Tile:
-    def __init__(self, idx, hardness=0, img="", dim=(1, 1), anim_delay=.25):
+    def __init__(self, idx, img="", dim=(1, 1), anim_delay=.25):
         self.idx = idx
-        self.hardness = hardness
         self.dim = dim
+
+        # Hp and hardness of block
+        self.hp = 0
+        self.hardness = 0
+        # Dictionaries of all world locations where a block has been damaged
+        self.damage = {}
 
         # Tile stores data
         self.has_data = False
@@ -89,6 +94,24 @@ class Tile:
     def activate(self, pos):
         pass
 
+    # Hits the block with given power, returns if the block is broken or not
+    def hit(self, x, y, power):
+        # Check if we even do damage to the block
+        if power < self.hardness:
+            return False
+        # Get current damage if available
+        dmg = c.get_from_dict(x, y, self.damage)
+        if dmg is None:
+            dmg = 0
+        # Update damage
+        dmg += power - self.hardness + 1
+        if dmg < self.hp:
+            c.update_dict(x, y, dmg, self.damage)
+            return False
+        else:
+            c.remove_from_dict(x, y, self.damage)
+            return True
+
 
 class CraftingStation(Tile):
     def __init__(self, idx, **kwargs):
@@ -147,7 +170,8 @@ class SpawnTile(Tile):
         self.entity = entity
         self.rarity = self.entity.rarity
         img = INV + "spawner_{}.png".format(self.rarity)
-        Tile.__init__(self, idx, hardness=self.rarity, img=img)
+        Tile.__init__(self, idx, img=img)
+        self.hardness = self.rarity
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
         if item_id != -1:

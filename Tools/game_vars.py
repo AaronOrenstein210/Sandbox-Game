@@ -142,11 +142,14 @@ def world_dim():
 
 
 # Returns position of mouse with respect to the entire world
-def global_mouse_pos():
+def global_mouse_pos(blocks=False):
     pos = pg.mouse.get_pos()
     screen_c = pg.display.get_surface().get_rect().center
     world_c = player.rect.center
-    return [pos[i] + world_c[i] - screen_c[i] for i in range(2)]
+    if blocks:
+        return [(pos[i] + world_c[i] - screen_c[i]) // BLOCK_W for i in range(2)]
+    else:
+        return [pos[i] + world_c[i] - screen_c[i] for i in range(2)]
 
 
 # Get block at position

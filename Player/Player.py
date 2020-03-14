@@ -378,6 +378,9 @@ class Player:
                     self.use_time = item.use_time
                     if item.has_ui:
                         self.active_ui = item.UI()
+            else:
+                self.break_block(*game_vars.global_mouse_pos(blocks=True), 0)
+                self.use_time = .5
 
     def right_click(self):
         pos = pg.mouse.get_pos()
@@ -410,7 +413,7 @@ class Player:
                         self.item_used = item
                         self.use_time = item.use_time
 
-    def break_block(self, block_x, block_y):
+    def break_block(self, block_x, block_y, power):
         # Make sure we aren't hitting air
         block_x, block_y = game_vars.get_topleft(block_x, block_y)
         block = game_vars.get_block_at(block_x, block_y)
@@ -420,9 +423,9 @@ class Player:
         # Make sure this block does not have a ui open
         if self.active_ui is not None and self.active_ui.block_pos == [block_x, block_y]:
             return False
-        # Make sure the block is in range
+        # Make sure the block is in range and check if we destroyed the block
         block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
-        if self.placement_range.collidepoint(*block_rect.center):
+        if self.placement_range.collidepoint(*block_rect.center) and (power == -1 or tile.hit(block_x, block_y, power)):
             return game_vars.break_block(block_x, block_y)
         return False
 
@@ -478,7 +481,7 @@ class Player:
         self.set_pos((spawn[0] * BLOCK_W, spawn[1] * BLOCK_W))
         for x in range(spawn[0], ceil(spawn[0] + self.dim[0])):
             for y in range(spawn[1], ceil(spawn[1] + self.dim[1])):
-                self.break_block(x, y)
+                self.break_block(x, y, -1)
 
     def respawn(self):
         self.stats.hp = self.stats.max_hp

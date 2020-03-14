@@ -24,86 +24,95 @@ class Air(Tile):
 
 class Dirt(Tile):
     def __init__(self):
-        super().__init__(t.DIRT, hardness=1, img=INV + "dirt.png")
+        super().__init__(t.DIRT, img=INV + "dirt.png")
         self.add_drop(i.DIRT, 1)
         self.map_color = (150, 75, 0)
+        self.hp = 2
 
 
 class Stone(Tile):
     def __init__(self):
-        super().__init__(t.STONE, hardness=2, img=INV + "stone.png")
+        super().__init__(t.STONE, img=INV + "stone.png")
         self.add_drop(i.STONE, 1)
         self.map_color = (200, 200, 200)
+        self.hardness = 1
 
 
 class Snow(Tile):
     def __init__(self):
-        super().__init__(t.SNOW, hardness=1, img=INV + "snow.png")
+        super().__init__(t.SNOW, img=INV + "snow.png")
         self.add_drop(i.SNOW_BALL, 2, 5)
         self.map_color = (255, 255, 255)
 
 
 class Wood(Tile):
     def __init__(self):
-        super().__init__(t.WOOD, hardness=1, img=INV + "wood_tile.png")
+        super().__init__(t.WOOD, img=INV + "wood_tile.png")
         self.add_drop(i.WOOD, 1)
         self.map_color = (100, 50, 0)
 
 
 class Leaves(Tile):
     def __init__(self):
-        super().__init__(t.LEAVES, hardness=0, img=INV + "leaves.png")
+        super().__init__(t.LEAVES, img=INV + "leaves.png")
         self.add_drop(i.LEAVES, 1)
         self.map_color = (0, 150, 0)
 
 
 class Boulder1(Tile):
     def __init__(self):
-        super().__init__(t.BOULDER1, hardness=0, img=INV + "boulder_1.png")
+        super().__init__(t.BOULDER1, img=INV + "boulder_1.png")
         self.add_drop(i.STONE, 0, max_amnt=1)
         self.map_color = (100, 100, 64)
+        self.hardness = 1
 
 
 class Boulder2(Tile):
     def __init__(self):
-        super().__init__(t.BOULDER2, hardness=0, img=INV + "boulder_2.png", dim=(2, 1))
+        super().__init__(t.BOULDER2, img=INV + "boulder_2.png", dim=(2, 1))
         self.map_color = (100, 100, 64)
         self.add_drop(i.STONE, 0, max_amnt=2)
+        self.hardness = 1
 
 
 class Boulder3(Tile):
     def __init__(self):
-        super().__init__(t.BOULDER3, hardness=0, img=INV + "boulder_3.png", dim=(3, 2))
+        super().__init__(t.BOULDER3, img=INV + "boulder_3.png", dim=(3, 2))
         self.map_color = (100, 100, 64)
         self.add_drop(i.STONE, 1, max_amnt=3)
+        self.hardness = 1
 
 
 class ShinyStone1(Tile):
     def __init__(self):
-        super().__init__(t.SHINY_STONE_1, hardness=1, img=INV + "shiny_stone_1.png")
+        super().__init__(t.SHINY_STONE_1, img=INV + "shiny_stone_1.png")
         self.add_drop(i.SHINY_STONE_1, 1)
         self.map_color = (175, 175, 175)
+        self.hardness = 1
 
 
 class ShinyStone2(Tile):
     def __init__(self):
-        super().__init__(t.SHINY_STONE_2, hardness=1, img=INV + "shiny_stone_2.png")
+        super().__init__(t.SHINY_STONE_2, img=INV + "shiny_stone_2.png")
         self.add_drop(i.SHINY_STONE_2, 1)
         self.map_color = (150, 150, 150)
+        self.hardness = 2
 
 
 class ShinyStone3(Tile):
     def __init__(self):
-        super().__init__(t.SHINY_STONE_3, hardness=1, img=INV + "shiny_stone_3.png")
+        super().__init__(t.SHINY_STONE_3, img=INV + "shiny_stone_3.png")
         self.add_drop(i.SHINY_STONE_3, 1)
         self.map_color = (125, 125, 125)
+        self.hardness = 3
 
 
 class DragonEgg(Tile):
     def __init__(self):
-        super().__init__(t.DRAGON_EGG, hardness=3, img=INV + "dragon_egg.png")
+        super().__init__(t.DRAGON_EGG, img=INV + "dragon_egg.png")
         self.add_drop(i.DRAGON_EGG, 1)
         self.map_color = (64, 200, 0)
+        self.hardness = 2
 
     def on_break(self, pos):
         game_vars.spawn_entity(mobs.Dragon(),
@@ -121,6 +130,7 @@ class WorkTable(CraftingStation):
         self.on_surface = True
         self.map_color = (54, 78, 154)
         self.add_drop(i.WORK_TABLE, 1)
+        self.hardness = 1
 
     def get_recipes(self):
         return [[[i.SNOW, 1], [i.SNOW_BALL, 4]],
@@ -170,10 +180,11 @@ class BirdieSpawner(SpawnTile):
 # Tiles that do stuff
 class DimensionHopper(FunctionalTile):
     def __init__(self):
-        super().__init__(t.DIMENSION_HOPPER, hardness=2, img=INV + "dimension_hopper.png")
+        super().__init__(t.DIMENSION_HOPPER, img=INV + "dimension_hopper.png")
         self.scroller = None
         self.add_drop(i.DIMENSION_HOPPER, 1)
         self.map_color = (0, 0, 0)
+        self.hardness = 2
 
     def activate(self, pos):
         game_vars.set_active_ui(self.UI(pos))
@@ -210,6 +221,7 @@ class WorldBuilder(FunctionalTile):
         self.on_surface = True
         self.add_drop(i.WORLD_BUILDER, 1)
         self.map_color = (0, 0, 0)
+        self.hardness = 1
 
     def activate(self, pos):
         data = game_vars.get_block_data(pos)
@@ -355,11 +367,11 @@ class Chest(FunctionalTile):
     INV_DIM = (10, 5)
 
     def __init__(self):
-        super().__init__(t.CHEST, hardness=1, img=INV + "chest.png",
-                         dim=(2, 2))
+        super().__init__(t.CHEST, img=INV + "chest.png", dim=(2, 2))
         self.on_surface = True
         self.add_drop(i.CHEST, 1)
         self.map_color = (200, 200, 0)
+        self.hardness = 1
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
@@ -412,6 +424,7 @@ class Crusher(FunctionalTile):
         self.on_surface = True
         self.add_drop(i.CRUSHER, 1)
         self.map_color = (64, 64, 64)
+        self.hardness = 1
 
     def on_place(self, pos):
         game_vars.write_block_data(pos, bytearray(4))

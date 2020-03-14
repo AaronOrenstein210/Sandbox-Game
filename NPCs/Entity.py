@@ -223,13 +223,13 @@ class Boss(Entity):
 
 
 class Projectile:
-    def __init__(self, pos, target, w=1, img="", speed=1, damage=1):
+    def __init__(self, pos, target, w=1, img="", speed=1, damage=1, gravity=True):
         angle = get_angle(pos, target)
 
         self.pos = list(pos)
         self.max_speed = speed
         self.v = [speed * math.cos(angle), speed * math.sin(angle)]
-        self.a = [0, 20]
+        self.a = [0, 20] if gravity else [0, 0]
 
         self.dmg = damage
 
@@ -243,13 +243,15 @@ class Projectile:
         # Seeks out enemies
         self.homing = False
         # Is affected by gravity
-        self.gravity = True
+        self.gravity = gravity
         # Can go through blocks
         self.hits_blocks = True
         # Bounces when hitting the ground
         self.bounce = False
         # Hurts player or hurts mobs
         self.hurts_mobs = True
+
+        self.direction = -1
 
         # Number of times the projectile can hit an object
         self.num_hits = 1
@@ -282,6 +284,10 @@ class Projectile:
         factor = self.max_speed / math.sqrt(self.v[0] ** 2 + self.v[1] ** 2)
         if factor < 1:
             self.v = [v * factor for v in self.v]
+
+        if self.direction * self.v[0] < 0:
+            self.direction *= -1
+            self.img = pg.transform.flip(self.img, True, False)
 
         # If we can hit blocks, check for collisions
         if self.hits_blocks:

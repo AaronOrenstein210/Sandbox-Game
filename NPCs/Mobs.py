@@ -163,7 +163,6 @@ class Dragon(Boss):
             self.hurts_mobs = self.gravity = self.hits_blocks = False
 
 
-# TODO: Cat sprite, start in zoom mode
 class MainBoss(Boss):
     def __init__(self):
         super().__init__(name="Main Boss", aggressive=True, w=3, rarity=3,
@@ -172,6 +171,17 @@ class MainBoss(Boss):
         self.no_knockback = True
         self.stage = self.jump_count = self.launch_angle = 0
         self.launch_target = [0, 0]
+        # Start in launch mode
+        self.launch()
+
+    def launch(self):
+        self.stage = 0
+        self.a = [0, 0]
+        self.v[0] = 15 * math.cos(self.launch_angle)
+        self.v[1] = 15 * math.sin(self.launch_angle)
+        self.hits_blocks = False
+        self.launch_target = game_vars.player_pos()
+        self.launch_angle = get_angle(self.rect.center, self.launch_target)
 
     def ai(self):
         pos = game_vars.player_pos()
@@ -199,12 +209,7 @@ class MainBoss(Boss):
                         self.v[1] = -10
                         self.jump_count += 1
                         if self.jump_count > 2:
-                            self.launch_angle = get_angle(self.rect.center, pos)
-                            self.launch_target = pos
-                            self.a = [0, 0]
-                            self.v[0] = 15 * math.cos(self.launch_angle)
-                            self.v[1] = 15 * math.sin(self.launch_angle)
-                            self.hits_blocks = False
+                            self.launch()
                     # Reset jumps if we aren't hitting something to the side
                     if self.collisions[0] == 0:
                         self.jump_count = 0
@@ -229,13 +234,17 @@ class MainBoss(Boss):
             if self.collisions[1] == 1:
                 self.stage = 0
                 self.v[1] = 0
-                p = self.GroundP(self.pos)
-                p.set_pos(self.rect.centerx - p.dim[0] * BLOCK_W / 2, self.rect.bottom - p.dim[1] * BLOCK_W)
+                p = self.GroundP(self.pos, -1)
+                p.set_pos(self.rect.centerx - p.dim[0] * BLOCK_W, self.rect.bottom - p.dim[1] * BLOCK_W)
+                game_vars.shoot_projectile(p)
+                p = self.GroundP(self.pos, 1)
+                p.set_pos(self.rect.centerx, self.rect.bottom - p.dim[1] * BLOCK_W)
                 game_vars.shoot_projectile(p)
 
     class GroundP(Projectile):
-        def __init__(self, pos):
-            super().__init__(pos, pos, img=MOB + "cat.png", w=7, speed=0, damage=10)
+        def __init__(self, pos, direction):
+            super().__init__(pos, [pos[0] + direction, pos[1]], img=PROJ + "dust_cloud.png", w=3, speed=1, damage=10,
+                             gravity=False)
             self.hurts_mobs = False
             self.hits_blocks = False
             self.num_hits = -1

@@ -196,17 +196,17 @@ class Weapon(Item):
         self.damage_type = damage_type
         self.projectiles = projectiles
         self.max_stack = 1
+        self.power = 1
         # Get inventory image
         from pygame.transform import scale, rotate
         from Tools.constants import INV_IMG_W
         self.inv_img = scale(rotate(self.image, 45), (INV_IMG_W, INV_IMG_W))
 
     def on_left_click(self):
-        pos = game_vars.global_mouse_pos()
-        pos = [p // c.BLOCK_W for p in pos]
+        pos = game_vars.global_mouse_pos(blocks=True)
         # Break blocks if necessary
         if self.breaks_blocks:
-            if game_vars.player.break_block(*pos) and self.consumable:
+            if game_vars.player.break_block(*pos, self.power) and self.consumable:
                 game_vars.player.inventory.use_item()
         elif self.consumable:
             game_vars.player.inventory.use_item()
