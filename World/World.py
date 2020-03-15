@@ -137,7 +137,7 @@ class World:
                     self.blocks[row][col:col + num] = [val] * num
                     # Save vertical multiblock
                     for i in range(1, tile.dim[1]):
-                        self.blocks[row + i][col + num] = [-i] * num
+                        self.blocks[row:row + i, col + num] = [-i] * num
                 # Loop through every block
                 for col1 in range(col, col + num):
                     # Add the block to applicable lists

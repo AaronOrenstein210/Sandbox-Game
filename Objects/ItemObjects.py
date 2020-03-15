@@ -4,6 +4,7 @@ from sys import byteorder
 from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
+from Objects.UpgradeObjects import head, chest, legs, feet
 from Tools.constants import *
 from Tools import game_vars, item_ids as i, tile_ids as t
 from NPCs.Entity import Projectile
@@ -186,9 +187,19 @@ class IronOre(Item):
         super().__init__(i.IRON_ORE, img=INV + "iron_ore.png", name="Iron Ore")
 
 
+class IronBar(Item):
+    def __init__(self):
+        super().__init__(i.IRON_BAR, img=INV + "iron_bar.png", name="Iron Bar")
+
+
 class GoldOre(Item):
     def __init__(self):
         super().__init__(i.GOLD_ORE, img=INV + "gold_ore.png", name="Gold Ore")
+
+
+class GoldBar(Item):
+    def __init__(self):
+        super().__init__(i.GOLD_BAR, img=INV + "gold_bar.png", name="Gold Bar")
 
 
 class Pyrite(Item):
@@ -213,35 +224,6 @@ class Obsidian(Item):
 
     def get_description(self, data):
         return "Obtained from the nether regions of the world"
-
-
-# Weapons/Tools
-class TestSword(Weapon):
-    def __init__(self):
-        super().__init__(i.BASIC_SWORD, damage=7, damage_type=MELEE,
-                         img=INV + "basic_sword.png", name="Basic Sword")
-
-    def on_left_click(self):
-        game_vars.shoot_projectile(self.P1(game_vars.player.rect.center, game_vars.global_mouse_pos()))
-
-    def get_description(self, data):
-        return "Your basic sword\nIt has so much potential"
-
-    class P1(Projectile):
-        def __init__(self, pos, target):
-            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=6)
-            self.hurts_mobs = True
-
-
-class TestPickaxe(Weapon):
-    def __init__(self):
-        super().__init__(i.BASIC_PICKAXE, damage=3, damage_type=MELEE,
-                         img=INV + "basic_pickaxe.png", name="Basic Pickaxe")
-        self.auto_use = True
-        self.breaks_blocks = True
-
-    def get_description(self, data):
-        return "Your basic pickaxe\nIt has so much potential"
 
 
 # Blocks
@@ -313,6 +295,14 @@ class WorkTable(Block):
         return "Now you can make pretty furniture!"
 
 
+class Forge(Block):
+    def __init__(self):
+        super().__init__(i.FORGE, t.FORGE, img=INV + "forge/forge_0.png")
+
+    def get_description(self, data):
+        return "I should really make a sweaty debuff for players near a forge"
+
+
 class DimensionHopper(Block):
     def __init__(self):
         super().__init__(i.DIMENSION_HOPPER, t.DIMENSION_HOPPER, name="Dimension Hopper",
@@ -346,3 +336,74 @@ class Crusher(Block):
 
     def get_description(self, data):
         return "This machine looks powerful enough to crush those shiny stones that you found"
+
+
+class UpgradeStation(Block):
+    def __init__(self):
+        super().__init__(i.UPGRADE_STATION, t.UPGRADE_STATION, name="Upgrade Station", img="")
+
+
+# Weapons/Tools
+class TestSword(Weapon):
+    def __init__(self):
+        super().__init__(i.BASIC_SWORD, damage=7, damage_type=MELEE,
+                         img=INV + "basic_sword.png", name="Basic Sword")
+
+    def on_left_click(self):
+        game_vars.shoot_projectile(self.P1(game_vars.player.rect.center, game_vars.global_mouse_pos()))
+
+    def get_description(self, data):
+        return "Your basic sword\nIt has so much potential"
+
+    class P1(Projectile):
+        def __init__(self, pos, target):
+            super().__init__(pos, target, w=.5, img=INV + "snow_ball.png", speed=10)
+            self.hurts_mobs = True
+
+
+class TestPickaxe(Tool):
+    def __init__(self):
+        super().__init__(i.BASIC_PICKAXE, damage=3, damage_type=MELEE, power=10,
+                         img=INV + "basic_pickaxe.png", name="Basic Pickaxe")
+        self.auto_use = True
+        self.breaks_blocks = True
+
+    def get_description(self, data):
+        return "Your basic pickaxe\nIt has so much potential"
+
+
+# Armor
+class Helmet(Armor):
+    def __init__(self):
+        super().__init__(i.HELMET, head, img=INV + "helmet.png", name="Helmet")
+        self.max_stack = 1
+
+    def get_description(self, data):
+        return "A handy helmet to protect your head from falling meteors"
+
+
+class Chestplate(Armor):
+    def __init__(self):
+        super().__init__(i.CHESTPLATE, chest, img=INV + "chestplate.png", name="Chestplate")
+        self.max_stack = 1
+
+    def get_description(self, data):
+        return "A thick chestplate to protect you during snowball fights"
+
+
+class Leggings(Armor):
+    def __init__(self):
+        super().__init__(i.LEGGINGS, legs, img=INV + "leggings.png", name="Leggings")
+        self.max_stack = 1
+
+    def get_description(self, data):
+        return "These are purely decorative, to be worn only as a fashion statement"
+
+
+class Boots(Armor):
+    def __init__(self):
+        super().__init__(i.BOOTS, feet, img=INV + "boots.png", name="Boots")
+        self.max_stack = 1
+
+    def get_description(self, data):
+        return "Their extra wide soles make jumping in rain puddles a blast!"

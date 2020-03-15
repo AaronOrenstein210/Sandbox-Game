@@ -14,6 +14,10 @@ class ActiveUI:
         else:
             self.invs = invs
 
+    # Called on exit
+    def on_exit(self):
+        pass
+
     # Override these if implementing a UI
     # Called when the screen is resized
     def on_resize(self):

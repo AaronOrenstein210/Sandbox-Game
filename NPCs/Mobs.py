@@ -1,21 +1,20 @@
 # Created on 23 November 2019
 # All mobs need to be defined here to create spawners for them
 
-import math
-from Objects import MOB, PROJ
 from NPCs.Entity import *
 from NPCs.conditions import *
-from Player.Stats import Stats
-from Tools.constants import BLOCK_W, scale_to_fit
-from Tools import item_ids as items
-from Tools import game_vars
+from Objects import MOB, PROJ
 from Objects.Animation import OscillateAnimation
+from Player.Stats import Stats, ENEMY_STATS, DEF_MOB
+from Tools import game_vars
+from Tools import item_ids as items
+from Tools.constants import BLOCK_W, scale_to_fit
 
 
 class Cat(Entity):
     def __init__(self):
         super().__init__(name="Cat", w=3, img=MOB + "cat.png", rarity=1,
-                         stats=Stats(hp=15, max_speed=(3, 10)))
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=15, max_speedx=2, jump_speed=9))
 
     def can_spawn(self, conditions):
         return conditions[SURFACE]
@@ -24,7 +23,9 @@ class Cat(Entity):
 class Birdie(Entity):
     def __init__(self):
         super().__init__(name="Birdie", w=.75, aggressive=False, img=MOB + "birdie.png",
-                         rarity=1, stats=Stats(hp=5, max_speed=(5, 5)))
+                         rarity=1,
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=5, max_speedx=5, max_speedy=5, acceleration=5,
+                                     jump_speed=10))
 
     def ai(self):
         fly_random(self)
@@ -36,7 +37,7 @@ class Birdie(Entity):
 class Zombie(Entity):
     def __init__(self):
         super().__init__(name="Zombie", w=1.5, aggressive=True, img=MOB + "zombie.png",
-                         rarity=2, stats=Stats(hp=50, damage=5, defense=5, max_speed=(5, 10)))
+                         rarity=2, stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=50, damage=40, defense=5, max_speedx=5))
 
     def ai(self):
         follow_player(self)
@@ -48,7 +49,8 @@ class Zombie(Entity):
 class DoomBunny(Entity):
     def __init__(self):
         super().__init__(name="Doom Bunny", w=1, aggressive=True, img=MOB + "doom_bunny.png",
-                         rarity=3, stats=Stats(hp=5, damage=100, defense=1, max_speed=(5, 20)))
+                         rarity=3,
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=5, damage=100, defense=1, jump_speed=15))
 
     def ai(self):
         jump(self, abs(game_vars.player_pos()[0] - self.rect.centerx) // BLOCK_W <= 10)
@@ -60,7 +62,8 @@ class DoomBunny(Entity):
 class Helicopter(Entity):
     def __init__(self):
         super().__init__(name="Helicopter", w=1.5, aggressive=True, img=MOB + "helicopter.png",
-                         rarity=1, stats=Stats(hp=5, damage=10, defense=1, max_speed=(10, 3)))
+                         rarity=1, stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=5, damage=25, defense=1, max_speedx=7,
+                                               max_speedy=7, acceleration=5))
 
     def ai(self):
         fly_follow(self)
@@ -79,7 +82,8 @@ class Dragon(Boss):
     def __init__(self):
         super().__init__(name="Dragon", aggressive=True, w=5, rarity=3,
                          img=MOB + "dragon/dragon_0.png", sprite=MOB + "dragon/dragon_0.png",
-                         stats=Stats(hp=100, damage=25, defense=10, max_speed=(15, 15)))
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=100, damage=65, defense=10, max_speedx=15,
+                                     max_speed_y=15))
         self.rising_anim = OscillateAnimation(folder=MOB + "dragon/", dim=self.img.get_size(), delay=.1)
         self.attacking_img = scale_to_fit(pg.image.load(MOB + "dragon_attack.png"), w=5 * BLOCK_W)
         self.zero_gravity = True
@@ -138,15 +142,8 @@ class Dragon(Boss):
     def start_diving(self):
         self.rising_anim.reset()
         pos = game_vars.player_pos()
-        d = [pos[0] - self.pos[0], self.pos[1] - pos[1]]
-        r = math.sqrt((d[0] * d[0]) + (d[1] * d[1]))
-        if r == 0:
-            self.v = [0, 15]
-        else:
-            theta = math.asin(d[1] / r)
-            if d[0] < 0:
-                theta = math.pi - theta
-            self.v = [15 * math.cos(theta), -15 * math.sin(theta)]
+        theta = get_angle(self.rect.center, pos)
+        self.v = [15 * math.cos(theta), 15 * math.sin(theta)]
         self.set_image(self.attacking_img)
         self.stage = 1
 
@@ -167,7 +164,7 @@ class MainBoss(Boss):
     def __init__(self):
         super().__init__(name="Main Boss", aggressive=True, w=3, rarity=3,
                          img=MOB + "main_boss/shadow_dude_0.png", sprite=MOB + "main_boss/shadow_dude_0.png",
-                         stats=Stats(hp=1000, damage=30, defense=25, max_speed=(20, 30)))
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=300, damage=100, defense=25, max_speedy=30))
         self.no_knockback = True
         self.stage = self.jump_count = self.launch_angle = 0
         self.launch_target = [0, 0]
@@ -197,7 +194,7 @@ class MainBoss(Boss):
                         if self.time >= 8:
                             self.time = 0
                             self.stage = 1
-                            self.v[1] = -self.stats.spd[1]
+                            self.v[1] = -self.stats.get_stat("max_speed")
                             self.hits_blocks = True
                     else:
                         self.time = 7.75

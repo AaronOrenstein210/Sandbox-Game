@@ -8,9 +8,9 @@ from Tools.constants import BLOCK_W
 from Tools import constants as c
 from Tools import game_vars
 from Tools.tile_ids import AIR
-from Player.PlayerInventory import PlayerInventory
+from Player.PlayerInventory import PlayerInventory, new_inventory
 from Player.CraftingUI import CraftingUI
-from Player.Stats import Stats
+from Player.Stats import Stats, STATS, DEF_PLAYER
 from Player.Map import Map
 from Objects.ItemTypes import Weapon
 
@@ -19,9 +19,9 @@ class Player:
     def __init__(self, player_file):
         self.file = player_file
         # Stats
-        self.stats = Stats(hp=100, max_speed=[15, 20])
+        self.stats = Stats(STATS, defaults=DEF_PLAYER)
         # Inventory
-        self.inventory = PlayerInventory()
+        self.inventory = PlayerInventory(self)
         self.item_used, self.use_time = None, 0
         self.used_left = True
         self.first_swing = True
@@ -43,6 +43,8 @@ class Player:
         self.pos = [0, 0]
         self.v = [0., 0.]
         self.a = [0., 20.]
+        # Collisions  in x and y
+        self.collisions = [0, 0]
         # Distance fallen
         self.fall_dist = 0
         # Attack immunity
@@ -122,6 +124,10 @@ class Player:
                     if e.key == K_SPACE and self.can_move:
                         if game_vars.touching_blocks_y(self.pos, self.dim, False):
                             self.v[1] = -15
+                    # Close current active ui
+                    if e.key == K_ESCAPE and self.active_ui and self.active_ui != self.crafting_ui:
+                        self.active_ui.on_exit()
+                        self.active_ui = None
                     # Inventory buttons
                     elif self.use_time <= 0:
                         self.inventory.key_pressed(e.key)
@@ -167,20 +173,20 @@ class Player:
 
             # Check if we can move
             if self.can_move:
+                acc = self.stats.get_stat("acceleration")
                 if keys[K_a] and not keys[K_d]:
-                    self.a[0] = -10
+                    self.a[0] = -acc
                 elif keys[K_d] and not keys[K_a]:
-                    self.a[0] = 10
+                    self.a[0] = acc
                 else:
                     if abs(self.v[0]) < .5:
                         self.v[0] = self.a[0] = 0
                     else:
-                        self.a[0] = copysign(10, -self.v[0])
+                        self.a[0] = copysign(acc, -self.v[0])
                 if self.a[0] * self.v[0] < 0:
-                    self.a[0] = copysign(100, self.a[0])
-                if keys[K_SPACE]:
-                    # TODO: No flying
-                    self.v[1] = -10
+                    self.a[0] = copysign(acc * 10, self.a[0])
+                if keys[K_SPACE] and self.collisions[1] == 1:
+                    self.v[1] = -self.stats.get_stat("jump_speed")
                 self.move()
 
     # Draws pre-ui visuals
@@ -210,10 +216,7 @@ class Player:
         pos = pg.mouse.get_pos()
 
         # Draw inventory
-        display.blit(self.inventory.surface, (0, 0), area=self.inventory.rect)
-        if self.inventory.rect.collidepoint(*pos):
-            pos_ = [pos[0] - self.inventory.rect.x, pos[1] - self.inventory.rect.y]
-            self.inventory.draw_hover_item(pos_)
+        self.inventory.draw(pos)
 
         # Draw item being used
         if self.item_used is not None:
@@ -225,21 +228,22 @@ class Player:
             self.active_ui.draw()
 
         # Draw other UI
-        life_text = str(self.stats.hp) + " / " + str(self.stats.max_hp) + " HP"
+        life_text = "{} / {} HP".format(self.stats.hp, self.stats.get_stat("hp"))
         # Draw stats
         text = c.ui_font.render(life_text, 1, (255, 255, 255))
         text_rect = text.get_rect()
         text_rect.right = rect.w
         display.blit(text, text_rect)
+        # TODO: Defense
 
         # Get minimap
         self.map.set_center([p / BLOCK_W for p in self.rect.center])
         self.map.draw_map(pg.Rect(dim[0] - c.MAP_W, text_rect.h, c.MAP_W, c.MAP_W))
 
         # Draw selected item under cursor if there is one
-        cursor = self.inventory.get_cursor_display()
-        if cursor is not None:
-            display.blit(cursor, pos)
+        item, amnt = self.inventory.get_cursor_item()
+        if item != -1:
+            display.blit(game_vars.items[item].image, pos)
 
         # Draw 'You Died' text
         if self.respawn_counter > 0:
@@ -306,15 +310,13 @@ class Player:
     def on_resize(self):
         if self.active_ui is not None:
             self.active_ui.on_resize()
+        self.inventory.on_resize()
 
     def move(self):
         if game_vars.dt == 0:
             return
 
         self.immunity -= game_vars.dt
-
-        # Save previous position and velocity for comparison
-        prev_pos, prev_v = self.pos.copy(), self.v.copy()
 
         # Do movement
         d = [0., 0.]
@@ -324,31 +326,43 @@ class Player:
             d[i] = BLOCK_W * self.v[i] * game_vars.dt
             # Calculate velocity
             self.v[i] += self.a[i] * game_vars.dt
-            if abs(self.v[i]) > self.stats.spd[i]:
-                self.v[i] = copysign(self.stats.spd[i], self.v[i])
+            spd = self.stats.get_stat("max_speed" + ("x" if i == 0 else "y"))
+            if abs(self.v[i]) > spd:
+                self.v[i] = copysign(spd, self.v[i])
 
+        prev_d, prev_pos = d.copy(), self.pos.copy()
         # Check for collisions and set new position
         game_vars.check_collisions(self.pos, self.dim, d)
         self.set_pos(self.pos)
 
-        # Get actual change in position TODO: Fix collided
+        # Get actual change in position
         d = [self.pos[0] - prev_pos[0], self.pos[1] - prev_pos[1]]
         # Check collisions in x and y, a collision occurred if we should have moved but didn't
-        collided = [(copysign(1, self.v[i]) if d[i] == 0 and prev_v[i] != 0 else 0) for i in range(2)]
-        # Stop our velocity if we hit something
-        if collided[0] != 0:
-            self.v[0] = 0
-        if collided[1] != 0:
-            self.v[1] = copysign(1, self.a[1])
+        self.collisions = [0, 0]
+        for i in range(2):
+            # If we didn't move the full distance, we hit something
+            if abs(d[i] - prev_d[i]) > c.ROUND_ERR:
+                self.collisions[i] = int(copysign(1, prev_d[i] - d[i]))
+            # If we didn't move, check collision based on acceleration
+            elif d[i] == prev_d[i] == 0 and self.a[i] != 0:
+                truth = self.a[i] < 0
+                if i == 0:
+                    result = game_vars.touching_blocks_x(self.pos, self.dim, truth)
+                else:
+                    result = game_vars.touching_blocks_y(self.pos, self.dim, truth)
+                self.collisions[i] = copysign(1, self.a[i]) if result else 0
+            # Update velocity
+            if self.collisions[i] != 0:
+                self.v[i] = 0
 
         # Check if we are touching the ground
-        if collided[1] == 0:
+        if self.collisions[1] == 0:
             # If we are falling, add to our fall distance
             if self.v[1] > 0:
                 self.fall_dist += d[1]
             else:
                 self.fall_dist = 0
-        elif collided[1] == 1:
+        elif self.collisions[1] == 1:
             # If our fall distance was great enough, do fall damage
             if self.fall_dist > 10 * BLOCK_W:
                 self.hit(int(self.fall_dist / BLOCK_W) - 10, None)
@@ -362,10 +376,7 @@ class Player:
 
     def left_click(self):
         pos = pg.mouse.get_pos()
-        if self.inventory.rect.collidepoint(*pos):
-            pos = [pos[0] - self.inventory.rect.x, pos[1] - self.inventory.rect.y]
-            self.inventory.left_click(pos)
-        else:
+        if not self.inventory.left_click(pos):
             idx = self.inventory.get_held_item()
             if idx != -1:
                 item = game_vars.items[idx]
@@ -385,10 +396,7 @@ class Player:
     def right_click(self):
         pos = pg.mouse.get_pos()
         global_pos = game_vars.global_mouse_pos()
-        if self.inventory.rect.collidepoint(*pos):
-            pos = [pos[0] - self.inventory.rect.x, pos[1] - self.inventory.rect.y]
-            self.inventory.right_click(pos)
-        else:
+        if not self.inventory.right_click(pos):
             block_x, block_y = game_vars.get_topleft(*[p // BLOCK_W for p in global_pos])
             tile = game_vars.tiles[game_vars.get_block_at(block_x, block_y)]
             # Make sure we didn't click the same block more than once
@@ -401,7 +409,7 @@ class Player:
                 if drop is not None:
                     # This determines if we clicked to the left or right of the player
                     left = global_pos[0] < self.rect.centerx
-                    game_vars.drop_item(*drop, left)
+                    game_vars.drop_item(drop, left)
             else:
                 item = self.inventory.get_held_item()
                 if item != -1:
@@ -448,14 +456,15 @@ class Player:
         return False
 
     # Get current damage
+    # TODO: weapon stats
     @property
     def damage(self):
         item = self.inventory.get_held_item()
         if item != -1:
             item = game_vars.items[item]
             if isinstance(item, Weapon):
-                return self.stats.dmg + item.damage
-        return self.stats.dmg
+                return self.stats.get_stat("damage") + item.damage
+        return self.stats.get_stat("damage")
 
     # Check if we hit the desired target
     def hit_target(self, rect):
@@ -466,6 +475,8 @@ class Player:
 
     # Deals damage and knockback to the player
     def hit(self, dmg, centerx):
+        defense = self.stats.get_stat("defense")
+        dmg = max(0, dmg - defense)
         self.stats.hp -= dmg
         game_vars.add_damage_text(dmg, self.rect.center)
         if self.stats.hp <= 0:
@@ -484,7 +495,7 @@ class Player:
                 self.break_block(x, y, -1)
 
     def respawn(self):
-        self.stats.hp = self.stats.max_hp
+        self.stats.hp = self.stats.get_stat("hp")
         self.immunity = 5
         self.v = [0, 0]
         self.spawn()
@@ -492,4 +503,4 @@ class Player:
 
 def create_new_player(player_file):
     with open(player_file.full_file, "wb+") as file:
-        file.write(PlayerInventory().new_inventory())
+        file.write(new_inventory())

@@ -41,11 +41,10 @@ class CraftingUI(ActiveUI):
         for item in game_vars.items:
             self.HAND_CRAFTS.append([[item, 1]])
 
-
     @property
     def max_scroll(self):
-        rows = ceil(len(self.recipes) // 10)
-        return 0 if rows <= 4 else (4 - rows) * INV_W
+        rows = ceil(len(self.recipes) // 10) + 1
+        return 0 if rows <= 4 else (rows - 4) * INV_W
 
     def i_can_craft(self, pos):
         return self.craft_rect.collidepoint(*pos) and self.player.use_time <= 0 and \
@@ -118,14 +117,18 @@ class CraftingUI(ActiveUI):
         if num_rows <= 4:
             self.scroll = 0
         else:
-            self.scroll = max(self.scroll, (5 - num_rows) * INV_W)
+            self.scroll = min(self.scroll, self.max_scroll)
         # Draw recipes
         surface = pg.Surface(self.rect.size, pg.SRCALPHA)
         surface.fill((0, 200, 200, 128))
-        min_row = -self.scroll / INV_W
-        for i, idx in enumerate(indexes[int(min_row) * 10: ceil(min_row + 4) * 10]):
+        min_row = self.scroll / INV_W
+        x, y = -INV_W, -(self.scroll % INV_W)
+        for idx in indexes[int(min_row) * 10: ceil(min_row + 4) * 10]:
             # Get rectangle
-            x, y = (i % 10) * INV_W, (i // 10) * INV_W + self.scroll
+            x += INV_W
+            if x >= self.rect.w:
+                x = 0
+                y += INV_W
             rect = pg.Rect(x, y, INV_W, INV_W)
             # Get the recipe
             r = self.recipes[idx]
@@ -135,6 +138,8 @@ class CraftingUI(ActiveUI):
             # Draw result amount
             text = c.inv_font.render(str(r[0][1]), 1, (255, 255, 255))
             surface.blit(text, text.get_rect(bottomright=rect.bottomright))
+        # Draw selected recipe
+        surface.fill((0, 200, 200, 128), (self.recipe_rect.topleft, (self.rect.w, INV_W)))
         if self.selected_ui is not None:
             surface.blit(self.selected_ui, self.recipe_rect.topleft,
                          area=(-self.selected_scroll, 0, *self.recipe_rect.size))
@@ -152,7 +157,7 @@ class CraftingUI(ActiveUI):
             # Draw description for result item
             if not pos[1] >= self.recipe_rect.y:
                 # Get recipe we are hovering over
-                x, y = pos[0] // INV_W, (pos[1] - self.scroll) // INV_W
+                x, y = pos[0] // INV_W, (pos[1] + self.scroll) // INV_W
                 idx = y * 10 + x
                 if idx < len(self.can_craft):
                     item = self.recipes[self.can_craft[idx]][0][0]
@@ -202,7 +207,7 @@ class CraftingUI(ActiveUI):
                                 return
                             # Select a new recipe
                             elif pos[1] < self.recipe_rect.y:
-                                row = (pos[1] - self.scroll) // INV_W
+                                row = (pos[1] + self.scroll) // INV_W
                                 col = pos[0] // INV_W
                                 idx = row * 10 + col
                                 if idx < len(self.can_craft):
@@ -223,14 +228,14 @@ class CraftingUI(ActiveUI):
                                     else:
                                         self.max_off = 0
                                     self.selected_scroll = 0
-                        elif e.button in [BUTTON_WHEELUP, BUTTON_WHEELDOWN]:
-                            self.scroll += INV_W // 2 * (1 if e.button == BUTTON_WHEELUP else -1)
-                            if self.scroll > 0:
+                        elif e.button == BUTTON_WHEELUP:
+                            self.scroll -= INV_W // 2
+                            if self.scroll < 0:
                                 self.scroll = 0
-                            else:
-                                ub = self.max_scroll
-                                if self.scroll < ub:
-                                    self.scroll = self.max_scroll
+                        elif e.button == BUTTON_WHEELDOWN:
+                            self.scroll += INV_W // 2
+                            if self.scroll > self.max_scroll:
+                                self.scroll = self.max_scroll
                     # Start dragging
                     elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT and \
                             self.recipe_rect.collidepoint(*pos):

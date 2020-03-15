@@ -43,9 +43,9 @@ class EntityHandler:
                     self.entities.remove(entity)
                     continue
             # If the player is not immune, check if the entity hit the player
-            if not player.immune:
+            if not player.immune and entity.aggressive:
                 if player.rect.colliderect(entity.rect):
-                    player.hit(entity.stats.dmg, entity.rect.centerx)
+                    player.hit(entity.stats.get_stat("damage"), entity.rect.centerx)
             # If the entity is still alive, move it
             entity.move()
         for projectile in self.mob_projectiles:

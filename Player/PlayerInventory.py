@@ -1,8 +1,9 @@
 # Created on 5 December 2019
 
 from Player.Inventory import *
+from Player.Stats import Stats, STATS
 from Objects.DroppedItem import DroppedItem
-from Tools import game_vars
+from Tools import game_vars, item_ids as items
 
 hotbar_controls = {
     K_1: 0, K_2: 1, K_3: 2, K_4: 3,
@@ -10,10 +11,15 @@ hotbar_controls = {
     K_9: 8, K_0: 9
 }
 
+DIM = (10, 5)
+
 
 class PlayerInventory(Inventory):
-    def __init__(self):
-        super().__init__((10, 5))
+    def __init__(self, player):
+        super().__init__(DIM)
+        # Armor inventory
+        self.armor = ArmorInventory(player)
+        self.armor.draw_inventory()
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
         self.selected_data = None
@@ -23,9 +29,63 @@ class PlayerInventory(Inventory):
         self.open = True
         self.toggle()
 
+        self.on_resize()
+
     def load(self, data):
-        super().load(data)
+        result = self.armor.load(super().load(data))
         self.select_hotbar(0)
+        return result
+
+    def write(self):
+        return super().write() + self.armor.write()
+
+    # Functions to set inventory slot values
+    def set_at(self, row, col, item=-1, amnt=0, data=None):
+        if row == col == -1:
+            if amnt <= 0 or item == -1:
+                amnt = 0
+                item = -1
+                data = None
+            self.selected_item = item
+            self.selected_amnt = amnt
+            self.selected_data = data
+        else:
+            super().set_at(row, col, item=item, amnt=amnt, data=data)
+
+    def set_amnt_at(self, row, col, amnt=0):
+        if row == col == -1:
+            self.selected_amnt = amnt
+            if amnt <= 0:
+                self.selected_item = -1
+                self.selected_data = None
+        else:
+            super().set_amnt_at(row, col, amnt=amnt)
+
+    def set_item_at(self, row, col, item=-1):
+        if row == col == -1:
+            self.selected_item = item
+            if item == -1:
+                self.selected_amnt = 0
+                self.selected_data = None
+        else:
+            super().set_item_at(row, col, item=item)
+
+    def set_data_at(self, row, col, data=None):
+        if row == col == -1:
+            self.selected_data = None
+        else:
+            super().set_data_at(row, col, data=data)
+
+    def on_resize(self):
+        self.armor.rect.bottomright = (pg.display.get_surface().get_size())
+
+    def draw(self, pos):
+        pg.display.get_surface().blit(self.surface, (0, 0), area=self.rect)
+        if self.open:
+            self.armor.draw(pos)
+            if self.rect.collidepoint(*pos):
+                pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                self.draw_hover_item(pos)
 
     # Sets the data of the item currently being used
     def set_item_data(self, data):
@@ -49,15 +109,33 @@ class PlayerInventory(Inventory):
         if self.open:
             super().draw_hover_item(pos)
 
+    # Perform left click
     def left_click(self, pos):
-        if self.open:
-            Inventory.left_click(self, pos)
-        else:
-            self.select_hotbar(int(pos[0] / INV_W))
+        if self.rect.collidepoint(*pos):
+            pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+            if self.open:
+                Inventory.left_click(self, pos)
+            else:
+                self.select_hotbar(int(pos[0] / INV_W))
+            return True
+        elif self.open and self.armor.rect.collidepoint(*pos):
+            pos = [pos[0] - self.armor.rect.x, pos[1] - self.armor.rect.y]
+            self.armor.left_click(pos)
+            return True
+        return False
 
+    # Perform right click
     def right_click(self, pos):
         if self.open:
-            Inventory.right_click(self, pos)
+            if self.rect.collidepoint(*pos):
+                pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                Inventory.right_click(self, pos)
+                return True
+            elif self.armor.rect.collidepoint(*pos):
+                pos = [pos[0] - self.armor.rect.x, pos[1] - self.armor.rect.y]
+                self.armor.left_click(pos)
+                return True
+        return False
 
     def select_hotbar(self, idx):
         if idx != self.hot_bar_item:
@@ -66,12 +144,15 @@ class PlayerInventory(Inventory):
             self.hot_bar_item = idx
             pg.draw.rect(self.surface, (128, 128, 0), (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
 
-    def get_cursor_display(self):
-        return game_vars.items[self.selected_item].image if self.selected_item != -1 else None
+    # Get item to draw under cursor
+    def get_cursor_item(self):
+        return [int(self.selected_item), int(self.selected_amnt)]
 
+    # Get the current held item
     def get_held_item(self):
         return self.selected_item if self.selected_item != -1 else self.inv_items[0][self.hot_bar_item]
 
+    # Use selected item
     def use_item(self):
         # We are using an item held by the cursor
         if self.selected_item != -1:
@@ -89,23 +170,28 @@ class PlayerInventory(Inventory):
                 self.inv_data[(self.hot_bar_item, 0)] = None
             self.update_item(0, self.hot_bar_item)
 
+    # Pressed a certain key
     def key_pressed(self, key):
         if key == K_ESCAPE:
             self.toggle()
         elif key in hotbar_controls.keys():
             self.select_hotbar(hotbar_controls[key])
 
+    # Scroll the hotbar
     def scroll(self, up):
         self.select_hotbar(min(max(0, self.hot_bar_item + (-1 if up else 1)), 9))
 
+    # Drop the currently held item
     def drop_item(self):
         drop = None
         if self.selected_item != -1:
-            drop = (self.selected_item, self.selected_amnt)
+            drop = DroppedItem(self.selected_item, self.selected_amnt, data=self.selected_data)
             self.selected_item = -1
             self.selected_amnt = 0
+            self.selected_data = None
         return drop
 
+    # Check if there is room for the given item in inventory
     def room_for_item(self, item):
         empty = []
         good = []
@@ -113,9 +199,10 @@ class PlayerInventory(Inventory):
         for y, row in enumerate(self.inv_items):
             for x, val in enumerate(row):
                 amnt = self.inv_amnts[y][x]
+                data = self.inv_data.get((y, x))
                 if val == -1:
                     empty.append((x, y))
-                elif val == item.idx and amnt != item.max_stack:
+                elif val == item.idx and amnt != item.max_stack and data == item.data:
                     if amnt + item_amnt <= item.max_stack:
                         return [(x, y)]
                     else:
@@ -123,6 +210,7 @@ class PlayerInventory(Inventory):
                         item_amnt -= item.max_stack - amnt
         return good + empty[:1]
 
+    # Try to pick up the given item
     def pick_up_item(self, item, space=None):
         if space is None:
             space = self.room_for_item(item)
@@ -141,6 +229,7 @@ class PlayerInventory(Inventory):
             else:
                 self.inv_items[y][x] = item.idx
                 self.inv_amnts[y][x] = item.amnt
+                self.inv_data[(x, y)] = item.data
                 item.amnt = 0
             # Update item
             self.update_item(y, x)
@@ -149,6 +238,7 @@ class PlayerInventory(Inventory):
                 return True
         return False
 
+    # Get list of inventory contents, sorted by item id and duplicates combined
     def get_all_items(self):
         results = []
         for row1, row2 in zip(self.inv_items, self.inv_amnts):
@@ -169,24 +259,27 @@ class PlayerInventory(Inventory):
                         results.insert(i, [item, amnt])
         return results
 
+    # Craft the given recipe
     def craft(self, recipe):
         # Get result
         item, amnt = recipe[0]
+        data = game_vars.items[item].new()
         # First try to have the player hold the item
         if self.selected_item == -1:
             self.selected_item = item
             self.selected_amnt = amnt
+            self.selected_data = data
         # Then try to add it to whatever the player is holding
-        elif self.selected_item == item:
+        elif self.selected_item == item and self.selected_data == data:
             grab = min(amnt, game_vars.items[item].max_stack - self.selected_amnt)
             self.selected_amnt += grab
             amnt -= grab
         else:
             # Finally try to put it into the inventory
-            item_obj = DroppedItem(item, amnt)
+            item_obj = DroppedItem(item, amnt, data=data)
             if not self.pick_up_item(item_obj):
                 # Drop whatever is left
-                game_vars.drop_item(item, item_obj.amnt, True)
+                game_vars.drop_item(item_obj, True)
         # Get the amounts of ingredients that are required
         parts = [r.copy() for r in recipe[1:]]
         # Remove ingredients
@@ -202,6 +295,9 @@ class PlayerInventory(Inventory):
                             transfer = min(self.inv_amnts[y][x], amnt)
                             self.inv_amnts[y][x] -= transfer
                             parts[i][1] -= transfer
+                            if self.inv_amnts[y][x] <= 0:
+                                self.inv_items[y][x] = -1
+                                self.inv_data[(x, y)] = None
                             # Check if we need to update this item
                             if transfer > 0:
                                 self.update_item(y, x)
@@ -213,9 +309,62 @@ class PlayerInventory(Inventory):
                                 i -= 1
                         i += 1
 
-    def new_inventory(self):
-        from Tools.item_ids import BASIC_PICKAXE
-        data = bytearray(4 * self.dim[0] * self.dim[1])
-        data[:2] = (1).to_bytes(2, byteorder)
-        data[2:4] = BASIC_PICKAXE.to_bytes(2, byteorder)
+
+class ArmorInventory(Inventory):
+    DIM = (1, 4)
+    ARMOR_ORDER = [items.HELMET, items.CHESTPLATE, items.LEGGINGS, items.BOOTS]
+
+    def __init__(self, player):
+        super().__init__(self.DIM, max_stack=1)
+        # These stat objects are created ONCE
+        self.stats = [Stats(STATS) for i in range(len(self.ARMOR_ORDER))]
+        for s in self.stats:
+            player.stats.add_stats(s)
+
+    def load(self, data):
+        data = super().load(data)
+        for idx in range(self.DIM[1]):
+            self.recalculate_stat(idx)
         return data
+
+    def draw(self, pos):
+        pg.display.get_surface().blit(self.surface, self.rect)
+        if self.rect.collidepoint(*pos):
+            pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+            self.draw_hover_item(pos)
+
+    def left_click(self, pos):
+        idx = pos[1] // INV_W
+        if idx < len(self.ARMOR_ORDER):
+            prev = self.inv_data.get((0, idx))
+            self.whitelist = self.ARMOR_ORDER[idx:idx + 1]
+            super().left_click(pos)
+            # If the armor data changed, recalculate stats
+            if prev != self.inv_data.get((0, idx)):
+                self.recalculate_stat(idx)
+
+    def right_click(self, pos):
+        idx = pos[1] // self.rect.h
+        if idx < self.ARMOR_ORDER:
+            prev = self.inv_data.get((0, idx))
+            self.whitelist = [self.ARMOR_ORDER[idx]]
+            super().right_click(pos)
+            # If the armor data changed, recalculate stats
+            if prev != self.inv_data.get((0, idx)):
+                self.recalculate_stat(idx)
+
+    def recalculate_stat(self, idx):
+        self.stats[idx].reset()
+        data = self.inv_data.get((0, idx))
+        if data:
+            game_vars.items[self.inv_items[idx][0]].load_stats(self.stats[idx], data)
+
+
+# Returns data for an empty inventory
+def new_inventory():
+    from Tools.item_ids import BASIC_PICKAXE
+    slots = DIM[0] * DIM[1] + ArmorInventory.DIM[0] * ArmorInventory.DIM[1]
+    data = bytearray(4 * slots + 1)
+    data[:2] = (1).to_bytes(2, byteorder)
+    data[2:4] = BASIC_PICKAXE.to_bytes(2, byteorder)
+    return data

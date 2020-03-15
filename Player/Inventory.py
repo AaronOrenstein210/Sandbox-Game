@@ -15,9 +15,9 @@ BKGROUND = (0, 255, 0, 64)
 
 
 class Inventory:
-    def __init__(self, dim, items_list=(), max_stack=999):
+    def __init__(self, dim, whitelist=(), max_stack=999):
         self.dim = dim
-        self.items_list = items_list
+        self.whitelist = whitelist
         self.max_stack = max_stack
         self.rect = Rect(0, 0, INV_W * self.dim[0], INV_W * self.dim[1])
         self.surface = pg.Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
@@ -25,7 +25,7 @@ class Inventory:
         # Contains all items in the inventory
         self.inv_items = full((self.dim[1], self.dim[0]), -1, dtype=int16)
         self.inv_amnts = full((self.dim[1], self.dim[0]), 0, dtype=int16)
-        # Stores [row,col]:bytes pairs
+        # Stores (col,row):bytes pairs
         self.inv_data = {}
         # How long we've been right clicking
         self.holding_r = 0
@@ -106,6 +106,38 @@ class Inventory:
                             data += bytearray(2)
         return data
 
+    # Functions to set inventory slot values
+    def set_at(self, row, col, item=-1, amnt=0, data=None):
+        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
+            if amnt <= 0 or item == -1:
+                amnt = 0
+                item = -1
+                data = None
+            self.inv_amnts[row][col] = amnt
+            self.inv_items[row][col] = item
+            self.inv_data[(col, row)] = data
+            self.update_item(row, col)
+
+    def set_item_at(self, row, col, item=-1):
+        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
+            self.inv_items[row][col] = item
+            if item == -1:
+                self.inv_amnts[row][col] = 0
+                self.inv_data[(col, row)] = None
+            self.update_item(row, col)
+
+    def set_amnt_at(self, row, col, amnt=0):
+        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
+            self.inv_amnts[row][col] = amnt
+            if amnt <= 0:
+                self.inv_items[row][col] = -1
+                self.inv_data[(col, row)] = None
+            self.update_item(row, col)
+
+    def set_data_at(self, row, col, data=None):
+        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
+            self.inv_data[(col, row)] = data
+
     def draw_inventory(self):
         for y in range(self.dim[1]):
             for x in range(self.dim[0]):
@@ -150,13 +182,10 @@ class Inventory:
         # Pick up item
         if inv.selected_amnt == 0:
             # Add item to selected item
-            inv.selected_item, inv.selected_amnt = item, amnt
-            inv.selected_data = data
+            inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
             # Remove item from our inventory
-            self.inv_items[y][x] = -1
-            self.inv_amnts[y][x] = 0
-            self.inv_data[(x, y)] = None
-        elif len(self.items_list) == 0 or inv.selected_item in self.items_list:
+            self.set_at(y, x)
+        elif len(self.whitelist) == 0 or inv.selected_item in self.whitelist:
             # Add item to item or to empty slot
             if (inv.selected_item == item and inv.selected_data == data) or amnt == 0:
                 if amnt == 0:
@@ -164,22 +193,14 @@ class Inventory:
                 else:
                     max_stack = min(game_vars.items[item].max_stack, self.max_stack)
                 amnt_ = min(max_stack, amnt + inv.selected_amnt)
-                self.inv_amnts[y][x] = amnt_
-                self.inv_items[y][x] = inv.selected_item
-                self.inv_data[(x, y)] = inv.selected_data
-                inv.selected_amnt -= amnt_ - amnt
-                if inv.selected_amnt == 0:
-                    inv.selected_item = -1
-                    inv.selected_data = None
+                self.set_at(y, x, item=inv.selected_item, amnt=amnt_, data=inv.selected_data)
+                inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt - (amnt_ - amnt))
             # Swap out items
             elif inv.selected_amnt <= self.max_stack:
-                self.inv_items[y][x], self.inv_amnts[y][x] = inv.selected_item, inv.selected_amnt
-                self.inv_data[(x, y)] = inv.selected_data
-                inv.selected_item, inv.selected_amnt = item, amnt
-                inv.selected_data = data
-        # If the item changed, redraw
+                self.set_at(y, x, item=inv.selected_item, amnt=inv.selected_amnt, data=inv.selected_data)
+                inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
+        # If the item changed, set use time
         if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
-            self.update_item(y, x)
             game_vars.player.use_time = .3
 
     def right_click(self, pos):
@@ -203,17 +224,13 @@ class Inventory:
             max_grab = game_vars.items[item].max_stack - inv.selected_amnt
             grab_amnt = min(ideal_grab, max_grab, amnt)
             if grab_amnt > 0:
-                # Updata inventory
-                self.inv_amnts[y][x] -= grab_amnt
-                if self.inv_amnts[y][x] == 0:
-                    self.inv_items[y][x] = -1
-                    self.inv_data[(x, y)] = None
-                # Update selected item, first check if we need to pass item data
+                # Update inventory
+                self.set_amnt_at(y, x, amnt=self.inv_amnts[y][x] - grab_amnt)
+                # Update selected item, first check if we need to set item data and type
                 if inv.selected_amnt == 0:
-                    inv.selected_data = data
-                inv.selected_item = item
-                inv.selected_amnt += grab_amnt
-                self.update_item(y, x)
+                    inv.set_at(-1, -1, item=item, amnt=grab_amnt, data=data)
+                else:
+                    inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt + grab_amnt)
                 game_vars.player.use_time = wait_time
 
     def is_empty(self):

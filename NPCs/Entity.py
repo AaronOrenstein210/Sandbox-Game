@@ -6,75 +6,72 @@ import math
 from random import randint, uniform
 import pygame as pg
 from Tools.constants import BLOCK_W, SPRITE_W, scale_to_fit, random_sign, get_angle, ROUND_ERR
-from Tools.game_vars import touching_blocks_x, touching_blocks_y
 from Tools import game_vars
-from Player.Stats import Stats
+from Player.Stats import Stats, ENEMY_STATS
+from Objects.DroppedItem import DroppedItem
 
 
 # AI functions, takes an entity object as its input
 def random_movement(entity):
     entity.time -= game_vars.dt
     # Check if we are standing on the ground
-    if touching_blocks_y(entity.pos, entity.dim, False):
+    if entity.collisions[1] == 1:
         # Check if we are ready to start/stop moving
         if entity.time <= 0:
             # We were stopped
             if entity.a[0] == 0:
-                entity.a[0] = random_sign()
+                entity.a[0] = entity.stats.get_stat("acceleration") * random_sign()
                 entity.time = uniform(2.5, 5)
             # We were moving
             else:
                 entity.a[0] = 0
                 entity.time = uniform(1, 3)
         # Check if we need to jump
-        if entity.a[0] != 0:
-            if (entity.a[0] < 0 and touching_blocks_x(entity.pos, entity.dim, True)) or \
-                    (entity.a[0] > 0 and touching_blocks_x(entity.pos, entity.dim, False)):
-                entity.v[1] = -12
-                entity.time = uniform(1, 3)
+        if entity.collisions[0] != 0:
+            entity.v[1] = -entity.stats.get_stat("jump_speed")
+            entity.time = uniform(1, 3)
 
 
 def follow_player(entity):
     # Check if we are standing on the ground
-    if game_vars.touching_blocks_y(entity.pos, entity.dim, False):
-        entity.a[0] = math.copysign(1, game_vars.player_pos() - entity.rect.centerx)
+    if entity.collisions[1]:
+        entity.a[0] = math.copysign(entity.stats.get_stat("acceleration"), game_vars.player_pos()[0] - entity.rect.centerx)
         # Check if we need to jump
-        if entity.a[0] != 0:
-            if (entity.a[0] < 0 and touching_blocks_x(entity.pos, entity.dim, True)) or \
-                    (entity.a[0] > 0 and touching_blocks_x(entity.pos, entity.dim, False)):
-                entity.v[1] = -12
+        if entity.collisions[0] != 0:
+            entity.v[1] = -entity.stats.get_stat("jump_speed")
 
 
 def jump(entity, follow):
     # If we are on the ground, progress our timer and make sure we aren't moving
-    if touching_blocks_y(entity.pos, entity.dim, False):
+    if entity.collisions[1] == 1:
         entity.a[0], entity.v[0] = 0, 0
         entity.time -= game_vars.dt
         # If we are done waiting, jump
         if entity.time <= 0:
             if follow:
-                entity.a[0] = math.copysign(1, game_vars.player_pos() - entity.rect.centerx)
+                entity.a[0] = math.copysign(entity.stats.get_stat("acceleration"),
+                                            game_vars.player_pos()[0] - entity.rect.centerx)
             else:
-                entity.a[0] = 1 if randint(0, 1) == 0 else -1
-            entity.v[0] = entity.stats.spd[0] * entity.a[0]
-            entity.v[1] = randint(-15, -5)
+                entity.a[0] = entity.stats.get_stat("acceleration") * random_sign()
+            entity.v[0] = math.copysign(entity.stats.get_stat("max_speedx"), entity.a[0])
+            entity.v[1] = -randint(5, entity.stats.get_stat("jump_speed"))
             entity.time = uniform(1, 2)
 
 
 def fly_random(entity):
-    if touching_blocks_y(entity.pos, entity.dim, False):
+    if entity.collisions[1] == 1:
         # Launch off
         entity.a = [0, 0]
-        entity.v[1] = -10
-        entity.time = 500
+        entity.v[1] = -entity.stats.get_stat("jump_speed")
+        entity.time = .5
     else:
         if entity.time > 0:
             entity.time -= game_vars.dt
         if entity.time <= 0:
-            # Random y speed, more likely to go down
-            entity.a[1] = -1 if randint(1, 5) >= 4 else 1
-            # Random x speed
-            entity.a[0] = random_sign()
+            # Random y acceleration, more likely to go down
+            entity.a[1] = entity.stats.get_stat("acceleration") * (-1 if randint(1, 5) >= 4 else 1)
+            # Random x acceleration
+            entity.a[0] = entity.stats.get_stat("acceleration") * random_sign()
             entity.time = uniform(.7, 1.4)
 
 
@@ -82,15 +79,15 @@ def fly_follow(entity):
     # Move towards player when we get to far away from the player
     pos = game_vars.player_pos()
     if entity.a[0] == 0 or abs(entity.rect.centerx - pos[0]) >= 5 * BLOCK_W:
-        entity.a[0] = math.copysign(1, pos[0] - entity.rect.centerx)
+        entity.a[0] = math.copysign(entity.stats.get_stat("acceleration"), pos[0] - entity.rect.centerx)
     if entity.a[1] == 0 or abs(entity.rect.centery - pos[1]) >= 2 * BLOCK_W:
-        entity.a[1] = math.copysign(1, pos[1] - entity.rect.centery)
+        entity.a[1] = math.copysign(entity.stats.get_stat("acceleration"), pos[1] - entity.rect.centery)
 
 
 # Draw all images with the entity going left!!!!
 class Entity:
     def __init__(self, name="No Name", w=1, aggressive=False, rarity=1, img="", sprite="",
-                 stats=Stats()):
+                 stats=Stats(ENEMY_STATS)):
         self.rarity = rarity
         # Stores entity info
         self.name = name
@@ -108,7 +105,7 @@ class Entity:
         # Movement variables
         self.pos = [0., 0.]
         self.v = [0., 0.]
-        self.a = [0, 10]
+        self.a = [0, 20]
         # Direction of image
         self.direction = math.copysign(1, self.v[0])
         self.time = 0
@@ -150,8 +147,9 @@ class Entity:
             if not self.zero_gravity:
                 # Calculate velocity
                 self.v[i] += self.a[i] * dt
-                if abs(self.v[i]) > self.stats.spd[i]:
-                    self.v[i] = math.copysign(self.stats.spd[i], self.v[i])
+                spd = self.stats.get_stat("max_speed" + ("x" if i == 0 else "y"))
+                if abs(self.v[i]) > spd:
+                    self.v[i] = math.copysign(spd, self.v[i])
         if self.direction * self.v[0] < 0:
             self.img = pg.transform.flip(self.img, True, False)
             self.direction *= -1
@@ -171,9 +169,14 @@ class Entity:
                 # If we didn't move the full distance, we hit something
                 if abs(d[i] - prev_d[i]) > ROUND_ERR:
                     self.collisions[i] = math.copysign(1, prev_d[i] - d[i])
-                # If we didn't move, set collision based on acceleration
+                # If we didn't move, check collision based on acceleration
                 elif d[i] == prev_d[i] == 0 and self.a[i] != 0:
-                    self.collisions[i] = math.copysign(1, self.a[i])
+                    truth = self.a[i] < 0
+                    if i == 0:
+                        result = game_vars.touching_blocks_x(self.pos, self.dim, truth)
+                    else:
+                        result = game_vars.touching_blocks_y(self.pos, self.dim, truth)
+                    self.collisions[i] = math.copysign(1, self.a[i]) if result else 0
                 # Update velocity
                 if self.collisions[i] != 0:
                     self.v[i] = 0
@@ -205,7 +208,7 @@ class Entity:
             # Get random drops and drop them
             items = self.get_drops()
             for (item, amnt) in items:
-                game_vars.drop_item(item, amnt, randint(0, 1) == 0, pos_=self.rect.center)
+                game_vars.drop_item(DroppedItem(item, amnt), randint(0, 1) == 0, pos_=self.rect.center)
             return True
         return False
 
@@ -304,9 +307,14 @@ class Projectile:
                 # If we didn't move the full distance, we hit something
                 if abs(d[i] - prev_d[i]) > ROUND_ERR:
                     collision = math.copysign(1, prev_d[i] - d[i])
-                # If we didn't move, set collision based on acceleration
+                # If we didn't move, check collision based on acceleration
                 elif d[i] == prev_d[i] == 0 and self.a[i] != 0:
-                    collision = math.copysign(1, self.a[i])
+                    truth = self.a[i] < 0
+                    if i == 0:
+                        result = game_vars.touching_blocks_x(self.pos, self.dim, truth)
+                    else:
+                        result = game_vars.touching_blocks_y(self.pos, self.dim, truth)
+                    collision = math.copysign(1, self.a[i]) if result else 0
                 # Update velocity
                 if collision != 0:
                     if self.bounce:

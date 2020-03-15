@@ -58,13 +58,19 @@ def load_fonts():
     ui_font = get_scaled_font(-1, INV_W * 2 // 5, "|")
 
 
+# TODO: Fix resizing (see inventory)
 def resize(w, h):
     pg.display.set_mode((max(w, MIN_W), max(h, MIN_H)), pg.RESIZABLE).fill(BACKGROUND)
 
 
 # Returns angle from start to end
-def get_angle(start, end):
+# Note: pixel angle and -sin = normal angle and +sin
+# In other words, you don't need to get the pixel angle for trig, just if the angle has other meaning
+def get_angle(start, end, pixels=False):
     dx, dy = end[0] - start[0], end[1] - start[1]
+    # Flip y for pixel coordinates
+    if pixels:
+        dy *= -1
     r = math.sqrt(dx * dx + dy * dy)
     if r == 0:
         return 0

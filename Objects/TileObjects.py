@@ -144,6 +144,19 @@ class WorkTable(CraftingStation):
                 [[i.SNOW_BALL, 1]]]
 
 
+class Forge(CraftingStation):
+    def __init__(self):
+        super().__init__(t.FORGE, dim=(1, 2), img=INV + "forge/")
+        self.on_surface = True
+        self.map_color = (99, 99, 99)
+        self.add_drop(i.FORGE, 1)
+        self.hardness = 1
+
+    def get_recipes(self):
+        return [[[i.IRON_BAR, 1], [i.IRON_ORE, 2]],
+                [[i.GOLD_BAR, 1], [i.GOLD_ORE, 2]]]
+
+
 # Spawners
 class CatSpawner(SpawnTile):
     def __init__(self):
@@ -198,11 +211,6 @@ class DimensionHopper(FunctionalTile):
             self.on_resize()
 
         def process_events(self, events, mouse, keys):
-            for e in events:
-                if e.type == KEYUP and e.key == K_ESCAPE:
-                    events.remove(e)
-                    game_vars.set_active_ui(None)
-                    return
             if self.selector.handle_events(events):
                 game_vars.set_active_ui(None)
 
@@ -251,9 +259,9 @@ class WorldBuilder(FunctionalTile):
             self.name = c.WorldFile(game_vars.universe())
             self.cursor = False
             # Load inventories
-            invs = {self.BIOME: Inventory((2, 2), max_stack=1, items_list=game_vars.biomes.keys()),
-                    self.STRUCTURE: Inventory((1, 1), max_stack=4, items_list=[i.BONUS_STRUCTURE]),
-                    self.SIZE: Inventory((1, 1), max_stack=1, items_list=WorldGenerator.WORLD_DIMS.keys())}
+            invs = {self.BIOME: Inventory((2, 2), max_stack=1, whitelist=game_vars.biomes.keys()),
+                    self.STRUCTURE: Inventory((1, 1), max_stack=4, whitelist=[i.BONUS_STRUCTURE]),
+                    self.SIZE: Inventory((1, 1), max_stack=1, whitelist=WorldGenerator.WORLD_DIMS.keys())}
             for idx in self.INV_ORDER:
                 data = invs[idx].load(data)
             # Set text height
@@ -344,9 +352,6 @@ class WorldBuilder(FunctionalTile):
                             self.ui.blit(inv.surface, inv.rect)
                             game_vars.write_block_data(self.block_pos, self.data)
                             break
-            if keys[K_ESCAPE]:
-                game_vars.set_active_ui(None)
-                keys[K_ESCAPE] = False
             for e in events:
                 if e.type == KEYDOWN:
                     self.name.type_char(e)
@@ -413,9 +418,6 @@ class Chest(FunctionalTile):
                     elif mouse[BUTTON_RIGHT - 1]:
                         self.invs[0].right_click(pos)
                     game_vars.write_block_data(self.block_pos, self.invs[0].write())
-            if keys[K_ESCAPE]:
-                game_vars.set_active_ui(None)
-                keys[K_ESCAPE] = False
 
 
 class Crusher(FunctionalTile):
@@ -437,8 +439,8 @@ class Crusher(FunctionalTile):
                 # Drop contents
                 from random import choice
                 item = int.from_bytes(data[2:4], byteorder)
-                game_vars.player.drop_item(DroppedItem(item, amnt), choice([True, False]),
-                                           [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
+                game_vars.drop_item(DroppedItem(item, amnt), choice([True, False]),
+                                    [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
         game_vars.write_block_data(pos, None)
         return True
 
@@ -464,7 +466,7 @@ class Crusher(FunctionalTile):
             s = pg.Surface((w, c.INV_W * 2))
             s.blit(text, self.text_rect)
             # This is where we will take/add items
-            inventory = Inventory((1, 1), items_list=self.ITEMS, max_stack=9)
+            inventory = Inventory((1, 1), whitelist=self.ITEMS, max_stack=9)
             inventory.rect = pg.Rect((w - c.INV_W) // 2, 0, c.INV_W, c.INV_W)
             inventory.load(data)
             s.blit(inventory.surface, inventory.rect)
@@ -475,6 +477,9 @@ class Crusher(FunctionalTile):
 
         def on_resize(self):
             self.rect.center = pg.display.get_surface().get_rect().center
+
+        def save(self):
+            game_vars.write_block_data(self.block_pos, self.invs[0].write())
 
         def process_events(self, events, mouse, keys):
             pos = pg.mouse.get_pos()
@@ -501,9 +506,9 @@ class Crusher(FunctionalTile):
                             # Make sure we don't drop more than max stack
                             while amnt > 0:
                                 transfer = min(max_stack, amnt)
-                                game_vars.drop_item(idx, transfer, choice([True, False]), block_pos)
+                                game_vars.drop_item(DroppedItem(idx, transfer), choice([True, False]), block_pos)
                                 amnt -= transfer
-                        game_vars.write_block_data(self.block_pos, self.invs[0].write())
+                        self.save()
                         self.invs[0].update_item(0, 0)
 
                 if game_vars.player.use_time <= 0 and self.invs[0].rect.collidepoint(*pos):
@@ -512,11 +517,159 @@ class Crusher(FunctionalTile):
                         self.invs[0].left_click(pos)
                     elif mouse[BUTTON_RIGHT - 1]:
                         self.invs[0].right_click(pos)
-                    game_vars.write_block_data(self.block_pos, self.invs[0].write())
+                    self.save()
 
                 self.ui.fill((0, 0, 0), self.invs[0].rect)
                 self.ui.blit(self.invs[0].surface, self.invs[0].rect)
 
-            if keys[K_ESCAPE]:
-                game_vars.write_block_data(self.block_pos, self.invs[0].write())
-                game_vars.set_active_ui(None)
+
+class UpgradeStation(FunctionalTile):
+    def __init__(self):
+        super().__init__(t.UPGRADE_STATION, img="")
+        self.on_surface = True
+        self.add_drop(i.UPGRADE_STATION, 1)
+        self.map_color = (200, 0, 200)
+        self.hardness = 0
+
+    def on_place(self, pos):
+        game_vars.write_block_data(pos, bytearray(4))
+
+    def activate(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data is not None:
+            game_vars.set_active_ui(self.UI(pos, data))
+            if not game_vars.player.inventory.open:
+                game_vars.player.inventory.toggle()
+
+    class UI(ActiveUI):
+        WHITELIST = (i.HELMET, i.CHESTPLATE, i.LEGGINGS, i.BOOTS)
+
+        def __init__(self, pos, data):
+            rect = pg.Rect(0, 0, c.MIN_W // 2, c.MIN_H // 2)
+            super().__init__(pg.Surface(rect.size), rect, pos=pos)
+            self.on_resize()
+
+            # Set up inventory for item
+            self.invs["Item"] = Inventory((1, 1), whitelist=self.WHITELIST, max_stack=1)
+            self.invs["Item"].rect.move_ip((self.rect.w - c.INV_W) // 2, c.INV_W // 2)
+            self.invs["Item"].load(data)
+            # Set up upgrade section with offsets, rect, and surface
+            self.dragging = self.can_click = False
+            self.off_x = self.off_y = 0
+            self.max_x = self.max_y = 0
+            y = self.invs["Item"].rect.bottom
+            self.tree_r = pg.Rect(0, y, self.rect.w, self.rect.h - y)
+            self.upgrade_tree = self.tree_s = None
+            # Load the data
+            self.load_tree()
+
+        def on_resize(self):
+            # TODO: smart fit to inventory
+            self.rect.center = pg.display.get_surface().get_rect().center
+
+        def draw(self):
+            super().draw()
+            # Check for hovering over upgrade tree
+            if self.upgrade_tree:
+                pos = pg.mouse.get_pos()
+                if self.rect.collidepoint(*pos):
+                    pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                    if self.tree_r.collidepoint(*pos):
+                        pos = [pos[0] - self.tree_r.x + self.off_x, pos[1] - self.tree_r.y + self.off_y]
+                        self.upgrade_tree.check_hover(pos)
+
+        def save(self):
+            if self.upgrade_tree:
+                self.invs["Item"].inv_data[(0, 0)] = self.upgrade_tree.write()
+            game_vars.write_block_data(self.block_pos, self.invs["Item"].write())
+
+        def draw_inventory(self):
+            self.ui.fill((0, 0, 0), self.invs["Item"].rect)
+            self.ui.blit(self.invs["Item"].surface, self.invs["Item"].rect)
+
+        def draw_tree(self):
+            self.ui.fill((0, 0, 0), self.tree_r)
+            if self.tree_s:
+                self.ui.blit(self.tree_s, self.tree_r, area=((self.off_x, self.off_y), self.tree_r.size))
+
+        def load_tree(self):
+            data = self.invs["Item"].inv_data.get((0, 0))
+            item = self.invs["Item"].inv_items[0][0]
+            if data and item != -1:
+                # Draw upgrade tree and get surface dimensions
+                self.upgrade_tree = game_vars.items[item].upgrade_tree
+                self.upgrade_tree.load(data)
+                self.tree_s = self.upgrade_tree.get_surface()
+                s_dim = self.tree_s.get_size()
+                # Readjust rectangle
+                y = self.invs["Item"].rect.bottom
+                self.tree_r = pg.Rect(0, y, min(self.rect.w, s_dim[0]), min(self.rect.h - y, s_dim[1]))
+                self.tree_r.centerx = self.rect.w // 2
+                # Update max scroll and current scroll
+                self.max_x = max(0, s_dim[0] - self.tree_r.w)
+                self.off_x = self.max_x // 2
+                self.max_y = max(0, s_dim[1] - self.tree_r.h)
+                self.off_y = 0
+            else:
+                self.tree_s = None
+            # Draw upgrade tree to ui surface
+            self.draw_tree()
+            self.draw_inventory()
+
+        def process_events(self, events, mouse, keys):
+            # Drag upgrade screen
+            if self.dragging and mouse[BUTTON_LEFT - 1]:
+                if game_vars.d_mouse.count(0) != 2:
+                    self.can_click = False
+                self.off_x -= game_vars.d_mouse[0]
+                self.off_x = min(max(0, self.off_x), self.max_x)
+                self.off_y -= game_vars.d_mouse[1]
+                self.off_y = min(max(0, self.off_y), self.max_y)
+                self.draw_tree()
+            pos = pg.mouse.get_pos()
+            if self.rect.collidepoint(*pos):
+                pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                # Process events
+                for e in events:
+                    # Start dragging
+                    if e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT:
+                        self.can_click = True
+                        if self.tree_r.collidepoint(*pos):
+                            self.dragging = True
+                    elif e.type == MOUSEBUTTONUP:
+                        if e.button == BUTTON_LEFT:
+                            self.dragging = False
+                            if self.can_click:
+                                # Inventory left click, check for change in item
+                                if self.invs["Item"].rect.collidepoint(*pos):
+                                    # Save whatever data we have to the item (not the block!)
+                                    prev = self.upgrade_tree.write() if self.upgrade_tree else None
+                                    self.invs["Item"].set_data_at(0, 0, data=prev)
+                                    # Do the left click
+                                    pos = [pos[0] - self.invs["Item"].rect.x, pos[1] - self.invs["Item"].rect.y]
+                                    self.invs["Item"].left_click(pos)
+                                    # Check if we now have new item data
+                                    new = self.invs["Item"].inv_data.get((0, 0))
+                                    if prev != new:
+                                        if new is None:
+                                            self.upgrade_tree = None
+                                        self.load_tree()
+                                        self.save()
+                                    self.draw_inventory()
+                                # Click on upgrade screen
+                                elif self.tree_r.collidepoint(*pos) and self.upgrade_tree:
+                                    pos = [pos[0] - self.tree_r.x + self.off_x, pos[1] - self.tree_r.y + self.off_y]
+                                    if self.upgrade_tree.click(pos):
+                                        self.tree_s = self.upgrade_tree.get_surface()
+                                        self.draw_tree()
+                                    self.save()
+                        elif e.button == BUTTON_RIGHT:
+                            # Right click inventory and check for change in item
+                            if self.invs["Item"].rect.collidepoint(*pos):
+                                self.save()
+                                prev = self.invs["Item"].inv_data.get((0, 0))
+                                pos = [pos[0] - self.invs["Item"].rect.x, pos[1] - self.invs["Item"].rect.y]
+                                self.invs["Item"].right_click(pos)
+                                if prev != self.invs["Item"].inv_data.get((0, 0)):
+                                    self.load_tree()
+                                self.draw_inventory()

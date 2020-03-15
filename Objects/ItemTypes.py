@@ -1,6 +1,6 @@
 # Created on 4 December 2019
 # Defines specific types of items
-
+from sys import byteorder
 from os.path import isfile, isdir
 import math
 import pygame as pg
@@ -8,6 +8,7 @@ from Tools.constants import ITEM_W, INV_IMG_W, scale_to_fit
 from Tools.collision import Polygon
 from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
+from Player.Stats import Stats, TOOL_STATS, WEAPON_STATS
 
 
 class Item:
@@ -102,6 +103,10 @@ class Item:
                     p[1] += tool_c[1] + rect.y
                 self.polygon = Polygon([a, b, c, d])
 
+    # Returns data for a new item
+    def new(self):
+        pass
+
     # Override this for special functionality and custom item consumption
     def on_left_click(self):
         if self.consumable:
@@ -187,6 +192,7 @@ class Block(Item):
             game_vars.player.inventory.use_item()
 
 
+# TODO: Weapon/Tool stats
 class Weapon(Item):
     def __init__(self, idx, damage=1, damage_type=0, projectiles=(), **kwargs):
         Item.__init__(self, idx, **kwargs)
@@ -196,11 +202,29 @@ class Weapon(Item):
         self.damage_type = damage_type
         self.projectiles = projectiles
         self.max_stack = 1
-        self.power = 1
         # Get inventory image
         from pygame.transform import scale, rotate
         from Tools.constants import INV_IMG_W
         self.inv_img = scale(rotate(self.image, 45), (INV_IMG_W, INV_IMG_W))
+        self.stats = Stats(WEAPON_STATS)
+
+    def on_left_click(self):
+        if self.consumable:
+            game_vars.player.inventory.use_item()
+
+    def get_full_description(self, data):
+        text = super().get_full_description(data)
+        # Add damage string
+        text.insert(1, "{} Damage".format(self.damage))
+        return text
+
+
+class Tool(Weapon):
+    def __init__(self, idx, power=1, **kwargs):
+        super().__init__(idx, **kwargs)
+        self.power = power
+        self.breaks_blocks = True
+        self.stats = Stats(TOOL_STATS)
 
     def on_left_click(self):
         pos = game_vars.global_mouse_pos(blocks=True)
@@ -211,11 +235,20 @@ class Weapon(Item):
         elif self.consumable:
             game_vars.player.inventory.use_item()
 
-    def get_full_description(self, data):
-        text = super().get_full_description(data)
-        # Add damage string
-        text.insert(1, "{} Damage".format(self.damage))
-        return text
+
+class Armor(Item):
+    def __init__(self, idx, upgrade_tree, **kwargs):
+        super().__init__(idx, **kwargs)
+        self.upgrade_tree = upgrade_tree
+        self.max_stack = 1
+        self.has_data = True
+
+    def load_stats(self, stats, data):
+        self.upgrade_tree.load(data)
+        self.upgrade_tree.apply(stats)
+
+    def new(self):
+        return self.upgrade_tree.new_tree()
 
 
 def rotate_point(p, d_theta):

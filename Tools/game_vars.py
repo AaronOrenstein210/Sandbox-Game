@@ -20,6 +20,8 @@ animations = []
 world = handler = player = None
 # Game time and time since last update (seconds)
 game_time = dt = 0
+# Change in mouse pos since last update
+d_mouse = [0, 0]
 # Damage text boxes ([surface, rect, timer])
 dmg_text = []
 
@@ -55,9 +57,10 @@ def init():
 
 def tick():
     # Update game time and get time since last tick
-    global game_time, dt
+    global game_time, dt, d_mouse
     dt = time() - game_time
     game_time = time()
+    d_mouse = pg.mouse.get_rel()
 
     # Check events
     events = pg.event.get()
@@ -200,7 +203,8 @@ def break_block(x, y):
                 for drop in drops:
                     if drop[1] > 0:
                         # Drop an item
-                        drop_item(*drop, None, pos_=block_rect.center)
+                        from Objects.DroppedItem import DroppedItem
+                        drop_item(DroppedItem(*drop), None, pos_=block_rect.center)
                 return True
     return False
 
@@ -221,13 +225,12 @@ def place_block(x, y, idx):
 # Functions that affect the entity handler object
 # Drops an item - input position in pixels
 #               - left = None drops the item straight down
-def drop_item(item, amnt, left, pos_=None):
+def drop_item(drop, left, pos_=None):
     from Objects.DroppedItem import DroppedItem
     if pos_ is None:
         pos_ = player.rect.center
-    item_obj = DroppedItem(item, amnt)
-    item_obj.drop(pos_, left)
-    handler.items.append(item_obj)
+    drop.drop(pos_, left)
+    handler.items.append(drop)
 
 
 # Spawns an enemy

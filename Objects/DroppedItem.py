@@ -10,9 +10,14 @@ X_SPEED = 15
 
 
 class DroppedItem:
-    def __init__(self, item_id, amnt):
+    def __init__(self, item_id, amnt, data=None):
         self.idx = item_id
         self.item = game_vars.items[item_id]
+        # If the item has data but we got none, get default item data
+        if self.item.has_data and data is None:
+            self.data = self.item.new()
+        else:
+            self.data = data
         self.max_stack = self.item.max_stack
         self.amnt = amnt
         self.rect = pg.Rect((0, 0), self.item.image.get_size())
