@@ -50,6 +50,10 @@ WLD = "save/universe/"
 # Inventory font, Loading screen font, UI font
 inv_font = load_font = ui_font = None
 
+# Screen width, height, and center
+screen_w = screen_h = 0
+screen_center = [MIN_W // 2, MIN_H // 2]
+
 
 def load_fonts():
     global inv_font, load_font, ui_font
@@ -58,9 +62,18 @@ def load_fonts():
     ui_font = get_scaled_font(-1, INV_W * 2 // 5, "|")
 
 
-# TODO: Fix resizing (see inventory)
+def load_image(file, w, h):
+    if isfile(file) and (file.endswith(".png") or file.endswith(".jpg")):
+        return scale_to_fit(pg.image.load(file), w=w, h=h)
+    else:
+        return pg.Surface((w, h))
+
+
 def resize(w, h):
-    pg.display.set_mode((max(w, MIN_W), max(h, MIN_H)), pg.RESIZABLE).fill(BACKGROUND)
+    global screen_w, screen_h, screen_center
+    screen_w, screen_h = max(w, MIN_W), max(h, MIN_H)
+    # Set the new screen dimensions and get screen center
+    screen_center = pg.display.set_mode((screen_w, screen_h), pg.RESIZABLE).fill(BACKGROUND).center
 
 
 # Returns angle from start to end

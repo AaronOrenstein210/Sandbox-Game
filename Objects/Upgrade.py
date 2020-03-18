@@ -328,17 +328,16 @@ class Upgrade:
             s.blit(text_s, text_rect)
         # Draw the description at the mouse location
         mouse_pos = pg.mouse.get_pos()
-        screen_dim = pg.display.get_surface().get_size()
         rect = s.get_rect(topleft=mouse_pos)
         # Make sure it isn't going off the right screen edge
-        if rect.right > screen_dim[0]:
+        if rect.right > c.screen_w:
             rect.right = mouse_pos[0]
             # Don't move it so much that it goes to the left of the screen
             if rect.left < 0:
                 rect.left = 0
         # Make sure it isn't going off the bottom of the screen
-        if rect.bottom > screen_dim[1]:
-            rect.bottom = screen_dim[1]
+        if rect.bottom > c.screen_h:
+            rect.bottom = mouse_pos[1]
             # Don't move it so much that it goes above the screen
             if rect.top < 0:
                 rect.top = 0

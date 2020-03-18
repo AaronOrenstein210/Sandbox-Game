@@ -147,7 +147,7 @@ def world_dim():
 # Returns position of mouse with respect to the entire world
 def global_mouse_pos(blocks=False):
     pos = pg.mouse.get_pos()
-    screen_c = pg.display.get_surface().get_rect().center
+    screen_c = c.screen_center
     world_c = player.rect.center
     if blocks:
         return [(pos[i] + world_c[i] - screen_c[i]) // BLOCK_W for i in range(2)]
@@ -270,11 +270,6 @@ def player_topleft(in_blocks=False):
         return [p / BLOCK_W for p in player.pos]
 
 
-# Sets player's active ui
-def set_active_ui(ui):
-    player.active_ui = ui
-
-
 # Sets the item data for the current held item
 def set_current_item_data(data):
     player.inventory.set_item_data(data)
@@ -282,7 +277,7 @@ def set_current_item_data(data):
 
 # Gets the item data for the current held item
 def get_current_item_data():
-    return player.inventory.get_item_data()
+    return player.inventory.get_held_data()
 
 
 # Functions that check the world blocks

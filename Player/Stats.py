@@ -2,7 +2,7 @@
 # Defines functions and variables for the stats class
 
 ENEMY_STATS = ["damage", "hp", "defense", "max_speedx", "max_speedy", "jump_speed", "acceleration"]
-WEAPON_STATS = ["damage", "crit_chance", "crit_damage", "use_speed", "knockback"]
+WEAPON_STATS = ["damage", "crit_chance", "crit_damage", "use_time", "knockback"]
 TOOL_STATS = WEAPON_STATS + ["power"]
 # Combine above and remove duplicates
 STATS = list(dict.fromkeys(TOOL_STATS + ENEMY_STATS).keys())
@@ -19,26 +19,31 @@ class Stats:
         self.base = {k: 0 for k in stats_list}
         self.add, self.multi = self.base.copy(), self.base.copy()
         self.base.update(kwargs)
-        # Other stats objects to add to this one
+        # Other stats objects to always add to this one
         self.other_stats = []
         # Current hp
         self.hp = self.get_stat("hp")
 
-    def get_stat(self, stat):
-        arr = [s for s in self.other_stats + [self] if stat in s.base.keys()]
+    # Gets a specified stats, optional add additional stat objects
+    def get_stat(self, stat, other_stats=()):
+        arr = [s for s in [self] + list(other_stats) if stat in s.base.keys()]
+        for s1 in arr:
+            arr += [s2 for s2 in s1.other_stats if s2 not in arr and stat in s2.base.keys()]
         base = sum(s.base[stat] for s in arr)
         multi = sum((s.multi[stat] for s in arr), 1)
         add = sum(s.add[stat] for s in arr)
         return base * multi + add
 
     def add_stats(self, stats):
-        self.other_stats.append(stats)
+        if stats not in self.other_stats:
+            self.other_stats.append(stats)
 
     def remove_stats(self, stats):
         if stats in self.other_stats:
             self.other_stats.remove(stats)
 
     def reset(self):
+        self.other_stats.clear()
         for key in self.base.keys():
             self.base[key] = self.add[key] = self.multi[key] = 0
 

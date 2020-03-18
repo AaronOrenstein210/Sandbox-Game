@@ -66,6 +66,23 @@ class World:
                 self.save_progress = 0
                 self.next_save = 30
                 game_vars.player.write()
+        # Update every animation
+        for a in game_vars.animations:
+            a.update()
+        from Tools.constants import BLOCK_W
+        rect = self.get_screen_rect(game_vars.player_pos())
+        xmin, xmax = rect.left // BLOCK_W, rect.right // BLOCK_W
+        ymin, ymax = rect.top // BLOCK_W, rect.bottom // BLOCK_W
+        # Multiblocks whose topleft is off screen won't update
+        # Go through all x/y and check if x+w is on screen (same for y)
+        for x in self.animations.keys():
+            if xmin <= x <= xmax:
+                for y in self.animations[x].keys():
+                    if ymin <= y <= ymax:
+                        img = game_vars.tiles[self.blocks[y][x]].get_block_img(c.get_from_dict(x, y, self.block_data))
+                        img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
+                        pg.draw.rect(self.surface, SRCALPHA, img_rect)
+                        self.surface.blit(img, img_rect)
 
     def change_file(self, world_file):
         # File variables
@@ -131,13 +148,13 @@ class World:
                         for dc in range(tile.dim[0]):
                             self.blocks[row + dr][col + dc] = -(dc * 100 + dr)
                     self.blocks[row][col] = val
-                # Otherwise, it is either a single block, or a vertical multiblock
+                # Otherwise, it is either a single block or a vertical multiblock
                 else:
-                    # Save single block
+                    # Load single block (top left)
                     self.blocks[row][col:col + num] = [val] * num
-                    # Save vertical multiblock
+                    # Load vertical multiblock
                     for i in range(1, tile.dim[1]):
-                        self.blocks[row:row + i, col + num] = [-i] * num
+                        self.blocks[row + i, col:col + num] = [-i] * num
                 # Loop through every block
                 for col1 in range(col, col + num):
                     # Add the block to applicable lists
@@ -295,24 +312,6 @@ class World:
 
     # Draws blocks
     def draw_blocks(self, rect):
-        # Update every animation
-        for a in game_vars.animations:
-            a.update()
-        from Tools.constants import BLOCK_W
-        xmin, xmax = rect.left // BLOCK_W, rect.right // BLOCK_W
-        ymin, ymax = rect.top // BLOCK_W, rect.bottom // BLOCK_W
-        # Multiblocks whose topleft is off screen won't update
-        # Go through all x/y and check if x+w is on screen (same for y)
-        for x in self.animations.keys():
-            if xmin <= x <= xmax:
-                for y in self.animations[x].keys():
-                    if ymin <= y <= ymax:
-                        anim = game_vars.animations[self.animations[x][y]]
-                        img = anim.get_frame()
-                        img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
-                        pg.draw.rect(self.surface, SRCALPHA, img_rect)
-                        self.surface.blit(anim.get_frame(), img_rect)
-
         # Draw sky and blocks
         d = pg.display.get_surface()
         d.blit(self.surface, (0, 0), area=rect)

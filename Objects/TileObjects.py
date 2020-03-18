@@ -5,7 +5,9 @@ from random import choice
 from pygame.locals import *
 from Objects.TileTypes import *
 from Objects.DroppedItem import DroppedItem
-from Objects import INV
+from Objects.ItemTypes import Upgradable
+from Objects.Animation import Animation, OscillateAnimation
+from Objects import INV, PROJ
 from NPCs import Mobs as mobs
 from Player.ActiveUI import ActiveUI
 from Player.Inventory import Inventory
@@ -146,11 +148,12 @@ class WorkTable(CraftingStation):
 
 class Forge(CraftingStation):
     def __init__(self):
-        super().__init__(t.FORGE, dim=(1, 2), img=INV + "forge/")
+        super().__init__(t.FORGE, dim=(1, 2))
         self.on_surface = True
         self.map_color = (99, 99, 99)
         self.add_drop(i.FORGE, 1)
         self.hardness = 1
+        self.set_animation(Animation(INV + "forge/", [d * BLOCK_W for d in self.dim], .25))
 
     def get_recipes(self):
         return [[[i.IRON_BAR, 1], [i.IRON_ORE, 2]],
@@ -200,7 +203,7 @@ class DimensionHopper(FunctionalTile):
         self.hardness = 2
 
     def activate(self, pos):
-        game_vars.set_active_ui(self.UI(pos))
+        game_vars.player.set_active_ui(self.UI(pos))
 
     class UI(ActiveUI):
         def __init__(self, pos):
@@ -212,11 +215,11 @@ class DimensionHopper(FunctionalTile):
 
         def process_events(self, events, mouse, keys):
             if self.selector.handle_events(events):
-                game_vars.set_active_ui(None)
+                game_vars.player.set_active_ui(None)
 
         def on_resize(self):
             r = pg.Rect(0, 0, c.MIN_W // 2, c.MIN_H * 3 // 4)
-            r.center = pg.display.get_surface().get_rect().center
+            r.center = c.screen_center
             self.selector.resize(rect=r)
             self.ui, self.rect = self.selector.get_surface(), self.selector.get_rect()
 
@@ -225,16 +228,17 @@ class WorldBuilder(FunctionalTile):
     INV_SPOTS = 6
 
     def __init__(self):
-        super().__init__(t.WORLD_BUILDER, img=INV + "world_builder/")
+        super().__init__(t.WORLD_BUILDER)
         self.on_surface = True
         self.add_drop(i.WORLD_BUILDER, 1)
         self.map_color = (0, 0, 0)
         self.hardness = 1
+        self.set_animation(Animation(INV + "world_builder/", [d * BLOCK_W for d in self.dim], .25))
 
     def activate(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            game_vars.set_active_ui(self.UI(pos, data))
+            game_vars.player.set_active_ui(self.UI(pos, data))
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
@@ -243,7 +247,7 @@ class WorldBuilder(FunctionalTile):
     def on_break(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            # Check if we have any i
+            # Check if we have any items
             for byte in data:
                 if byte != 0:
                     return False
@@ -303,7 +307,7 @@ class WorldBuilder(FunctionalTile):
             for surface, rect in surfaces:
                 s.blit(surface, rect)
             super().__init__(s, s.get_rect(), pos=pos, invs=invs)
-            self.on_resize()
+            self.rect.center = c.screen_center
 
             if not game_vars.player.inventory.open:
                 game_vars.player.inventory.toggle()
@@ -338,7 +342,7 @@ class WorldBuilder(FunctionalTile):
                                 del new
                                 from Player.Inventory import new_inventory
                                 game_vars.write_block_data(self.block_pos, new_inventory((1, WorldBuilder.INV_SPOTS)))
-                                game_vars.set_active_ui(None)
+                                game_vars.player.set_active_ui(None)
                 # Clicked inventories
                 else:
                     for inv in self.invs.values():
@@ -363,9 +367,6 @@ class WorldBuilder(FunctionalTile):
             text_rect = text.get_rect(center=self.name_rect.center)
             self.ui.fill((0, 0, 0), self.name_rect)
             self.ui.blit(text, text_rect)
-
-        def on_resize(self):
-            self.rect.center = pg.display.get_surface().get_rect().center
 
 
 class Chest(FunctionalTile):
@@ -396,13 +397,14 @@ class Chest(FunctionalTile):
     def activate(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            game_vars.set_active_ui(self.UI(pos, data))
+            game_vars.player.set_active_ui(self.UI(pos, data))
 
     class UI(ActiveUI):
         def __init__(self, pos, data):
             inventory = Inventory(Chest.INV_DIM)
             ActiveUI.__init__(self, inventory.surface, inventory.rect.move(0, inventory.rect.h),
                               pos=pos, invs={0: inventory})
+            self.can_drag = False
             self.invs[0].load(data)
 
             if not game_vars.player.inventory.open:
@@ -422,11 +424,12 @@ class Chest(FunctionalTile):
 
 class Crusher(FunctionalTile):
     def __init__(self):
-        super().__init__(t.CRUSHER, img=INV + "crusher/", dim=(2, 2))
+        super().__init__(t.CRUSHER, dim=(2, 2))
         self.on_surface = True
         self.add_drop(i.CRUSHER, 1)
         self.map_color = (64, 64, 64)
         self.hardness = 1
+        self.set_animation(Animation(INV + "crusher/", [d * BLOCK_W for d in self.dim], .25))
 
     def on_place(self, pos):
         game_vars.write_block_data(pos, bytearray(4))
@@ -447,7 +450,7 @@ class Crusher(FunctionalTile):
     def activate(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            game_vars.set_active_ui(self.UI(pos, data, 9))
+            game_vars.player.set_active_ui(self.UI(pos, data, 9))
             if not game_vars.player.inventory.open:
                 game_vars.player.inventory.toggle()
 
@@ -473,10 +476,7 @@ class Crusher(FunctionalTile):
 
             ActiveUI.__init__(self, s, s.get_rect(), pos=pos, invs={0: inventory})
 
-            self.on_resize()
-
-        def on_resize(self):
-            self.rect.center = pg.display.get_surface().get_rect().center
+            self.rect.center = c.screen_center
 
         def save(self):
             game_vars.write_block_data(self.block_pos, self.invs[0].write())
@@ -525,32 +525,51 @@ class Crusher(FunctionalTile):
 
 class UpgradeStation(FunctionalTile):
     def __init__(self):
-        super().__init__(t.UPGRADE_STATION, img="")
+        super().__init__(t.UPGRADE_STATION, img=INV + "upgrade_station.png", dim=(1, 2))
         self.on_surface = True
         self.add_drop(i.UPGRADE_STATION, 1)
         self.map_color = (200, 0, 200)
         self.hardness = 0
+        self.set_animation(self.Anim(self.image))
+
+    def get_block_img(self, data):
+        if data and len(data) >= 4:
+            amnt = int.from_bytes(data[:2], byteorder)
+            if amnt != 0:
+                item = int.from_bytes(data[2:4], byteorder)
+                return game_vars.animations[self.anim_idx].get_frame(img=game_vars.items[item].inv_img)
+        return game_vars.animations[self.anim_idx].get_frame()
 
     def on_place(self, pos):
         game_vars.write_block_data(pos, bytearray(4))
 
+    def on_break(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data:
+            inv = Inventory((1, 1))
+            inv.load(data)
+            item, amnt, data = inv.inv_items[0][0], inv.inv_amnts[0][0], inv.inv_data.get((0, 0))
+            if amnt != 0:
+                game_vars.drop_item(DroppedItem(item, amnt, data=data), c.random_sign(), [p * BLOCK_W for p in pos])
+        game_vars.write_block_data(pos, None)
+        return True
+
     def activate(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            game_vars.set_active_ui(self.UI(pos, data))
+            game_vars.player.set_active_ui(self.UI(pos, data))
             if not game_vars.player.inventory.open:
                 game_vars.player.inventory.toggle()
 
     class UI(ActiveUI):
-        WHITELIST = (i.HELMET, i.CHESTPLATE, i.LEGGINGS, i.BOOTS)
-
         def __init__(self, pos, data):
             rect = pg.Rect(0, 0, c.MIN_W // 2, c.MIN_H // 2)
+            rect.center = c.screen_center
             super().__init__(pg.Surface(rect.size), rect, pos=pos)
-            self.on_resize()
 
             # Set up inventory for item
-            self.invs["Item"] = Inventory((1, 1), whitelist=self.WHITELIST, max_stack=1)
+            whitelist = [item_id for item_id, item in game_vars.items.items() if isinstance(item, Upgradable)]
+            self.invs["Item"] = Inventory((1, 1), whitelist=whitelist, max_stack=1)
             self.invs["Item"].rect.move_ip((self.rect.w - c.INV_W) // 2, c.INV_W // 2)
             self.invs["Item"].load(data)
             # Set up upgrade section with offsets, rect, and surface
@@ -562,10 +581,6 @@ class UpgradeStation(FunctionalTile):
             self.upgrade_tree = self.tree_s = None
             # Load the data
             self.load_tree()
-
-        def on_resize(self):
-            # TODO: smart fit to inventory
-            self.rect.center = pg.display.get_surface().get_rect().center
 
         def draw(self):
             super().draw()
@@ -673,3 +688,40 @@ class UpgradeStation(FunctionalTile):
                                 if prev != self.invs["Item"].inv_data.get((0, 0)):
                                     self.load_tree()
                                 self.draw_inventory()
+
+    class Anim(Animation):
+        def __init__(self, img):
+            super().__init__("", [0, 0])
+            dim = img.get_size()
+            # Set background image
+            self.background = img
+            # Set up default floating item
+            img_w = min(dim[0], dim[1] // 2)
+            self.def_img = c.load_image(PROJ + "fire_ball.png", img_w, img_w)
+            # Calculate float bounds
+            self.min_y, self.max_y = dim[1] // 4, dim[1] // 2
+            self.x, self.y = dim[0] // 2, self.max_y
+            self.going_up = True
+
+        def update(self):
+            dy = (self.max_y - self.min_y) * game_vars.dt / .75
+            if self.going_up:
+                self.y -= dy
+                if self.y <= self.min_y:
+                    self.y = self.min_y
+                    self.going_up = False
+            else:
+                self.y += dy
+                if self.y >= self.max_y:
+                    self.y = self.max_y
+                    self.going_up = True
+
+        def get_frame(self, img=None):
+            if not img:
+                img = self.def_img
+            else:
+                w, h = self.def_img.get_size()
+                img = c.scale_to_fit(img, w=w, h=h)
+            result = self.background.copy()
+            result.blit(img, img.get_rect(center=(self.x, self.y)))
+            return result

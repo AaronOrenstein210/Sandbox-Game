@@ -9,11 +9,10 @@ from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
 from Objects import INV
 from Objects.ItemTypes import Block
-from Objects.Animation import Animation
 
 
 class Tile:
-    def __init__(self, idx, img="", dim=(1, 1), anim_delay=.25):
+    def __init__(self, idx, img="", dim=(1, 1)):
         self.idx = idx
         self.dim = dim
 
@@ -44,10 +43,6 @@ class Tile:
         img_dim = (BLOCK_W * dim[0], BLOCK_W * dim[1])
         if isfile(img) and img.endswith(".png") or img.endswith(".jpg"):
             self.image = scale_to_fit(pg.image.load(img), *img_dim)
-        elif isdir(img):
-            self.anim_idx = len(game_vars.animations)
-            game_vars.animations.append(Animation(img, img_dim, delay=anim_delay))
-            self.image = game_vars.animations[-1].frames[0]
         else:
             self.image = pg.Surface(img_dim)
 
@@ -59,9 +54,16 @@ class Tile:
         # Add tile to list
         game_vars.tiles[self.idx] = self
 
-    # Return Animation object if tile has animation
-    def get_animation(self):
-        pass
+    def set_animation(self, animation):
+        self.anim_idx = len(game_vars.animations)
+        game_vars.animations.append(animation)
+        self.image = animation.get_frame()
+
+    # Return block image
+    def get_block_img(self, data):
+        if self.anim_idx != -1:
+            self.image = game_vars.animations[self.anim_idx].get_frame()
+        return self.image
 
     def add_drop(self, item, min_amnt, max_amnt=-1):
         if max_amnt == -1:

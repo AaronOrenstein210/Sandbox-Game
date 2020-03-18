@@ -3,6 +3,7 @@
 from Player.Inventory import *
 from Player.Stats import Stats, STATS
 from Objects.DroppedItem import DroppedItem
+from Objects.ItemTypes import Weapon
 from Tools import game_vars, item_ids as items
 
 hotbar_controls = {
@@ -20,6 +21,8 @@ class PlayerInventory(Inventory):
         # Armor inventory
         self.armor = ArmorInventory(player)
         self.armor.draw_inventory()
+        self.armor.rect.left = self.rect.right
+        self.armor.rect.centery = self.rect.centery
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
         self.selected_data = None
@@ -28,8 +31,8 @@ class PlayerInventory(Inventory):
         # Checks if the inventory is open or not
         self.open = True
         self.toggle()
-
-        self.on_resize()
+        # Player that this inventory belongs to
+        self.player = player
 
     def load(self, data):
         result = self.armor.load(super().load(data))
@@ -42,6 +45,7 @@ class PlayerInventory(Inventory):
     # Functions to set inventory slot values
     def set_at(self, row, col, item=-1, amnt=0, data=None):
         if row == col == -1:
+            prev = self.selected_item
             if amnt <= 0 or item == -1:
                 amnt = 0
                 item = -1
@@ -49,6 +53,9 @@ class PlayerInventory(Inventory):
             self.selected_item = item
             self.selected_amnt = amnt
             self.selected_data = data
+            if self.selected_item != prev:
+                self.on_change_held()
+
         else:
             super().set_at(row, col, item=item, amnt=amnt, data=data)
 
@@ -58,15 +65,19 @@ class PlayerInventory(Inventory):
             if amnt <= 0:
                 self.selected_item = -1
                 self.selected_data = None
+                self.on_change_held()
         else:
             super().set_amnt_at(row, col, amnt=amnt)
 
     def set_item_at(self, row, col, item=-1):
         if row == col == -1:
+            prev = self.selected_item
             self.selected_item = item
             if item == -1:
                 self.selected_amnt = 0
                 self.selected_data = None
+            if self.selected_item != prev:
+                self.on_change_held()
         else:
             super().set_item_at(row, col, item=item)
 
@@ -75,9 +86,6 @@ class PlayerInventory(Inventory):
             self.selected_data = None
         else:
             super().set_data_at(row, col, data=data)
-
-    def on_resize(self):
-        self.armor.rect.bottomright = (pg.display.get_surface().get_size())
 
     def draw(self, pos):
         pg.display.get_surface().blit(self.surface, (0, 0), area=self.rect)
@@ -95,7 +103,7 @@ class PlayerInventory(Inventory):
             self.selected_data = data
 
     # Gets the data of teh item currently being used
-    def get_item_data(self):
+    def get_held_data(self):
         if self.selected_amnt == 0 or self.selected_item == -1:
             return self.inv_data.get((self.hot_bar_item, 0))
         else:
@@ -143,6 +151,7 @@ class PlayerInventory(Inventory):
                 pg.draw.rect(self.surface, BKGROUND, (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
             self.hot_bar_item = idx
             pg.draw.rect(self.surface, (128, 128, 0), (self.hot_bar_item * INV_W, 0, INV_W, INV_W), 2)
+            self.on_change_held()
 
     # Get item to draw under cursor
     def get_cursor_item(self):
@@ -151,6 +160,21 @@ class PlayerInventory(Inventory):
     # Get the current held item
     def get_held_item(self):
         return self.selected_item if self.selected_item != -1 else self.inv_items[0][self.hot_bar_item]
+
+    # Runs when the current item is changed
+    def on_change_held(self):
+        # Update item stats
+        self.player.item_stats.reset()
+        if self.selected_item == -1:
+            item_id = self.inv_items[0][self.hot_bar_item]
+            if item_id != -1:
+                item = game_vars.items[item_id]
+                if isinstance(item, Weapon):
+                    item.load_stats(self.player.item_stats, self.inv_data.get((self.hot_bar_item, 0)))
+        else:
+            item = game_vars.items[self.selected_item]
+            if isinstance(item, Weapon):
+                item.load_stats(self.player.item_stats, self.selected_data)
 
     # Use selected item
     def use_item(self):

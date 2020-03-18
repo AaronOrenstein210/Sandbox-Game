@@ -192,63 +192,67 @@ class Block(Item):
             game_vars.player.inventory.use_item()
 
 
-# TODO: Weapon/Tool stats
-class Weapon(Item):
-    def __init__(self, idx, damage=1, damage_type=0, projectiles=(), **kwargs):
-        Item.__init__(self, idx, **kwargs)
+class Upgradable(Item):
+    def __init__(self, idx, upgrade_tree, **kwargs):
+        super().__init__(idx, **kwargs)
+        self.has_data = True
+        self.max_stack = 1
+        self.upgrade_tree = upgrade_tree
+
+    def new(self):
+        return self.upgrade_tree.new_tree()
+
+    def load_stats(self, stats, data):
+        stats.reset()
+        if data:
+            self.upgrade_tree.load(data)
+            self.upgrade_tree.apply(stats)
+
+
+class Weapon(Upgradable):
+    def __init__(self, idx, upgrade_tree, stats=Stats(WEAPON_STATS), projectiles=(), **kwargs):
+        super().__init__(idx, upgrade_tree, **kwargs)
         self.swing = True
         self.is_weapon = True
-        self.damage = damage
-        self.damage_type = damage_type
+        self.stats = stats
         self.projectiles = projectiles
         self.max_stack = 1
         # Get inventory image
         from pygame.transform import scale, rotate
         from Tools.constants import INV_IMG_W
         self.inv_img = scale(rotate(self.image, 45), (INV_IMG_W, INV_IMG_W))
-        self.stats = Stats(WEAPON_STATS)
 
     def on_left_click(self):
+        self.use_time = game_vars.player.stats.get_stat("use_time")
         if self.consumable:
             game_vars.player.inventory.use_item()
 
-    def get_full_description(self, data):
-        text = super().get_full_description(data)
-        # Add damage string
-        text.insert(1, "{} Damage".format(self.damage))
-        return text
+    def load_stats(self, stats, data):
+        super().load_stats(stats, data)
+        stats.add_stats(self.stats)
 
 
 class Tool(Weapon):
-    def __init__(self, idx, power=1, **kwargs):
-        super().__init__(idx, **kwargs)
-        self.power = power
+    def __init__(self, idx, upgrade_tree, **kwargs):
+        # Default it tool stats
+        if "stats" not in kwargs:
+            kwargs["stats"] = Stats(TOOL_STATS)
+        super().__init__(idx, upgrade_tree, **kwargs)
         self.breaks_blocks = True
-        self.stats = Stats(TOOL_STATS)
 
     def on_left_click(self):
         pos = game_vars.global_mouse_pos(blocks=True)
         # Break blocks if necessary
         if self.breaks_blocks:
-            if game_vars.player.break_block(*pos, self.power) and self.consumable:
+            if game_vars.player.break_block(*pos) and self.consumable:
                 game_vars.player.inventory.use_item()
         elif self.consumable:
             game_vars.player.inventory.use_item()
 
 
-class Armor(Item):
+class Armor(Upgradable):
     def __init__(self, idx, upgrade_tree, **kwargs):
-        super().__init__(idx, **kwargs)
-        self.upgrade_tree = upgrade_tree
-        self.max_stack = 1
-        self.has_data = True
-
-    def load_stats(self, stats, data):
-        self.upgrade_tree.load(data)
-        self.upgrade_tree.apply(stats)
-
-    def new(self):
-        return self.upgrade_tree.new_tree()
+        super().__init__(idx, upgrade_tree, **kwargs)
 
 
 def rotate_point(p, d_theta):

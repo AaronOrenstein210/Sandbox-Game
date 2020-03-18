@@ -340,13 +340,13 @@ class Crusher(Block):
 
 class UpgradeStation(Block):
     def __init__(self):
-        super().__init__(i.UPGRADE_STATION, t.UPGRADE_STATION, name="Upgrade Station", img="")
+        super().__init__(i.UPGRADE_STATION, t.UPGRADE_STATION, name="Upgrade Station", img=INV + "upgrade_station.png")
 
 
 # Weapons/Tools
 class TestSword(Weapon):
     def __init__(self):
-        super().__init__(i.BASIC_SWORD, damage=7, damage_type=MELEE,
+        super().__init__(i.BASIC_SWORD, head, stats=Stats(WEAPON_STATS, damage=7, use_time=.5),
                          img=INV + "basic_sword.png", name="Basic Sword")
 
     def on_left_click(self):
@@ -363,8 +363,8 @@ class TestSword(Weapon):
 
 class TestPickaxe(Tool):
     def __init__(self):
-        super().__init__(i.BASIC_PICKAXE, damage=3, damage_type=MELEE, power=10,
-                         img=INV + "basic_pickaxe.png", name="Basic Pickaxe")
+        super().__init__(i.BASIC_PICKAXE, head, img=INV + "basic_pickaxe.png", name="Basic Pickaxe",
+                         stats=Stats(TOOL_STATS, damage=3, use_time=.3, power=10))
         self.auto_use = True
         self.breaks_blocks = True
 

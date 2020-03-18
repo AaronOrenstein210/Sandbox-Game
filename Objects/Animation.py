@@ -25,7 +25,7 @@ class Animation:
             self.idx = int((self.idx + self.time / self.frame_delay) % len(self.frames))
             self.time %= self.frame_delay
 
-    def get_frame(self):
+    def get_frame(self, **kwargs):
         return self.frames[self.idx]
 
     def reset(self):

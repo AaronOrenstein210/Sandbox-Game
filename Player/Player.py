@@ -10,9 +10,8 @@ from Tools import game_vars
 from Tools.tile_ids import AIR
 from Player.PlayerInventory import PlayerInventory, new_inventory
 from Player.CraftingUI import CraftingUI
-from Player.Stats import Stats, STATS, DEF_PLAYER
+from Player.Stats import Stats, STATS, DEF_PLAYER, TOOL_STATS
 from Player.Map import Map
-from Objects.ItemTypes import Weapon
 
 
 class Player:
@@ -20,6 +19,9 @@ class Player:
         self.file = player_file
         # Stats
         self.stats = Stats(STATS, defaults=DEF_PLAYER)
+        # Stats object for held weapon/tool
+        self.item_stats = Stats(TOOL_STATS)
+        self.stats.add_stats(self.item_stats)
         # Inventory
         self.inventory = PlayerInventory(self)
         self.item_used, self.use_time = None, 0
@@ -56,12 +58,13 @@ class Player:
         # Stores an active ui and position of source block if applicable
         self.active_ui = None
         self.active_block = [0, 0]
+        self.active_ui_pos = [0, 0]
+        # Crafting UI
+        self.crafting_ui = CraftingUI(self)
         # If the world map is open or not
         self.map_open = False
         # Map object
         self.map = None
-        # Crafting UI
-        self.crafting_ui = CraftingUI(self)
 
         self.set_pos((0, 0))
 
@@ -100,15 +103,14 @@ class Player:
 
             # Check if we need to open or close the crafting menu
             if self.inventory.open:
-                if self.active_ui is None:
-                    self.active_ui = self.crafting_ui
+                if not self.active_ui:
+                    self.set_active_ui(self.crafting_ui)
             else:
                 if self.active_ui is self.crafting_ui:
-                    self.active_ui = None
-                # Send the events to the current active UI
+                    self.set_active_ui(None)
 
             # Send events to the active ui
-            if self.active_ui is not None:
+            if self.active_ui:
                 self.active_ui.process_events(events, mouse, keys)
 
             # Process events
@@ -212,7 +214,6 @@ class Player:
     # Draws ui
     def draw_ui(self, rect):
         display = pg.display.get_surface()
-        dim = display.get_size()
         pos = pg.mouse.get_pos()
 
         # Draw inventory
@@ -238,7 +239,7 @@ class Player:
 
         # Get minimap
         self.map.set_center([p / BLOCK_W for p in self.rect.center])
-        self.map.draw_map(pg.Rect(dim[0] - c.MAP_W, text_rect.h, c.MAP_W, c.MAP_W))
+        self.map.draw_map(pg.Rect(c.screen_w - c.MAP_W, text_rect.h, c.MAP_W, c.MAP_W))
 
         # Draw selected item under cursor if there is one
         item, amnt = self.inventory.get_cursor_item()
@@ -249,7 +250,7 @@ class Player:
         if self.respawn_counter > 0:
             font = c.get_scaled_font(c.MIN_W // 2, -1, "You Died")
             text = font.render("You Died", 1, (0, 0, 0))
-            display.blit(text, text.get_rect(center=(dim[0] // 2, dim[1] // 2)))
+            display.blit(text, text.get_rect(center=(c.screen_w // 2, c.screen_h // 2)))
 
     # Interprets events when the world map is open
     def run_map(self, events):
@@ -259,9 +260,8 @@ class Player:
             if e.type == MOUSEBUTTONUP:
                 # Spawn player at clicked location
                 if e.button == BUTTON_RIGHT:
-                    dim = pg.display.get_surface().get_size()
                     # Get screen center
-                    center = (dim[0] / 2, dim[1] / 2)
+                    center = (c.screen_w / 2, c.screen_h / 2)
                     # Get vector from screen center to mouse position in blocks
                     delta = [(pos[i] - center[i]) / self.map.zoom for i in (0, 1)]
                     # Calculate block position of the map position under the map
@@ -308,9 +308,16 @@ class Player:
         self.map.draw_map(pg.display.get_surface().get_rect())
 
     def on_resize(self):
-        if self.active_ui is not None:
+        if self.active_ui:
             self.active_ui.on_resize()
-        self.inventory.on_resize()
+            if self.active_ui.can_drag:
+                self.active_ui.rect.centerx = self.active_ui_pos[0] * c.screen_w
+                self.active_ui.rect.centery = self.active_ui_pos[1] * c.screen_h
+
+    def set_active_ui(self, ui):
+        self.active_ui = ui
+        if ui:
+            self.active_ui_pos = [ui.rect.centerx / c.screen_w, ui.rect.centery / c.screen_h]
 
     def move(self):
         if game_vars.dt == 0:
@@ -387,10 +394,8 @@ class Player:
                     item.on_left_click()
                     self.item_used = item
                     self.use_time = item.use_time
-                    if item.has_ui:
-                        self.active_ui = item.UI()
             else:
-                self.break_block(*game_vars.global_mouse_pos(blocks=True), 0)
+                self.break_block(*game_vars.global_mouse_pos(blocks=True))
                 self.use_time = .5
 
     def right_click(self):
@@ -421,7 +426,7 @@ class Player:
                         self.item_used = item
                         self.use_time = item.use_time
 
-    def break_block(self, block_x, block_y, power):
+    def break_block(self, block_x, block_y):
         # Make sure we aren't hitting air
         block_x, block_y = game_vars.get_topleft(block_x, block_y)
         block = game_vars.get_block_at(block_x, block_y)
@@ -432,8 +437,9 @@ class Player:
         if self.active_ui is not None and self.active_ui.block_pos == [block_x, block_y]:
             return False
         # Make sure the block is in range and check if we destroyed the block
+        power = self.stats.get_stat("power")
         block_rect = Rect(block_x * BLOCK_W, block_y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
-        if self.placement_range.collidepoint(*block_rect.center) and (power == -1 or tile.hit(block_x, block_y, power)):
+        if self.placement_range.collidepoint(*block_rect.center) and tile.hit(block_x, block_y, power):
             return game_vars.break_block(block_x, block_y)
         return False
 
@@ -459,11 +465,6 @@ class Player:
     # TODO: weapon stats
     @property
     def damage(self):
-        item = self.inventory.get_held_item()
-        if item != -1:
-            item = game_vars.items[item]
-            if isinstance(item, Weapon):
-                return self.stats.get_stat("damage") + item.damage
         return self.stats.get_stat("damage")
 
     # Check if we hit the desired target
@@ -492,7 +493,7 @@ class Player:
         self.set_pos((spawn[0] * BLOCK_W, spawn[1] * BLOCK_W))
         for x in range(spawn[0], ceil(spawn[0] + self.dim[0])):
             for y in range(spawn[1], ceil(spawn[1] + self.dim[1])):
-                self.break_block(x, y, -1)
+                self.break_block(x, y)
 
     def respawn(self):
         self.stats.hp = self.stats.get_stat("hp")

@@ -8,6 +8,8 @@ class ActiveUI:
         self.ui, self.rect = ui, rect
         # Used if it is tied to a block
         self.block_pos = list(pos)
+        # Can we drag this ui
+        self.can_drag = True
         # Stores any inventories
         if invs is None:
             self.invs = {}
