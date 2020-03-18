@@ -2,7 +2,6 @@
 # Defines functions and variables for handling items
 
 from sys import byteorder
-from time import time
 from numpy import full, int16
 from math import ceil
 import pygame as pg
@@ -33,6 +32,11 @@ class Inventory:
     @property
     def num_bytes(self):
         return 4 * self.dim[0] * self.dim[1] + sum(len(data) for data in self.inv_data.values())
+
+    # Returns wait time after right clicking as a function of time spent right clicking
+    @property
+    def wait_time(self):
+        return max(.75 / (self.holding_r + 1), .01)
 
     # Loads the inventory and returns leftover data
     def load(self, data):
@@ -211,14 +215,13 @@ class Inventory:
         # Make sure we can pickup the clicked item
         same_item = inv.selected_item == item and inv.selected_data == data
         if amnt > 0 and (inv.selected_amnt == 0 or same_item):
-            # Calculate wait time
-            t = time()
-            wait_time = (t - self.holding_r) * 19 // 20
-            if wait_time > 1:
-                wait_time = 1
-            elif wait_time < .01:
-                wait_time = .01
-            self.holding_r = t
+            # If we haven't held down right, just add dt
+            if self.holding_r == 0:
+                self.holding_r += game_vars.dt
+            # Otherwise, add the time since we last processed a right click
+            else:
+                self.holding_r += self.wait_time
+            wait_time = self.wait_time
             # Do click
             ideal_grab = ceil(game_vars.dt / wait_time)
             max_grab = game_vars.items[item].max_stack - inv.selected_amnt

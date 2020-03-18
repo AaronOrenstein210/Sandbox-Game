@@ -49,6 +49,10 @@ class CraftingUI(ActiveUI):
         rows = ceil(len(self.can_craft) // 10) + 1
         return 0 if rows <= 4 else (rows - 4) * INV_W
 
+    @property
+    def wait_time(self):
+        return max(.75 / (self.held_right + 1), .01)
+
     def i_can_craft(self, pos):
         return self.craft_rect.collidepoint(*pos) and self.player.use_time <= 0 and \
                self.selected != []
@@ -194,12 +198,14 @@ class CraftingUI(ActiveUI):
             inv = self.player.inventory
             if mouse[BUTTON_RIGHT - 1] and self.i_can_craft(pos):
                 inv.craft(self.selected)
-                self.held_right += game_vars.dt
-                if self.held_right > 3:
-                    self.held_right = 3
-                self.player.use_time = .4 / (1 + self.held_right)
+                if self.held_right == 0:
+                    self.held_right += game_vars.dt
+                else:
+                    self.held_right += self.wait_time
+                self.player.use_time = self.wait_time
             else:
-                self.held_right = 0
+                if not mouse[BUTTON_RIGHT - 1]:
+                    self.held_right = 0
                 # Check for clicking
                 for e in events:
                     if e.type == MOUSEBUTTONUP:

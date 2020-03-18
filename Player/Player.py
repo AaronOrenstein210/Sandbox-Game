@@ -268,7 +268,12 @@ class Player:
         # Draw selected item under cursor if there is one
         item, amnt = self.inventory.get_cursor_item()
         if item != -1:
-            display.blit(game_vars.items[item].image, pos)
+            img_rect = pg.Rect(0, 0, c.INV_IMG_W, c.INV_IMG_W)
+            img_rect.center = pos
+            img = game_vars.items[item].inv_img
+            display.blit(img, img.get_rect(center=img_rect.center))
+            text = c.inv_font.render(str(amnt), 1, (255, 255, 255))
+            display.blit(text, text.get_rect(bottomright=img_rect.bottomright))
 
         # Draw 'You Died' text
         if self.respawn_counter > 0:
