@@ -614,7 +614,7 @@ class UpgradeStation(FunctionalTile):
             item = self.invs["Item"].inv_items[0][0]
             if data and item != -1:
                 # Draw upgrade tree and get surface dimensions
-                self.upgrade_tree = game_vars.items[item].upgrade_tree
+                self.upgrade_tree = game_vars.items[item].upgrade_tree.new_tree()
                 self.upgrade_tree.load(data)
                 self.tree_s = self.upgrade_tree.get_surface()
                 s_dim = self.tree_s.get_size()

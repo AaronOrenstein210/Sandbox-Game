@@ -200,7 +200,7 @@ class Upgradable(Item):
         self.upgrade_tree = upgrade_tree
 
     def new(self):
-        return self.upgrade_tree.new_tree()
+        return self.upgrade_tree.new_tree().write()
 
     def load_stats(self, stats, data):
         stats.reset()

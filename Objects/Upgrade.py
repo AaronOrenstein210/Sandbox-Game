@@ -11,7 +11,6 @@ MARGIN = c.INV_IMG_W
 HALF_PI = math.pi / 2
 
 
-# TODO: Save lvl & upgrade no. & item amnt
 class UpgradeTree:
     def __init__(self, paths):
         self.paths = paths
@@ -70,12 +69,9 @@ class UpgradeTree:
             data += len(d).to_bytes(1, byteorder) + d
         return data
 
+    # Returns a new upgrade tree object with the same upgrades
     def new_tree(self):
-        data = bytearray()
-        for path in self.paths:
-            d = path.new_path()
-            data += len(d).to_bytes(1, byteorder) + d
-        return data
+        return UpgradeTree([p.new_path() for p in self.paths])
 
 
 class UpgradePath:
@@ -199,8 +195,8 @@ class UpgradePath:
                         # Completed level or current level and already upgraded
                         if self.level > lvl or (self.level == lvl and self.unlocked[idx]):
                             u.draw_description(0)
-                        # Current level and the last upgrade was upgraded (aka current upgrade)
-                        elif self.level == lvl and idx != 0 and self.unlocked[idx - 1]:
+                        # Current level and the last upgrade has been purchased (aka current upgrade)
+                        elif self.level == lvl and (idx == 0 or self.unlocked[idx - 1]):
                             u.draw_description(self.current_reqs)
                         # After current upgrade
                         else:
@@ -232,55 +228,36 @@ class UpgradePath:
                 self.upgrades[self.level][i].remove(stats)
 
     def load(self, data):
-        # Load current level
-        if len(self.upgrades) != 0:
-            if len(data) < 1:
-                print("Missing number of levels")
-                return data
-            else:
-                self.level = min(int.from_bytes(data[:1], byteorder), len(self.upgrades) - 1)
-                data = data[1:]
-        else:
-            data = data[1:]
-            self.level = 0
-        # Load current upgrade items
-        if len(data) < 2:
-            print("Missing current progress")
+        if len(data) < 4:
+            print("Missing upgrade data")
             return data
+        elif len(self.upgrades) == 0:
+            print("No upgrades")
+            self.level = 0
+            self.unlocked = []
+            self.current_reqs = 0
         else:
-            self.current_reqs = int.from_bytes(data[:2], byteorder)
-            data = data[2:]
-        # Load unlocks
-        if len(self.upgrades) != 0:
-            count = len(self.upgrades[self.level])
-            if len(data) < count:
-                print("Missing unlock data")
-                return data
-            else:
-                self.unlocked = [False] * count
-                for i in range(count):
-                    self.unlocked[i] = bool.from_bytes([data[i]], byteorder)
-                data = data[len(self.unlocked):]
-
+            self.level = int.from_bytes(data[:1], byteorder)
+            upgrade_no = int.from_bytes(data[1:2], byteorder)
+            self.unlocked = [False] * len(self.upgrades[self.level])
+            self.unlocked[:upgrade_no] = [True] * upgrade_no
+            self.current_reqs = int.from_bytes(data[2:4], byteorder)
         self.draw()
-        return data
+        return data[4:]
 
     def write(self):
         data = bytearray()
+        # Current level of upgrade
         data += self.level.to_bytes(1, byteorder)
+        # Current upgrade in that level
+        data += sum(1 for u in self.unlocked if u).to_bytes(1, byteorder)
+        # Requirements for current upgrade
         data += self.current_reqs.to_bytes(2, byteorder)
-        for truth in self.unlocked:
-            data += truth.to_bytes(1, byteorder)
         return data
 
+    # Returns a new upgrade path object with the same upgrades
     def new_path(self):
-        # Level, unlocks, current requirements
-        if len(self.upgrades) > 0:
-            return bytearray(1) + self.upgrades[0][0].amnt.to_bytes(2, byteorder) + False.to_bytes(
-                len(self.upgrades[0]), byteorder)
-        # Level, no unlocks, requirements = 0
-        else:
-            return bytearray(3)
+        return UpgradePath(self.upgrades, imgs=self.imgs)
 
 
 class Upgrade:
