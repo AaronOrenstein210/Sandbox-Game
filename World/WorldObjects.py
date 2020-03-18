@@ -64,10 +64,11 @@ class Biome:
         for i in range(num_chunks):
             x, y = randint(rect.left, rect.right), randint(rect.top, rect.bottom)
             r_x, r_y = randint(*self.ore_w_range), randint(*self.ore_h_range)
+            ore = self.get_ore_type(y / h)
             for dx in range(max(-x, -r_x), min(w - x, r_x)):
                 dy = int(math.sqrt(1 - (dx * dx / r_x / r_x)) * r_y)
                 min_y, max_y = max(0, y - dy - randint(-1, 1)), min(h, y + dy + randint(-1, 1))
-                fill_chunk(world.blocks, x + dx, 1, min_y, max_y - min_y, self.get_ore_type((y + dy) / h))
+                fill_chunk(world.blocks, x + dx, 1, min_y, max_y - min_y, ore)
 
     # Returns type of ore to spawn based on fraction of world height (from the top)
     def get_ore_type(self, h_frac):
