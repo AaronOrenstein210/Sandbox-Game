@@ -24,6 +24,8 @@ class CraftingUI(ActiveUI):
         self.rect = inv_rect.move(0, inv_rect.h)
         # Used to scroll horizontally on a recipe
         self.hold_x = -1
+        # Length of time we have been right click crafting
+        self.held_right = 0
         # Variables for the current recipe
         self.selected = []
         self.selected_ui = None
@@ -44,7 +46,7 @@ class CraftingUI(ActiveUI):
 
     @property
     def max_scroll(self):
-        rows = ceil(len(self.recipes) // 10) + 1
+        rows = ceil(len(self.can_craft) // 10) + 1
         return 0 if rows <= 4 else (rows - 4) * INV_W
 
     def i_can_craft(self, pos):
@@ -97,28 +99,26 @@ class CraftingUI(ActiveUI):
         # Make sure the selected recipe is still there
         if self.selected:
             goal = self.selected[0][0]
-            # Take care of special cases
-            if len(self.can_craft) == 0:
+            found = False
+            for i, idx in enumerate(self.can_craft):
+                recipe = self.recipes[idx]
+                # If we found the recipe, stop
+                if recipe == self.selected:
+                    found = True
+                    break
+                # If we are on the last element or we past our goal, remove selected
+                elif recipe[0][0] > goal:
+                    break
+            # If we didn't find it, remove selected
+            if not found:
+                self.selected = []
                 self.selected_ui = None
-            else:
-                for i, idx in enumerate(self.can_craft):
-                    recipe = self.recipes[idx]
-                    if recipe[0][0] == goal and recipe == self.selected:
-                        break
-                    # If the selected item was skipped over, then it isn't craftable
-                    if recipe[0][0] > goal or idx == len(self.can_craft) - 1:
-                        self.selected_ui = None
-                        break
+
+        self.scroll = min(self.scroll, self.max_scroll)
 
     def update_ui(self, indexes):
-        # 10 items per row
-        num = len(indexes)
-        num_rows = ceil(num / 10)
         # Trim scroll if necessary
-        if num_rows <= 4:
-            self.scroll = 0
-        else:
-            self.scroll = min(self.scroll, self.max_scroll)
+        self.scroll = min(self.scroll, self.max_scroll)
         # Draw recipes
         surface = pg.Surface(self.rect.size, pg.SRCALPHA)
         surface.fill((0, 200, 200, 128))
@@ -141,7 +141,7 @@ class CraftingUI(ActiveUI):
             surface.blit(text, text.get_rect(bottomright=rect.bottomright))
         # Draw selected recipe
         surface.fill((0, 200, 200, 128), (self.recipe_rect.topleft, (self.rect.w, INV_W)))
-        if self.selected_ui is not None:
+        if self.selected_ui:
             surface.blit(self.selected_ui, self.recipe_rect.topleft,
                          area=(-self.selected_scroll, 0, *self.recipe_rect.size))
             pg.draw.rect(surface, (200, 200, 0), self.recipe_rect, 2)
@@ -194,8 +194,12 @@ class CraftingUI(ActiveUI):
             inv = self.player.inventory
             if mouse[BUTTON_RIGHT - 1] and self.i_can_craft(pos):
                 inv.craft(self.selected)
-                self.player.use_time = .5
+                self.held_right += game_vars.dt
+                if self.held_right > 3:
+                    self.held_right = 3
+                self.player.use_time = .4 / (1 + self.held_right)
             else:
+                self.held_right = 0
                 # Check for clicking
                 for e in events:
                     if e.type == MOUSEBUTTONUP:

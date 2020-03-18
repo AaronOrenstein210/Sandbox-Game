@@ -23,12 +23,18 @@ class ActiveUI:
     # Override these if implementing a UI
     # Called when the screen is resized
     def on_resize(self):
-        return
+        pass
+
+    # This is called every tick no matter what
+    # Events not dependent on user inputs should happen here
+    def tick(self):
+        pass
 
     # Remove events if they should not be used
     # Set a specific key of button to be false if it shouldn't be used further
+    # This is not called if the user is dragging the ui
     def process_events(self, events, mouse, keys):
-        return
+        pass
 
     # Draws stored surface
     def draw(self):

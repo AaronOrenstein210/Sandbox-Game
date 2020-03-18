@@ -59,6 +59,7 @@ class Player:
         self.active_ui = None
         self.active_block = [0, 0]
         self.active_ui_pos = [0, 0]
+        self.dragging_ui = False
         # Crafting UI
         self.crafting_ui = CraftingUI(self)
         # If the world map is open or not
@@ -100,6 +101,7 @@ class Player:
         else:
             mouse = list(pg.mouse.get_pressed())
             keys = list(pg.key.get_pressed())
+            mods = pg.key.get_mods()
 
             # Check if we need to open or close the crafting menu
             if self.inventory.open:
@@ -111,7 +113,25 @@ class Player:
 
             # Send events to the active ui
             if self.active_ui:
-                self.active_ui.process_events(events, mouse, keys)
+                self.active_ui.tick()
+                if self.dragging_ui:
+                    # Check if we are done dragging
+                    if not mouse[BUTTON_LEFT - 1]:
+                        self.dragging_ui = False
+                    else:
+                        w, h = self.active_ui.rect.size
+                        # Move x
+                        x = self.active_ui_pos[0] * c.screen_w + game_vars.d_mouse[0]
+                        x = max(w // 2, min(x, c.screen_w - w // 2))
+                        self.active_ui_pos[0] = x / c.screen_w
+                        self.active_ui.rect.centerx = x
+                        # Move y
+                        y = self.active_ui_pos[1] * c.screen_h + game_vars.d_mouse[1]
+                        y = max(h // 2, min(y, c.screen_h - h // 2))
+                        self.active_ui_pos[1] = y / c.screen_h
+                        self.active_ui.rect.centery = y
+                else:
+                    self.active_ui.process_events(events, mouse, keys)
 
             # Process events
             for e in events:
@@ -121,6 +141,10 @@ class Player:
                         self.inventory.scroll(True)
                     elif e.button == BUTTON_WHEELDOWN:
                         self.inventory.scroll(False)
+                elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT:
+                    if mods & KMOD_SHIFT and self.active_ui and self.active_ui.can_drag and \
+                            self.active_ui.rect.collidepoint(*pos):
+                        self.dragging_ui = True
                 elif e.type == KEYDOWN:
                     # Try to jump
                     if e.key == K_SPACE and self.can_move:

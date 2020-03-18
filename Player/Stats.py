@@ -11,6 +11,7 @@ DEF_PLAYER = {"hp": 100, "max_speedx": 8, "acceleration": 10, "jump_speed": 12, 
 DEF_MOB = {"jump_speed": 12, "acceleration": 10, "max_speedy": 20, "max_speedx": 7}
 
 
+# TODO: Get rid of add stats?
 class Stats:
     def __init__(self, stats_list, defaults=None, **kwargs):
         if defaults:

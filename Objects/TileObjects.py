@@ -319,11 +319,13 @@ class WorldBuilder(FunctionalTile):
                 data += self.invs[idx].write()
             return data
 
-        def process_events(self, events, mouse, keys):
+        def tick(self):
             temp = self.cursor
             self.cursor = (pg.time.get_ticks() // 400) % 2 == 0
             if temp != self.cursor:
                 self.draw_name()
+
+        def process_events(self, events, mouse, keys):
             pos = pg.mouse.get_pos()
             if self.rect.collidepoint(*pos) and game_vars.player.use_time <= 0:
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]

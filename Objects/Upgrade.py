@@ -11,6 +11,7 @@ MARGIN = c.INV_IMG_W
 HALF_PI = math.pi / 2
 
 
+# TODO: Save lvl & upgrade no. & item amnt
 class UpgradeTree:
     def __init__(self, paths):
         self.paths = paths
