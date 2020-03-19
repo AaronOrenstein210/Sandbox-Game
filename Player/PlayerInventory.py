@@ -22,7 +22,10 @@ class PlayerInventory(Inventory):
         self.armor = ArmorInventory(player)
         self.armor.draw_inventory()
         self.armor.rect.left = self.rect.right
-        self.armor.rect.centery = self.rect.centery
+        # Crafting ui toggle button
+        button_w = INV_W // 2
+        self.crafting_toggle = UIButton("res/images/crafting_toggle.png",
+                                        pg.Rect(self.armor.rect.bottomleft, (button_w, button_w)))
         # Defines current selected item
         self.selected_item, self.selected_amnt = -1, 0
         self.selected_data = None
@@ -88,8 +91,10 @@ class PlayerInventory(Inventory):
             super().set_data_at(row, col, data=data)
 
     def draw(self, pos):
-        pg.display.get_surface().blit(self.surface, (0, 0), area=self.rect)
+        d = pg.display.get_surface()
+        d.blit(self.surface, (0, 0), area=self.rect)
         if self.open:
+            self.crafting_toggle.draw()
             self.armor.draw(pos)
             if self.rect.collidepoint(*pos):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
@@ -126,10 +131,15 @@ class PlayerInventory(Inventory):
             else:
                 self.select_hotbar(int(pos[0] / INV_W))
             return True
-        elif self.open and self.armor.rect.collidepoint(*pos):
-            pos = [pos[0] - self.armor.rect.x, pos[1] - self.armor.rect.y]
-            self.armor.left_click(pos)
-            return True
+        elif self.open:
+            if self.armor.rect.collidepoint(*pos):
+                pos = [pos[0] - self.armor.rect.x, pos[1] - self.armor.rect.y]
+                self.armor.left_click(pos)
+                return True
+            elif self.crafting_toggle.rect.collidepoint(*pos):
+                self.player.crafting_open = not self.player.crafting_open
+                self.player.use_time = .3
+                return True
         return False
 
     # Perform right click
@@ -377,7 +387,26 @@ class ArmorInventory(Inventory):
             game_vars.items[self.inv_items[idx][0]].load_stats(self.stats[idx], data)
 
 
+class UIButton:
+    def __init__(self, img, rect):
+        # Load image and rectangle
+        self.img = c.load_image(img, rect.w, rect.h)
+        self.rect = self.img.get_rect(center=rect.center)
+        # This is the image but lighter for when it is being hovered over
+        self.selected = self.img.copy()
+        self.selected.fill([75] * 3, special_flags=BLEND_RGB_ADD)
+
+    def draw(self):
+        pos = pg.mouse.get_pos()
+        if self.rect.collidepoint(*pos):
+            pg.display.get_surface().blit(self.selected, self.rect)
+        else:
+            pg.display.get_surface().blit(self.img, self.rect)
+
+
 # Returns data for an empty inventory
+
+
 def new_inventory():
     from Tools.item_ids import BASIC_PICKAXE
     slots = DIM[0] * DIM[1] + ArmorInventory.DIM[0] * ArmorInventory.DIM[1]

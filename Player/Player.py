@@ -62,6 +62,7 @@ class Player:
         self.dragging_ui = False
         # Crafting UI
         self.crafting_ui = CraftingUI(self)
+        self.crafting_open = True
         # If the world map is open or not
         self.map_open = False
         # Map object
@@ -103,13 +104,15 @@ class Player:
             keys = list(pg.key.get_pressed())
             mods = pg.key.get_mods()
 
-            # Check if we need to open or close the crafting menu
-            if self.inventory.open:
+            # Open the crafting ui if the inventory is open, crafting should be open,
+            # and there is no current ui
+            if self.inventory.open and self.crafting_open:
                 if not self.active_ui:
                     self.set_active_ui(self.crafting_ui)
-            else:
-                if self.active_ui is self.crafting_ui:
-                    self.set_active_ui(None)
+            # Close the crafting ui if it is open and the inventory is closed of it
+            # should not be open
+            elif self.active_ui is self.crafting_ui:
+                self.set_active_ui(None)
 
             # Send events to the active ui
             if self.active_ui:
