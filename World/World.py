@@ -182,17 +182,17 @@ class World:
             dim = (c.BLOCK_W * self.blocks.shape[1], c.BLOCK_W * self.blocks.shape[0])
             self.surface = pg.Surface(dim, SRCALPHA)
             self.map = pg.Surface(self.dim)
+            self.map.fill(game_vars.tiles[AIR].map_color)
         map_arr = pg.surfarray.pixels2d(self.map)
         one_percent_h = math.ceil(self.dim[1] / 100)
-        air = self.map.map_rgb(game_vars.tiles[AIR].map_color)
         # Load world
         y = int(progress * self.dim[1] + .5 / self.dim[1])
         for y in range(y, min(y + one_percent_h, self.dim[1])):
             # Get initial section
             explored = bool.from_bytes(self.f_obj.read(1), byteorder)
             length = int.from_bytes(self.f_obj.read(2), byteorder)
-            if explored:
-                map_arr[:length, y] = [air] * length
+            if not explored:
+                map_arr[:length, y] = [0] * length
             # Loop through row
             for x, val in enumerate(self.blocks[y]):
                 if val != AIR and val >= 0:
@@ -206,8 +206,8 @@ class World:
                 if length == 0 and x < self.dim[0] - 1:
                     explored = not explored
                     length = int.from_bytes(self.f_obj.read(2), byteorder)
-                    if explored:
-                        map_arr[x + 1:x + length + 1, y] = [air] * length
+                    if not explored:
+                        map_arr[x + 1:x + length + 1, y] = [0] * length
         return (y + 1) / self.dim[1]
 
     # Load world
