@@ -3,7 +3,7 @@
 
 from random import uniform, choice
 from Tools import item_ids as items
-from UI.Operations import CompleteTask, loading_bar
+from UI.Operations import SaveWorld
 from Tools import game_vars
 
 WORLD_DIMS = {items.SMALL_WORLD: [500, 250], items.MED_WORLD: [750, 375], items.LARGE_WORLD: [1000, 500]}
@@ -80,4 +80,4 @@ def generate_world(world, modifiers=()):
             game_vars.structures[choice(structure_list)].generate(world, surface_heights, structure_rects)
     world.spawn = [world.dim[0] // 2, min(surface_heights[world.dim[0] // 2:world.dim[0] // 2 + 2]) - 2]
     # Save world
-    CompleteTask(world.save_part, [1], loading_bar, ["Saving World"], can_exit=False).run_now()
+    SaveWorld(world).run_now()

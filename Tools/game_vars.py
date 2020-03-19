@@ -10,7 +10,7 @@ from pygame.locals import QUIT, VIDEORESIZE
 from Tools.constants import BLOCK_W, resize
 from Tools import constants as c
 from Tools.tile_ids import AIR
-from UI.Operations import CompleteTask, loading_bar, percent
+from UI.Operations import CompleteTask, LoadWorld, SaveWorld
 
 # Object lists
 items, tiles = {}, {}
@@ -226,7 +226,6 @@ def place_block(x, y, idx):
 # Drops an item - input position in pixels
 #               - left = None drops the item straight down
 def drop_item(drop, left, pos_=None):
-    from Objects.DroppedItem import DroppedItem
     if pos_ is None:
         pos_ = player.rect.center
     drop.drop(pos_, left)
@@ -494,7 +493,7 @@ def in_block(pos, dim):
 # Functions that change the world
 # Closes current world
 def close_world():
-    CompleteTask(world.save_part, [3], loading_bar, ["Saving World"], can_exit=False).run_now()
+    SaveWorld(world).run_now()
     player.write()
 
 
@@ -507,11 +506,9 @@ def load_world(world_file):
     else:
         world = World(world_file)
     # Load the world
-    if not CompleteTask(world.load_part, [], percent, ["Loading World Blocks"]).run_now():
+    if not LoadWorld(world).run_now():
         pg.quit()
         exit(0)
-    # Draw world blocks
-    world.draw_world()
     # Reset entity handler
     handler.reset()
     # Set up player map
@@ -532,6 +529,6 @@ def change_world(world_file):
 
     # If the world exists, save it with a fade animation
     if world:
-        CompleteTask(world.save_part, [10], screen_goes_white, [], can_exit=False).run_now()
+        CompleteTask(world.save_world, [], screen_goes_white, [], can_exit=False).run_now()
     player.write()
     load_world(world_file)

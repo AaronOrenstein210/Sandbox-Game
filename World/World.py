@@ -1,14 +1,13 @@
 # Created on 21 December 2019
 
 from sys import byteorder
-from numpy import full, int16
+from numpy import full, int16, where
 import math
 import pygame as pg
 from pygame.locals import *
 from Tools.tile_ids import AIR
 from Tools import constants as c
 from Tools import game_vars
-from UI.Operations import CompleteTask, percent
 
 WORLD = 0
 
@@ -38,7 +37,7 @@ class World:
         self.crafters = {}
         # File variables
         self.file = world_file
-        self.f_obj = open(self.file.full_file, 'a+')
+        self.f_obj = open(self.file.full_file, 'ab+')
         self.f_obj.close()
         # Auto save variables
         self.next_save = 30
@@ -61,11 +60,19 @@ class World:
         # Run auto save
         self.next_save -= game_vars.dt
         if self.next_save <= 0:
-            self.save_progress = self.save_part(self.save_progress, 1)
+            self.save_progress = self.save_world(self.save_progress)
             if self.save_progress >= 1:
                 self.save_progress = 0
                 self.next_save = 30
                 game_vars.player.write()
+        # Update minimap
+        pos = game_vars.player_pos(True)
+        left, top = max(int(pos[0] - 10), 0), max(int(pos[1] - 10), 0)
+        # Go through every row, column pair where the color is black
+        section = pg.surfarray.pixels2d(self.map)[left:math.ceil(pos[0] + 10), top:math.ceil(pos[1] + 10)]
+        for x, y in zip(*where(section == 0)):
+            map_color = game_vars.tiles[game_vars.get_block_at(left + x, top + y)].map_color
+            section[x][y] = self.map.map_rgb(map_color)
         # Update every animation
         for a in game_vars.animations:
             a.update()
@@ -94,6 +101,7 @@ class World:
         self.dim = dim
         self.num_blocks = dim[0] * dim[1]
         self.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
+        self.map = pg.Surface(dim)
 
     # Load world information
     # @param close_file: should we close the file when done
@@ -113,19 +121,10 @@ class World:
         if close_file:
             self.f_obj.close()
 
-    # Load world
-    def load_part(self, progress):
-        # If we are just opening the file, get world info
-        if progress == 0:
-            # Reset world data
-            self.spawners.clear()
-            self.block_data.clear()
-            self.animations.clear()
-            # Load world info, automatically opens the file
-            self.load_info(False)
-            self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
+    # Loads world blocks
+    def load_blocks(self, progress):
         # Get current row and column and the blocks left to load
-        current_block = int(progress * self.num_blocks)
+        current_block = int(progress * self.num_blocks + .5 / self.num_blocks)
         col, row = current_block % self.dim[0], current_block // self.dim[0]
         blocks_left = math.ceil(self.num_blocks / 100)
         # Write data to array
@@ -172,10 +171,63 @@ class World:
                 row += 1
                 # Check if we hit the end of the map
                 if row >= self.dim[1]:
-                    self.f_obj.close()
                     return 1
         # If we are done, close the file
         return (row * self.dim[0] + col) / self.num_blocks
+
+    # Draws the entire world and map
+    def draw_world(self, progress):
+        if progress == 0:
+            # Calculate pixel dimensions
+            dim = (c.BLOCK_W * self.blocks.shape[1], c.BLOCK_W * self.blocks.shape[0])
+            self.surface = pg.Surface(dim, SRCALPHA)
+            self.map = pg.Surface(self.dim)
+        map_arr = pg.surfarray.pixels2d(self.map)
+        one_percent_h = math.ceil(self.dim[1] / 100)
+        air = self.map.map_rgb(game_vars.tiles[AIR].map_color)
+        # Load world
+        y = int(progress * self.dim[1] + .5 / self.dim[1])
+        for y in range(y, min(y + one_percent_h, self.dim[1])):
+            # Get initial section
+            explored = bool.from_bytes(self.f_obj.read(1), byteorder)
+            length = int.from_bytes(self.f_obj.read(2), byteorder)
+            if explored:
+                map_arr[:length, y] = [air] * length
+            # Loop through row
+            for x, val in enumerate(self.blocks[y]):
+                if val != AIR and val >= 0:
+                    self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
+                    if explored:
+                        tile = game_vars.tiles[val]
+                        color_int = self.map.map_rgb(tile.map_color)
+                        map_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[color_int] * tile.dim[1]] * tile.dim[0]
+                length -= 1
+                # If we finished this map section, get next section length and flip explored
+                if length == 0 and x < self.dim[0] - 1:
+                    explored = not explored
+                    length = int.from_bytes(self.f_obj.read(2), byteorder)
+                    if explored:
+                        map_arr[x + 1:x + length + 1, y] = [air] * length
+        return (y + 1) / self.dim[1]
+
+    # Load world
+    def load_world(self, progress):
+        if progress == 0:
+            # Reset world data
+            self.spawners.clear()
+            self.block_data.clear()
+            self.animations.clear()
+            # Load world info, automatically opens the file
+            self.load_info(False)
+            self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
+        progress *= 2
+        if progress < 1:
+            return self.load_blocks(progress) / 2
+        else:
+            result = self.draw_world(progress - 1) / 2 + .5
+            if result == 1:
+                self.f_obj.close()
+            return result
 
     # Saves world information
     # @param close_file: should we close the file when done
@@ -193,17 +245,13 @@ class World:
         if close_file:
             self.f_obj.close()
 
-    # Save world
-    def save_part(self, progress, num_rows):
+    # Save world blocks
+    def save_blocks(self, progress, num_rows):
         # If there is no data, just end the process
         if self.blocks is None:
             return 1
-        # If we are just opening the file, save world info
-        if progress == 0:
-            # Save world information, automatically opens the file
-            self.save_info(False)
         # Get current block along with rows and columns to save
-        block_num = int(progress * self.num_blocks)
+        block_num = int(progress * self.num_blocks + .5 / self.num_blocks)
         col, row = block_num % self.dim[0], block_num // self.dim[0]
         blocks_left = int(num_rows * self.dim[0])
         while blocks_left > 0:
@@ -248,9 +296,36 @@ class World:
                 row += 1
                 # Check if we hit the end of the map
                 if row >= self.dim[1]:
-                    self.f_obj.close()
                     return 1
         return (row * self.dim[0] + col) / self.num_blocks
+
+    # Saves map data
+    def save_map(self, progress):
+        if not self.map:
+            return 1
+        # Get current row
+        row = int(progress * self.dim[1] + .5 / self.dim[1])
+        arr = pg.surfarray.pixels2d(self.map)[:, row]
+        # Figure out which sections have been explored
+        self.f_obj.write(bool(arr[0] != 0).to_bytes(1, byteorder))
+        result = [i + 1 for i, (v1, v2) in enumerate(zip(arr[:-1], arr[1:])) if (v1 == 0) != (v2 == 0)]
+        for v1, v2 in zip([0] + result, result + [len(arr)]):
+            self.f_obj.write((v2 - v1).to_bytes(2, byteorder))
+        return (row + 1) / self.dim[1]
+
+    # Save world
+    def save_world(self, progress):
+        if progress == 0:
+            # Save world information, automatically opens the file
+            self.save_info(False)
+        progress *= 2
+        if progress < 1:
+            return self.save_blocks(progress, 1) / 2
+        else:
+            result = self.save_map(progress - 1) / 2 + .5
+            if result == 1:
+                self.f_obj.close()
+            return result
 
     # Update block
     def place_block(self, x, y, block):
@@ -315,28 +390,3 @@ class World:
         # Draw sky and blocks
         d = pg.display.get_surface()
         d.blit(self.surface, (0, 0), area=rect)
-
-    # TODO: Chunks
-    # Draws the entire world
-    def draw_world(self):
-        # Calculate pixel dimensions
-        dim = (c.BLOCK_W * self.blocks.shape[1], c.BLOCK_W * self.blocks.shape[0])
-        self.surface = pg.Surface(dim, SRCALPHA)
-        self.map = pg.Surface(self.dim)
-        self.map.fill((64, 64, 255))
-        one_percent_h = math.ceil(self.dim[1] / 100)
-
-        def draw_row(progress):
-            y = int(progress * self.dim[1])
-            for y in range(y, min(y + one_percent_h, self.dim[1])):
-                for x, val in enumerate(self.blocks[y]):
-                    if val != AIR and val >= 0:
-                        self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
-                        tile = game_vars.tiles[val]
-                        pg.draw.rect(self.map, tile.map_color, (x, y, *tile.dim))
-            return (y + 1) / self.dim[1]
-
-        self.surface.fill(SRCALPHA)
-        if not CompleteTask(draw_row, [], percent, ["Drawing World"]).run_now():
-            pg.quit()
-            exit(0)

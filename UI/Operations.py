@@ -84,6 +84,24 @@ class CompleteTask(UIOperation):
         self.progress = 0
 
 
+class LoadWorld(CompleteTask):
+    def __init__(self, world):
+        super().__init__(world.load_world, [], percent, ["Loading World Blocks"])
+
+    def check_events(self, events):
+        self.draw_args = ["Loading World Blocks"] if self.progress <= .5 else ["Drawing World"]
+        return super().check_events(events)
+
+
+class SaveWorld(CompleteTask):
+    def __init__(self, world):
+        super().__init__(world.save_world, [], percent, ["Saving World Blocks"], can_exit=False)
+
+    def check_events(self, events):
+        self.draw_args = ["Saving World Blocks"] if self.progress < .5 else ["Saving World Map"]
+        return super().check_events(events)
+
+
 class TextInput(UIOperation):
     IMG = "res/images/"
 
