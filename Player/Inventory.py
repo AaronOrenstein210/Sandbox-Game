@@ -6,6 +6,7 @@ from numpy import full, int16
 from math import ceil
 import pygame as pg
 from pygame.locals import *
+from Objects.DroppedItem import DroppedItem
 from Tools.constants import INV_W, INV_IMG_W
 from Tools import constants as c
 from Tools import game_vars
@@ -140,7 +141,11 @@ class Inventory:
 
     def set_data_at(self, row, col, data=None):
         if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
-            self.inv_data[(col, row)] = data
+            # If there is no item there, don't save the data
+            if self.inv_amnts[row][col] == 0:
+                self.inv_data[(col, row)] = None
+            else:
+                self.inv_data[(col, row)] = data
 
     def draw_inventory(self):
         for y in range(self.dim[1]):
@@ -175,37 +180,109 @@ class Inventory:
             if item != -1:
                 game_vars.items[item].draw_description(self.inv_data.get((x, y)))
 
+    # Automatically moves item to the player inventory
+    def auto_move_item(self, row, col):
+        # Make sure there is an item
+        amnt = self.inv_amnts[row][col]
+        if amnt != 0:
+            item = self.inv_items[row][col]
+            data = self.inv_data.get((col, row))
+            # Try to get the player inventory to pick up the item
+            inv = game_vars.player.inventory
+            item_obj = DroppedItem(item, amnt, data=data)
+            inv.pick_up_item(item_obj)
+            # Set whatever is left
+            self.set_amnt_at(row, col, amnt=item_obj.amnt)
+
+    # Check if there is room for the given item in inventory
+    def room_for_item(self, item):
+        # Make sure this item is in the whitelist
+        if len(self.whitelist) > 0 and item.idx not in self.whitelist:
+            return []
+        empty = []
+        good = []
+        item_amnt = item.amnt
+        for y, row in enumerate(self.inv_items):
+            for x, val in enumerate(row):
+                max_stack = min(item.max_stack, self.max_stack)
+                amnt = self.inv_amnts[y][x]
+                data = self.inv_data.get((y, x))
+                if val == -1:
+                    empty.append((x, y))
+                elif val == item.idx and amnt != max_stack and data == item.data:
+                    if amnt + item_amnt <= max_stack:
+                        return [(x, y)]
+                    else:
+                        good.append((x, y))
+                        item_amnt -= max_stack - amnt
+        return good + empty[:1]
+
+    # Try to pick up the given item, returns if we picked up any of it
+    def pick_up_item(self, item, space=None):
+        max_stack = min(item.max_stack, self.max_stack)
+        if space is None:
+            space = self.room_for_item(item)
+        for x, y in space:
+            # Add to existing item
+            if self.inv_items[y][x] != -1:
+                # Fill up item to max value
+                if item.amnt + self.inv_amnts[y][x] > max_stack:
+                    item.amnt -= max_stack - self.inv_amnts[y][x]
+                    self.set_amnt_at(y, x, amnt=max_stack)
+                # Add all of the item
+                else:
+                    self.set_amnt_at(y, x, amnt=item.amnt + self.inv_amnts[y][x])
+                    item.amnt = 0
+            # Add to empty slot
+            else:
+                transfer = min(item.amnt, max_stack)
+                self.set_at(y, x, item=item.idx, amnt=transfer, data=item.data)
+                item.amnt -= transfer
+            self.on_pick_up(y, x)
+            # Check if we are done
+            if item.amnt == 0:
+                return True
+        return False
+
+    # Defines what to do when an item is picked up
+    # This is necessary as an inventory picking up an item is often not detectable
+    def on_pick_up(self, row, col):
+        pass
+
     def left_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
-        inv = game_vars.player.inventory
-        item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
-        data = self.inv_data.get((x, y))
-        # Stop if he are holding nothing and clicked on nothing
-        if inv.selected_amnt == 0 and amnt == 0:
-            return
-        # Pick up item
-        if inv.selected_amnt == 0:
-            # Add item to selected item
-            inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
-            # Remove item from our inventory
-            self.set_at(y, x)
-        elif len(self.whitelist) == 0 or inv.selected_item in self.whitelist:
-            # Add item to item or to empty slot
-            if (inv.selected_item == item and inv.selected_data == data) or amnt == 0:
-                if amnt == 0:
-                    max_stack = self.max_stack
-                else:
-                    max_stack = min(game_vars.items[item].max_stack, self.max_stack)
-                amnt_ = min(max_stack, amnt + inv.selected_amnt)
-                self.set_at(y, x, item=inv.selected_item, amnt=amnt_, data=inv.selected_data)
-                inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt - (amnt_ - amnt))
-            # Swap out items
-            elif inv.selected_amnt <= self.max_stack:
-                self.set_at(y, x, item=inv.selected_item, amnt=inv.selected_amnt, data=inv.selected_data)
+        if not pg.key.get_mods() & KMOD_SHIFT:
+            inv = game_vars.player.inventory
+            item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
+            data = self.inv_data.get((x, y))
+            # Stop if he are holding nothing and clicked on nothing
+            if inv.selected_amnt == 0 and amnt == 0:
+                return
+            # Pick up item
+            if inv.selected_amnt == 0:
+                # Add item to selected item
                 inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
-        # If the item changed, set use time
-        if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
-            game_vars.player.use_time = .3
+                # Remove item from our inventory
+                self.set_at(y, x)
+            elif len(self.whitelist) == 0 or inv.selected_item in self.whitelist:
+                # Add item to item or to empty slot
+                if (inv.selected_item == item and inv.selected_data == data) or amnt == 0:
+                    if amnt == 0:
+                        max_stack = self.max_stack
+                    else:
+                        max_stack = min(game_vars.items[item].max_stack, self.max_stack)
+                    amnt_ = min(max_stack, amnt + inv.selected_amnt)
+                    self.set_at(y, x, item=inv.selected_item, amnt=amnt_, data=inv.selected_data)
+                    inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt - (amnt_ - amnt))
+                # Swap out items
+                elif inv.selected_amnt <= self.max_stack:
+                    self.set_at(y, x, item=inv.selected_item, amnt=inv.selected_amnt, data=inv.selected_data)
+                    inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
+            # If the item changed, set use time
+            if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
+                game_vars.player.use_time = .3
+        else:
+            self.auto_move_item(y, x)
 
     def right_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)

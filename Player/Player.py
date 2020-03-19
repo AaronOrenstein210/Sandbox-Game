@@ -116,7 +116,7 @@ class Player:
                 self.active_ui.tick()
                 if self.dragging_ui:
                     # Check if we are done dragging
-                    if not mouse[BUTTON_LEFT - 1]:
+                    if not mouse[BUTTON_RIGHT - 1]:
                         self.dragging_ui = False
                     else:
                         w, h = self.active_ui.rect.size
@@ -141,7 +141,7 @@ class Player:
                         self.inventory.scroll(True)
                     elif e.button == BUTTON_WHEELDOWN:
                         self.inventory.scroll(False)
-                elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT:
+                elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_RIGHT:
                     if mods & KMOD_SHIFT and self.active_ui and self.active_ui.can_drag and \
                             self.active_ui.rect.collidepoint(*pos):
                         self.dragging_ui = True

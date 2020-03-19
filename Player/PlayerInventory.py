@@ -122,7 +122,7 @@ class PlayerInventory(Inventory):
         if self.rect.collidepoint(*pos):
             pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
             if self.open:
-                Inventory.left_click(self, pos)
+                super().left_click(pos)
             else:
                 self.select_hotbar(int(pos[0] / INV_W))
             return True
@@ -137,13 +137,42 @@ class PlayerInventory(Inventory):
         if self.open:
             if self.rect.collidepoint(*pos):
                 pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
+                x, y = pos[0] // INV_W, pos[1] // INV_W
+                # Try to move the item to the armor inventory, if that fails, just right click
+                amnt = self.inv_amnts[y][x]
+                if amnt != 0:
+                    item_obj = DroppedItem(self.inv_items[y][x], amnt, data=self.inv_data.get((x, y)))
+                    if self.armor.pick_up_item(item_obj):
+                        self.set_amnt_at(y, x, amnt=item_obj.amnt)
+                        return True
                 Inventory.right_click(self, pos)
                 return True
             elif self.armor.rect.collidepoint(*pos):
                 pos = [pos[0] - self.armor.rect.x, pos[1] - self.armor.rect.y]
-                self.armor.left_click(pos)
+                self.armor.right_click(pos)
                 return True
         return False
+
+    # Auto moves item to all inventories in active ui
+    def auto_move_item(self, row, col):
+        # Make sure we are clicking an item and there is a ui up
+        amnt = self.inv_amnts[row][col]
+        if amnt != 0 and self.player.active_ui:
+            # Get ui inventories
+            invs = self.player.active_ui.get_inventories()
+            # Go through the inventories until we get rid of the item
+            item = self.inv_items[row][col]
+            data = self.inv_data.get((col, row))
+            item_obj = DroppedItem(item, amnt, data=data)
+            for inv in invs:
+                inv.pick_up_item(item_obj)
+                if item_obj.amnt <= 0:
+                    break
+            self.set_amnt_at(row, col, amnt=item_obj.amnt)
+            # If some item moved, tell the current active ui
+            if amnt != item_obj.amnt:
+                self.player.active_ui.on_inv_pickup()
+        return amnt != self.inv_amnts[row][col]
 
     def select_hotbar(self, idx):
         if idx != self.hot_bar_item:
@@ -214,53 +243,6 @@ class PlayerInventory(Inventory):
             self.selected_amnt = 0
             self.selected_data = None
         return drop
-
-    # Check if there is room for the given item in inventory
-    def room_for_item(self, item):
-        empty = []
-        good = []
-        item_amnt = item.amnt
-        for y, row in enumerate(self.inv_items):
-            for x, val in enumerate(row):
-                amnt = self.inv_amnts[y][x]
-                data = self.inv_data.get((y, x))
-                if val == -1:
-                    empty.append((x, y))
-                elif val == item.idx and amnt != item.max_stack and data == item.data:
-                    if amnt + item_amnt <= item.max_stack:
-                        return [(x, y)]
-                    else:
-                        good.append((x, y))
-                        item_amnt -= item.max_stack - amnt
-        return good + empty[:1]
-
-    # Try to pick up the given item
-    def pick_up_item(self, item, space=None):
-        if space is None:
-            space = self.room_for_item(item)
-        for x, y in space:
-            # Add to existing item
-            if self.inv_items[y][x] != -1:
-                # Fill up item to max value
-                if item.amnt + self.inv_amnts[y][x] > item.max_stack:
-                    item.amnt -= item.max_stack - self.inv_amnts[y][x]
-                    self.inv_amnts[y][x] = item.max_stack
-                # Add all of the item
-                else:
-                    self.inv_amnts[y][x] += item.amnt
-                    item.amnt = 0
-            # Add to empty slot
-            else:
-                self.inv_items[y][x] = item.idx
-                self.inv_amnts[y][x] = item.amnt
-                self.inv_data[(x, y)] = item.data
-                item.amnt = 0
-            # Update item
-            self.update_item(y, x)
-            # Check if we are done
-            if item.amnt == 0:
-                return True
-        return False
 
     # Get list of inventory contents, sorted by item id and duplicates combined
     def get_all_items(self):
@@ -369,13 +351,24 @@ class ArmorInventory(Inventory):
 
     def right_click(self, pos):
         idx = pos[1] // self.rect.h
-        if idx < self.ARMOR_ORDER:
+        if idx < len(self.ARMOR_ORDER):
             prev = self.inv_data.get((0, idx))
             self.whitelist = [self.ARMOR_ORDER[idx]]
             super().right_click(pos)
             # If the armor data changed, recalculate stats
             if prev != self.inv_data.get((0, idx)):
                 self.recalculate_stat(idx)
+
+    def room_for_item(self, item):
+        for idx, item_id in enumerate(self.ARMOR_ORDER):
+            if item.idx == item_id:
+                if self.inv_amnts[idx][0] == 0:
+                    return [(0, idx)]
+                break
+        return []
+
+    def on_pick_up(self, row, col):
+        self.recalculate_stat(row)
 
     def recalculate_stat(self, idx):
         self.stats[idx].reset()
