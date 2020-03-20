@@ -1,11 +1,11 @@
 # Created on 21 December 2019
 
 from sys import byteorder
-from numpy import full, int16, where
+import numpy as np
 import math
 import pygame as pg
 from pygame.locals import *
-from Tools.tile_ids import AIR
+from Tools.tile_ids import AIR, SNOW
 from Tools import constants as c
 from Tools import game_vars
 
@@ -17,6 +17,7 @@ class World:
         # Visual variables
         self.surface = None
         self.map = None
+        self.light = None
         # World type
         self.type = WORLD  # 1 bytes
         # Can we delete the world
@@ -35,6 +36,7 @@ class World:
         self.animations = {}
         self.block_data = {}
         self.crafters = {}
+        self.lights = {}
         # File variables
         self.file = world_file
         self.f_obj = open(self.file.full_file, 'ab+')
@@ -70,7 +72,7 @@ class World:
         left, top = max(int(pos[0] - 10), 0), max(int(pos[1] - 10), 0)
         # Go through every row, column pair where the color is black
         section = pg.surfarray.pixels2d(self.map)[left:math.ceil(pos[0] + 10), top:math.ceil(pos[1] + 10)]
-        for x, y in zip(*where(section == 0)):
+        for x, y in zip(*np.where(section == 0)):
             map_color = game_vars.tiles[game_vars.get_block_at(left + x, top + y)].map_color
             section[x][y] = self.map.map_rgb(map_color)
         # Update every animation
@@ -100,7 +102,7 @@ class World:
     def new_world(self, dim):
         self.dim = dim
         self.num_blocks = dim[0] * dim[1]
-        self.blocks = full((dim[1], dim[0]), AIR, dtype=int16)
+        self.blocks = np.full((dim[1], dim[0]), AIR, dtype=np.int16)
         self.map = pg.Surface(dim)
 
     # Load world information
@@ -183,8 +185,10 @@ class World:
             self.surface = pg.Surface(dim, SRCALPHA)
             self.map = pg.Surface(self.dim)
             self.map.fill(game_vars.tiles[AIR].map_color)
+            self.light = pg.Surface(self.dim, SRCALPHA)
         map_arr = pg.surfarray.pixels2d(self.map)
         one_percent_h = math.ceil(self.dim[1] / 100)
+        light_arr = pg.surfarray.pixels_alpha(self.light)
         # Load world
         y = int(progress * self.dim[1] + .5 / self.dim[1])
         for y in range(y, min(y + one_percent_h, self.dim[1])):
@@ -195,12 +199,14 @@ class World:
                 map_arr[:length, y] = [0] * length
             # Loop through row
             for x, val in enumerate(self.blocks[y]):
-                if val != AIR and val >= 0:
-                    self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
-                    if explored:
-                        tile = game_vars.tiles[val]
-                        color_int = self.map.map_rgb(tile.map_color)
-                        map_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[color_int] * tile.dim[1]] * tile.dim[0]
+                if val != AIR:
+                    light_arr[x][y] = 255
+                    if val >= 0:
+                        self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
+                        if explored:
+                            tile = game_vars.tiles[val]
+                            color_int = self.map.map_rgb(tile.map_color)
+                            map_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[color_int] * tile.dim[1]] * tile.dim[0]
                 length -= 1
                 # If we finished this map section, get next section length and flip explored
                 if length == 0 and x < self.dim[0] - 1:
@@ -219,7 +225,7 @@ class World:
             self.animations.clear()
             # Load world info, automatically opens the file
             self.load_info(False)
-            self.blocks = full((self.dim[1], self.dim[0]), AIR, dtype=int16)
+            self.blocks = np.full((self.dim[1], self.dim[0]), AIR, dtype=np.int16)
         progress *= 2
         if progress < 1:
             return self.load_blocks(progress) / 2
@@ -335,6 +341,8 @@ class World:
         self.blocks[y][x] = block
         self.surface.blit(game_vars.tiles[block].image, (x * c.BLOCK_W, y * c.BLOCK_W))
         pg.draw.rect(self.map, tile.map_color, (x, y, *tile.dim))
+        light_arr = pg.surfarray.pixels_alpha(self.light)
+        light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[255] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.add_block(x, y, block)
 
@@ -348,6 +356,8 @@ class World:
         block_rect = Rect(x * c.BLOCK_W, y * c.BLOCK_W, c.BLOCK_W * w, c.BLOCK_W * h)
         self.surface.fill(SRCALPHA, block_rect)
         pg.draw.rect(self.map, (64, 64, 255), (x, y, *tile.dim))
+        light_arr = pg.surfarray.pixels_alpha(self.light)
+        light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[0] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.remove_block(x, y, tile.idx)
 
@@ -358,6 +368,8 @@ class World:
             c.update_dict(x, y, idx, self.spawners)
         if tile.crafting:
             c.update_dict(x, y, idx, self.crafters)
+        if tile.emits_light:
+            c.update_dict(x, y, idx, self.lights)
         if tile.anim_idx != -1:
             c.update_dict(x, y, tile.anim_idx, self.animations)
 
@@ -367,6 +379,8 @@ class World:
             c.remove_from_dict(x, y, self.spawners)
         if tile.crafting:
             c.remove_from_dict(x, y, self.crafters)
+        if tile.emits_light:
+            c.remove_from_dict(x, y, self.lights)
         if tile.anim_idx != -1:
             c.remove_from_dict(x, y, self.animations)
 
@@ -388,5 +402,43 @@ class World:
     # Draws blocks
     def draw_blocks(self, rect):
         # Draw sky and blocks
-        d = pg.display.get_surface()
-        d.blit(self.surface, (0, 0), area=rect)
+        pg.display.get_surface().blit(self.surface, (0, 0), area=rect)
+
+    # Draws light
+    def draw_light(self, rect):
+        # Draw light surface
+        left, top = int(rect.x / c.BLOCK_W), int(rect.y / c.BLOCK_W)
+        right, bot = math.ceil(rect.right / c.BLOCK_W), math.ceil(rect.bottom / c.BLOCK_W)
+        off_x, off_y = rect.x % c.BLOCK_W, rect.y % c.BLOCK_W
+        b_dim = (right - left, bot - top)
+        light = pg.Surface(b_dim, SRCALPHA)
+        light.blit(self.light, (0, 0), area=((left, top), b_dim))
+        light.fill((0, 0, 0, 255 - self.sky_color[-1]), special_flags=BLEND_RGBA_ADD)
+        light = pg.transform.scale(light, (b_dim[0] * c.BLOCK_W, b_dim[1] * c.BLOCK_W))
+        air_light = game_vars.tiles[AIR].light_s.copy()
+        air_light.fill((0, 0, 0, 255 - self.sky_color[-1]), special_flags=BLEND_RGBA_SUB)
+        radius = int(air_light.get_size()[0] / c.BLOCK_W / 2)
+        r = pg.Rect(0, 0, c.BLOCK_W, c.BLOCK_W)
+        y_lb, y_ub = max(top - radius, 0), min(bot + radius, self.dim[1])
+        x_lb, x_ub = max(left - radius, 0), min(right + radius, self.dim[0])
+        for y, x in zip(*np.where(self.blocks[y_lb:y_ub, x_lb:x_ub] == AIR)):
+            # Global position of the air block
+            x_, y_ = x + x_lb, y + y_lb
+            if (self.blocks[y_ - 1:y_ + 2, x_ - 1:x_ + 2] != AIR).any():
+                # Bounds to iterate around the air block
+                y_lb1, y_ub1 = max([y_ - radius, top, 0]), min([y_ + radius + 1, bot, self.dim[1]])
+                x_lb1, x_ub1 = max([x_ - radius, left, 0]), min([x_ + radius + 1, right, self.dim[0]])
+                for y1, x1 in zip(*np.where(self.blocks[y_lb1:y_ub1, x_lb1:x_ub1] != AIR)):
+                    # Global position of this block
+                    x1_, y1_ = x1 + x_lb1, y1 + y_lb1
+                    light.blit(air_light, ((x1_ - left) * c.BLOCK_W, (y1_ - top) * c.BLOCK_W),
+                               area=r.move((x1_ - x_ + radius) * c.BLOCK_W, (y1_ - y_ + radius) * c.BLOCK_W),
+                               special_flags=BLEND_RGBA_SUB)
+        for x in self.lights.keys():
+            for y in self.lights[x].keys():
+                light_s = game_vars.tiles[self.lights[x][y]].light_s
+                r = light_s.get_rect(center=(int((x + .5) * c.BLOCK_W), int((y + .5) * c.BLOCK_W)))
+                if rect.colliderect(r):
+                    light.blit(light_s, (r.x - (left * c.BLOCK_W), r.y - (top * c.BLOCK_W)),
+                               special_flags=BLEND_RGBA_SUB)
+        pg.display.get_surface().blit(light, (0, 0), area=((off_x, off_y), rect.size))

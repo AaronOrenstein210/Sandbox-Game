@@ -94,6 +94,11 @@ def get_angle(start, end, pixels=False):
         return theta % (2 * math.pi)
 
 
+def distance(p1, p2):
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    return math.sqrt(dx ** 2 + dy ** 2)
+
+
 # Resizes surface to fit within desired dimensions, keeping surface's w:h ratio
 def scale_to_fit(s, w=-1, h=-1):
     if w == -1 and h == -1:

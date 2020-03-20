@@ -1,7 +1,8 @@
 # Created on 23 November 2019
 
 from random import random, uniform
-from os.path import isfile, isdir
+from os.path import isfile
+import math
 import pygame as pg
 from random import randint
 from Tools.constants import BLOCK_W, scale_to_fit, update_dict
@@ -36,6 +37,8 @@ class Tile:
         self.crafting = False
         # Has an animation
         self.anim_idx = -1
+        # Emits light
+        self.emits_light = False
 
         # Minimap color, does not need to be unique
         self.map_color = (64, 64, 255)
@@ -50,6 +53,12 @@ class Tile:
         self.drops = []
         # Recipes for crafting blocks
         self.recipes = []
+
+        # Light magnitude and radius
+        self.light_mag = 0
+        self.light_r = 0
+        # Light surface
+        self.light_s = None
 
         # Add tile to list
         game_vars.tiles[self.idx] = self
@@ -117,7 +126,7 @@ class Tile:
 
 class CraftingStation(Tile):
     def __init__(self, idx, **kwargs):
-        Tile.__init__(self, idx, **kwargs)
+        super().__init__(idx, **kwargs)
         self.crafting = True
         self.recipes = self.get_recipes()
         i = 0
@@ -160,7 +169,7 @@ class CraftingStation(Tile):
 
 class FunctionalTile(Tile):
     def __init__(self, idx, **kwargs):
-        Tile.__init__(self, idx, **kwargs)
+        super().__init__(idx, **kwargs)
         self.clickable = True
         self.has_ui = True
         self.has_data = True
@@ -168,11 +177,11 @@ class FunctionalTile(Tile):
 
 # SpawnBlocks are blocks that spawn enemies
 class SpawnTile(Tile):
-    def __init__(self, idx, entity, item_id=-1):
+    def __init__(self, idx, entity, item_id=-1, **kwargs):
         self.entity = entity
         self.rarity = self.entity.rarity
         img = INV + "spawner_{}.png".format(self.rarity)
-        Tile.__init__(self, idx, img=img)
+        super().__init__(idx, img=img, **kwargs)
         self.hardness = self.rarity
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
@@ -200,6 +209,25 @@ class SpawnTile(Tile):
                     return mob
                 else:
                     num -= chance
+
+
+class LightTile(Tile):
+    def __init__(self, idx, magnitude=10, radius=5, **kwargs):
+        super().__init__(idx, *kwargs)
+        self.emits_light = True
+        self.light_mag = magnitude
+        self.light_r = int(max(min(radius, 255), 1) * BLOCK_W)
+        # self.light_s = full((self.light_r * 2 + 1, self.light_r * 2 + 1), 0, dtype=uint8)
+        self.light_s = pg.Surface((self.light_r * 2 + 1, self.light_r * 2 + 1), pg.SRCALPHA)
+        for r in range(1, self.light_r + 1):
+            dtheta = .5 / r
+            theta = 0
+            color_ = (0, 0, 0, 255 * (1 - (r / self.light_r) ** 2))
+            while theta < 2 * math.pi:
+                x, y = int(r * math.cos(theta)) + self.light_r, int(r * math.sin(theta)) + self.light_r
+                self.light_s.set_at((x, y), color_)
+                # self.light_s[x][y] = 255 - 255 * (r / self.light_r) ** 2
+                theta += dtheta
 
 
 def get_spawn_spaces(center, r, walking):

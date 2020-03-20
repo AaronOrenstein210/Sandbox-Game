@@ -208,7 +208,7 @@ class Player:
                 elif keys[K_d] and not keys[K_a]:
                     self.a[0] = acc
                 else:
-                    if abs(self.v[0]) < .5:
+                    if abs(self.v[0]) < 1:
                         self.v[0] = self.a[0] = 0
                     else:
                         self.a[0] = copysign(acc, -self.v[0])
@@ -238,6 +238,11 @@ class Player:
         # Draw player
         display.blit(self.surface, (self.pos[0] - rect.x, self.pos[1] - rect.y))
 
+        # Draw item being used
+        if self.item_used is not None:
+            center = [self.rect.centerx - rect.x, self.rect.centery - rect.y]
+            self.item_used.use_anim(self.use_time, self.arm, self.used_left, center, rect)
+
     # Draws ui
     def draw_ui(self, rect):
         display = pg.display.get_surface()
@@ -245,11 +250,6 @@ class Player:
 
         # Draw inventory
         self.inventory.draw(pos)
-
-        # Draw item being used
-        if self.item_used is not None:
-            center = [self.rect.centerx - rect.x, self.rect.centery - rect.y]
-            self.item_used.use_anim(self.use_time, self.arm, self.used_left, center, rect)
 
         # Draw block ui
         if self.active_ui is not None:

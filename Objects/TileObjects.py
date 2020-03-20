@@ -19,9 +19,10 @@ from World.Selector import WorldSelector
 
 
 # Normal Tiles
-class Air(Tile):
+class Air(LightTile):
     def __init__(self):
-        super().__init__(t.AIR)
+        super().__init__(t.AIR, radius=2.5)
+        self.emits_light = False
 
 
 class Dirt(Tile):
@@ -40,7 +41,7 @@ class Stone(Tile):
         self.hardness = 1
 
 
-class Snow(Tile):
+class Snow(LightTile):
     def __init__(self):
         super().__init__(t.SNOW, img=INV + "snow.png")
         self.add_drop(i.SNOW_BALL, 2, 5)

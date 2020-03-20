@@ -21,6 +21,8 @@ resize(MIN_W, MIN_H)
 
 game_vars.init()
 
+clock = pg.time.Clock()
+
 while True:
     result = False
     try:
@@ -34,3 +36,4 @@ while True:
         exit(0)
 
     pg.display.flip()
+    clock.tick(60)

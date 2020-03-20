@@ -108,6 +108,8 @@ def draw():
         handler.draw_display(rect)
         # Draw pre-ui player visuals
         player.draw_pre_ui(rect)
+        # Draw lighting
+        #world.draw_light(rect)
         # Draw damage text boxes
         for arr in dmg_text:
             # Decrement textbox counter
@@ -128,7 +130,7 @@ def draw():
     # Draw fps
     fps = int(1 / dt)
     print("\r" + str(fps), end=" ")
-    text = c.ui_font.render(str(fps) + " FPS", 1, (0, 0, 0))
+    text = c.ui_font.render(str(fps) + " FPS", 1, (255, 255, 255))
     text_rect = text.get_rect(bottom=pg.display.get_surface().get_size()[1])
     pg.display.get_surface().blit(text, text_rect)
 
