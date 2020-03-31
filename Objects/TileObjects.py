@@ -683,8 +683,8 @@ class UpgradeStation(FunctionalTile):
             self.x, self.y = dim[0] // 2, self.max_y
             self.going_up = True
 
-        def update(self):
-            dy = (self.max_y - self.min_y) * game_vars.dt / .75
+        def update(self, dt):
+            dy = (self.max_y - self.min_y) * dt / .75
             if self.going_up:
                 self.y -= dy
                 if self.y <= self.min_y:

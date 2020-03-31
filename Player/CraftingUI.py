@@ -58,6 +58,8 @@ class CraftingUI(ActiveUI):
                self.selected != []
 
     def update_blocks(self):
+        prev = self.recipes.copy()
+
         crafters = game_vars.world.crafters
         # Get all crafting blocks in the area and load their recipes
         rect = self.player.placement_range
@@ -120,12 +122,14 @@ class CraftingUI(ActiveUI):
 
         self.scroll = min(self.scroll, self.max_scroll)
 
+        return self.recipes != prev
+
     def update_ui(self, indexes):
         # Trim scroll if necessary
         self.scroll = min(self.scroll, self.max_scroll)
         # Draw recipes
-        surface = pg.Surface(self.rect.size, pg.SRCALPHA)
-        surface.fill((0, 200, 200, 128))
+        self.ui = pg.Surface(self.rect.size, pg.SRCALPHA)
+        self.ui.fill((0, 200, 200, 128))
         min_row = self.scroll / INV_W
         x, y = -INV_W, -(self.scroll % INV_W)
         for idx in indexes[int(min_row) * 10: ceil(min_row + 4) * 10]:
@@ -139,23 +143,22 @@ class CraftingUI(ActiveUI):
             r = self.recipes[idx]
             # Draw the result item's image
             img = game_vars.items[r[0][0]].inv_img
-            surface.blit(img, img.get_rect(center=rect.center))
+            self.ui.blit(img, img.get_rect(center=rect.center))
             # Draw result amount
             text = c.inv_font.render(str(r[0][1]), 1, (255, 255, 255))
-            surface.blit(text, text.get_rect(bottomright=rect.bottomright))
+            self.ui.blit(text, text.get_rect(bottomright=rect.bottomright))
         # Draw selected recipe
-        surface.fill((0, 200, 200, 128), (self.recipe_rect.topleft, (self.rect.w, INV_W)))
+        self.ui.fill((0, 200, 200, 128), (self.recipe_rect.topleft, (self.rect.w, INV_W)))
         if self.selected_ui:
-            surface.blit(self.selected_ui, self.recipe_rect.topleft,
+            self.ui.blit(self.selected_ui, self.recipe_rect.topleft,
                          area=(-self.selected_scroll, 0, *self.recipe_rect.size))
-            pg.draw.rect(surface, (200, 200, 0), self.recipe_rect, 2)
-        surface.blit(self.craft, self.craft_rect)
-        pg.display.get_surface().blit(surface, self.rect)
-        del surface
+            pg.draw.rect(self.ui, (200, 200, 0), self.recipe_rect, 2)
+        self.ui.blit(self.craft, self.craft_rect)
 
     def draw(self):
-        self.update_blocks()
-        self.update_ui(self.can_craft)
+        if self.update_blocks():
+            self.update_ui(self.can_craft)
+        pg.display.get_surface().blit(self.ui, self.rect)
         pos = pg.mouse.get_pos()
         if self.rect.collidepoint(*pos):
             pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
@@ -243,10 +246,12 @@ class CraftingUI(ActiveUI):
                             self.scroll -= INV_W // 2
                             if self.scroll < 0:
                                 self.scroll = 0
+                            self.update_ui(self.can_craft)
                         elif e.button == BUTTON_WHEELDOWN:
                             self.scroll += INV_W // 2
                             if self.scroll > self.max_scroll:
                                 self.scroll = self.max_scroll
+                            self.update_ui(self.can_craft)
                     # Start dragging
                     elif e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT and \
                             self.recipe_rect.collidepoint(*pos):

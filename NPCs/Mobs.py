@@ -164,7 +164,7 @@ class MainBoss(Boss):
     def __init__(self):
         super().__init__(name="Main Boss", aggressive=True, w=3, rarity=3,
                          img=MOB + "main_boss/shadow_dude_0.png", sprite=MOB + "main_boss/shadow_dude_0.png",
-                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=300, damage=100, defense=25, max_speedy=30))
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=2, damage=100, defense=25, max_speedy=30))
         self.no_knockback = True
         self.stage = self.jump_count = self.launch_angle = 0
         self.launch_target = [0, 0]

@@ -20,6 +20,9 @@ animations = []
 world = handler = player = None
 # Game time and time since last update (seconds)
 game_time = dt = 0
+draw_time = 0
+# Should we resize
+new_dim = (0, 0)
 # Change in mouse pos since last update
 d_mouse = [0, 0]
 # Damage text boxes ([surface, rect, timer])
@@ -59,7 +62,7 @@ def tick():
     # Update game time and get time since last tick
     global game_time, dt, d_mouse
     dt = time() - game_time
-    game_time = time()
+    game_time += dt
     d_mouse = pg.mouse.get_rel()
 
     # Check events
@@ -68,14 +71,12 @@ def tick():
         if e.type == QUIT:
             return False
         elif e.type == VIDEORESIZE:
-            resize(e.w, e.h)
-            player.on_resize()
-        else:
-            continue
-        events.remove(e)
+            global new_dim
+            new_dim = (e.w, e.h)
+            events.remove(e)
 
     # Update world
-    world.tick()
+    world.tick(dt)
 
     # Update the player
     if player.map_open:
@@ -89,14 +90,28 @@ def tick():
     # Also checks collisions and attacks
     handler.move(player)
 
-    draw()
+    from time import sleep
+
     return True
 
 
 def draw():
+    global draw_time
+    draw_dt = time() - draw_time
+    draw_time += draw_dt
+
+    global new_dim
+    if new_dim.count(0) < 2:
+        resize(*new_dim)
+        player.on_resize()
+        new_dim = (0, 0)
+
     display = pg.display.get_surface()
     display.fill(world.sky_color)
     rect = world.get_screen_rect(player.rect.center)
+
+    # Update world
+    world.draw_tick(draw_dt)
 
     if player.map_open:
         # Draw world map
@@ -109,17 +124,17 @@ def draw():
         # Draw pre-ui player visuals
         player.draw_pre_ui(rect)
         # Draw lighting
-        #world.draw_light(rect)
+        # world.draw_light(rect)
         # Draw damage text boxes
         for arr in dmg_text:
             # Decrement textbox counter
-            arr[2] -= dt
+            arr[2] -= draw_dt
             # Check if the textbox is done
             if arr[2] <= 0:
                 dmg_text.remove(arr)
             else:
                 # Move the text up
-                arr[1][1] -= BLOCK_W * 1.5 * dt
+                arr[1][1] -= BLOCK_W * 1.5 * draw_dt
                 # Check if we need to blit it
                 r = arr[0].get_rect(center=arr[1])
                 if r.colliderect(rect):
@@ -128,11 +143,17 @@ def draw():
         player.draw_ui(rect)
 
     # Draw fps
-    fps = int(1 / dt)
-    print("\r" + str(fps), end=" ")
+    game_fps = int(1 / dt) if dt != 0 else math.inf
+    fps = int(1 / draw_dt) if draw_dt != 0 else math.inf
+    print("\r" + str(game_fps), str(fps), end=" ")
+    # Draw fps
+    d = pg.display.get_surface()
     text = c.ui_font.render(str(fps) + " FPS", 1, (255, 255, 255))
-    text_rect = text.get_rect(bottom=pg.display.get_surface().get_size()[1])
-    pg.display.get_surface().blit(text, text_rect)
+    text_rect = text.get_rect(bottom=d.get_size()[1])
+    d.blit(text, text_rect)
+    text = c.ui_font.render(str(game_fps) + " FPS", 1, (255, 255, 255))
+    text_rect = text.get_rect(bottom=text_rect.top)
+    d.blit(text, text_rect)
 
 
 # Functions that affect the world object

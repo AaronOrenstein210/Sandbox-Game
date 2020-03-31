@@ -5,7 +5,7 @@ import numpy as np
 import math
 import pygame as pg
 from pygame.locals import *
-from Tools.tile_ids import AIR, SNOW
+from Tools.tile_ids import AIR
 from Tools import constants as c
 from Tools import game_vars
 
@@ -57,8 +57,8 @@ class World:
     def sky_color(self):
         return 0, 0, 255 * (1 - pow((self.time - c.NOON) / c.NOON, 2))
 
-    def tick(self):
-        self.time = (self.time + game_vars.dt) % c.SEC_PER_DAY
+    def tick(self, dt):
+        self.time = (self.time + dt) % c.SEC_PER_DAY
         # Run auto save
         self.next_save -= game_vars.dt
         if self.next_save <= 0:
@@ -67,6 +67,8 @@ class World:
                 self.save_progress = 0
                 self.next_save = 30
                 game_vars.player.write()
+
+    def draw_tick(self, dt):
         # Update minimap
         pos = game_vars.player_pos(True)
         left, top = max(int(pos[0] - 10), 0), max(int(pos[1] - 10), 0)
@@ -75,9 +77,10 @@ class World:
         for x, y in zip(*np.where(section == 0)):
             map_color = game_vars.tiles[game_vars.get_block_at(left + x, top + y)].map_color
             section[x][y] = self.map.map_rgb(map_color)
+        del section
         # Update every animation
         for a in game_vars.animations:
-            a.update()
+            a.update(dt)
         from Tools.constants import BLOCK_W
         rect = self.get_screen_rect(game_vars.player_pos())
         xmin, xmax = rect.left // BLOCK_W, rect.right // BLOCK_W
@@ -311,7 +314,7 @@ class World:
             return 1
         # Get current row
         row = int(progress * self.dim[1] + .5 / self.dim[1])
-        arr = pg.surfarray.pixels2d(self.map)[:, row]
+        arr = pg.surfarray.array2d(self.map)[:, row]
         # Figure out which sections have been explored
         self.f_obj.write(bool(arr[0] != 0).to_bytes(1, byteorder))
         result = [i + 1 for i, (v1, v2) in enumerate(zip(arr[:-1], arr[1:])) if (v1 == 0) != (v2 == 0)]

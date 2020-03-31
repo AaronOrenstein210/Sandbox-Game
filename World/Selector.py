@@ -113,7 +113,7 @@ class WorldSelector(Selector):
         self.delete.clear()
         for file in listdir(self.path):
             if file.endswith(".wld"):
-                name = get_file_name(file)
+                name = remove_ext(file)
                 # Make sure this file is not the current world file
                 if not game_vars.world or game_vars.world.file.name != name:
                     with open(self.path + file, 'rb') as f:
@@ -176,12 +176,13 @@ class WorldSelector(Selector):
                         pos = (pos[0] - self.rects["Scroll"].x, pos[1] - self.rects["Scroll"].y)
                         idx = (pos[1] - self.scroll) // ITEM_H
                         if idx < len(self.files) and pos[0] >= ITEM_W - BUTTON_W:
+                            world_name = add_spaces(self.files[idx])
                             if (pos[1] - self.scroll) % ITEM_H < BUTTON_W:
-                                game_vars.change_world(c.WorldFile(self.universe, name=self.files[idx]))
+                                game_vars.change_world(c.WorldFile(self.universe, name=world_name))
                                 return True
                             elif self.delete[idx]:
-                                if YesNo("Delete " + self.files[idx] + "?", redraw_back=self.draw()).run_now():
-                                    remove(c.WorldFile(self.universe, name=self.files[idx]).full_file)
+                                if YesNo("Delete " + world_name + "?", redraw_back=self.draw()).run_now():
+                                    remove(c.WorldFile(self.universe, name=world_name).full_file)
                                     self.load_files()
 
 
@@ -209,7 +210,7 @@ class MainSelector(Selector):
         for file in listdir(self.file.path):
             if self.mode == PLAYER:
                 if isfile(self.file.path + file) and file.endswith(self.file.extension):
-                    self.files.append(get_file_name(file))
+                    self.files.append(remove_ext(file))
             elif self.mode == UNIVERSE:
                 if isdir(self.file.path + file) and any(f.endswith(".wld") for f in listdir(self.file.path + file)):
                     self.files.append(file)
@@ -306,7 +307,7 @@ class MainSelector(Selector):
                                     return WorldSelector(self.files[idx]).run()
                             # Bottom button is delete button
                             else:
-                                if YesNo("Delete " + self.files[idx].replace("_", " ") + "?",
+                                if YesNo("Delete " + add_spaces(self.files[idx]) + "?",
                                          redraw_back=self.draw()).run_now():
                                     if self.mode == PLAYER:
                                         remove(self.file.path + self.files[idx] + self.file.extension)
@@ -335,7 +336,11 @@ class MainSelector(Selector):
                 self.draw_text()
 
 
-# Takes off extension and replaces '_' with ' '
-def get_file_name(name):
-    name = name.replace('_', ' ')
+# Takes off extension
+def remove_ext(name):
     return name[:name.rfind(".")]
+
+
+# Switches '_' to ' '
+def add_spaces(file_name):
+    return file_name.replace('_', ' ')

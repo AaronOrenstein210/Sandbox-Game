@@ -4,7 +4,6 @@ from os import listdir
 from os.path import isdir
 import pygame as pg
 from Tools.constants import scale_to_fit
-from Tools import game_vars
 
 
 # Generic animations, goes through list of frames
@@ -19,8 +18,8 @@ class Animation:
         self.frame_delay = delay
         self.idx = self.time = 0
 
-    def update(self):
-        self.time += game_vars.dt
+    def update(self, dt):
+        self.time += dt
         if self.time >= self.frame_delay:
             self.idx = int((self.idx + self.time / self.frame_delay) % len(self.frames))
             self.time %= self.frame_delay
@@ -38,8 +37,8 @@ class OscillateAnimation(Animation):
         Animation.__init__(self, **kwargs)
         self.forwards = True
 
-    def update(self):
-        self.time += game_vars.dt
+    def update(self, dt):
+        self.time += dt
         if self.time >= self.frame_delay:
             self.idx += 1 if self.forwards else -1
             if (self.idx == len(self.frames) - 1 and self.forwards) or \

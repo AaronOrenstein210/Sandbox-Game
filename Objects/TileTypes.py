@@ -211,9 +211,10 @@ class SpawnTile(Tile):
                     num -= chance
 
 
+# TODO: By row/col, not radius
 class LightTile(Tile):
     def __init__(self, idx, magnitude=10, radius=5, **kwargs):
-        super().__init__(idx, *kwargs)
+        super().__init__(idx, **kwargs)
         self.emits_light = True
         self.light_mag = magnitude
         self.light_r = int(max(min(radius, 255), 1) * BLOCK_W)
