@@ -206,12 +206,12 @@ class Inventory:
             for x, val in enumerate(row):
                 max_stack = min(item.max_stack, self.max_stack)
                 amnt = self.inv_amnts[y][x]
-                data = self.inv_data.get((y, x))
+                data = self.inv_data.get((x, y))
                 if val == -1:
                     empty.append((x, y))
                 elif val == item.idx and amnt != max_stack and data == item.data:
                     if amnt + item_amnt <= max_stack:
-                        return [(x, y)]
+                        return good + [(x, y)]
                     else:
                         good.append((x, y))
                         item_amnt -= max_stack - amnt
