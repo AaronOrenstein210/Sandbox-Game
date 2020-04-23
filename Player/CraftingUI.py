@@ -168,16 +168,16 @@ class CraftingUI(ActiveUI):
                 x, y = pos[0] // INV_W, (pos[1] + self.scroll) // INV_W
                 idx = y * 10 + x
                 if idx < len(self.can_craft):
-                    item = self.recipes[self.can_craft[idx]][0][0]
-                    game_vars.items[item].draw_description(None)
+                    item = game_vars.items[self.recipes[self.can_craft[idx]][0][0]]
+                    item.draw_description(item.new())
             # Draw description for recipe item
             elif self.recipe_rect.collidepoint(*pos):
                 # Get index of recipe item we are hovering over
                 # +1 to skip the result item
                 idx = (pos[0] - self.selected_scroll) // INV_W + 1
                 if idx < len(self.selected):
-                    item = self.selected[idx][0]
-                    game_vars.items[item].draw_description(None)
+                    item = game_vars.items[self.selected[idx][0]]
+                    item.draw_description(item.new())
 
     def process_events(self, events, mouse, keys):
         pos = pg.mouse.get_pos()
@@ -242,6 +242,12 @@ class CraftingUI(ActiveUI):
                                     else:
                                         self.max_off = 0
                                     self.selected_scroll = 0
+                                    # Draw recipe
+                                    self.ui.fill((0, 200, 200, 128), (self.recipe_rect.topleft, (self.rect.w, INV_W)))
+                                    self.ui.blit(self.selected_ui, self.recipe_rect.topleft,
+                                                 area=(-self.selected_scroll, 0, *self.recipe_rect.size))
+                                    pg.draw.rect(self.ui, (200, 200, 0), self.recipe_rect, 2)
+                                    self.ui.blit(self.craft, self.craft_rect)
                         elif e.button == BUTTON_WHEELUP:
                             self.scroll -= INV_W // 2
                             if self.scroll < 0:
