@@ -149,6 +149,14 @@ class ValleyBiome(Item):
         return "Reveals the mysteries of the Valley"
 
 
+class DesertBiome(Item):
+    def __init__(self):
+        super().__init__(i.DESERT, img=INV + "desert.png", name="Desert Biome")
+
+    def get_description(self, data):
+        return "Pulsates with the power of the Desert"
+
+
 class SmallWorld(Item):
     def __init__(self):
         super().__init__(i.SMALL_WORLD, img=INV + "small_world.png", name="Small World")
@@ -226,6 +234,28 @@ class Obsidian(Item):
         return "Obtained from the nether regions of the world"
 
 
+# Other Items
+class MagicBall(MagicContainer):
+    def __init__(self):
+        super().__init__(i.MAGIC_BALL, capacity=100, img=INV + "magic_ball.png", name="Magic Ball")
+
+
+class ReinforcedMagicBall(MagicContainer):
+    def __init__(self):
+        super().__init__(i.REINFORCED_MAGIC_BALL, capacity=500, img=INV + "reinforced_magic_ball.png",
+                         name="Reinforced Magic Ball")
+
+
+class ShinyMagicBall(MagicContainer):
+    def __init__(self):
+        super().__init__(i.SHINY_MAGIC_BALL, capacity=2500, img=INV + "shiny_magic_ball.png", name="Shiny Magic Ball")
+
+
+class GiantMagicBall(MagicContainer):
+    def __init__(self):
+        super().__init__(i.GIANT_MAGIC_BALL, capacity=10000, img=INV + "giant_magic_ball.png", name="Giant Magic Ball")
+
+
 # Blocks
 class Dirt(Block):
     def __init__(self):
@@ -250,6 +280,16 @@ class Wood(Block):
 class Leaves(Block):
     def __init__(self):
         super().__init__(i.LEAVES, t.LEAVES, name="Leaves", img=INV + "leaves.png")
+
+
+class Sand(Block):
+    def __init__(self):
+        super().__init__(i.SAND, t.SAND, name="Sand", img=INV + "sand.png")
+
+
+class Glass(Block):
+    def __init__(self):
+        super().__init__(i.GLASS, t.GLASS, name="Glass", img=INV + "glass.png")
 
 
 class ShinyStone1(Block):

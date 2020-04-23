@@ -130,6 +130,25 @@ class Valley(Biome):
         return random_ore(h_frac, .66, 1, chances_i, chances_f)
 
 
+class Desert(Biome):
+    def __init__(self):
+        super().__init__(items.DESERT)
+
+    def generate_terrain(self, world, surface, x, dx):
+        land = generate_noise(20, 20, 3, dx)
+        stone = generate_noise(10, 25, 3, dx)
+
+        for i, (val1, val2) in enumerate(zip(land, stone)):
+            land_h = world.surface_h + val1
+            stone_h = world.underground + val2
+            fill_chunk(world.blocks, x + i, 1, land_h, stone_h - land_h, tiles.SAND)
+            fill_chunk(world.blocks, x + i, 1, stone_h, world.dim[1] - stone_h, tiles.STONE)
+            surface[x + i] = land_h
+
+    def get_ore_type(self, h_frac):
+        return tiles.SAND if uniform(0, 10 * (h_frac - .66)) <= 1 else tiles.SHINY_STONE_1
+
+
 # Returns random ore type with chances scaling based on height
 # Takes in current height, height range, initial ore chances (@h=hmin),
 # and final ore chances (@h=hmax)

@@ -255,6 +255,29 @@ class Armor(Upgradable):
         super().__init__(idx, upgrade_tree, **kwargs)
 
 
+class MagicContainer(Item):
+    NONE, FIRE, WATER, EARTH = range(4)
+    ELEMENT_NAMES = {NONE: "Unbound", FIRE: "Fire", WATER: "Water", EARTH: "Earth"}
+
+    def __init__(self, idx, capacity=100, **kwargs):
+        super().__init__(idx, **kwargs)
+        self.capacity = capacity
+        self.int_bytes = math.ceil(math.log2(capacity) / 8)
+
+    def new(self):
+        return bytearray(self.int_bytes + 1)
+
+    def get_description(self, data):
+        if data and len(data) <= self.int_bytes + 1:
+            element = int.from_bytes(data[:1], byteorder)
+            amnt = int.from_bytes(data[1:self.int_bytes + 1], byteorder)
+        else:
+            element = self.NONE
+            amnt = 0
+        return "Element: {}\n{} / {} Essence Stored".format(self.ELEMENT_NAMES[element],
+                                                            amnt, self.capacity)
+
+
 def rotate_point(p, d_theta):
     r = math.sqrt(pow(p[0], 2) + pow(p[1], 2))
     theta_i = math.asin(p[1] / r)

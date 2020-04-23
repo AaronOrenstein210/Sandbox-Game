@@ -62,6 +62,19 @@ class Leaves(Tile):
         self.map_color = (0, 150, 0)
 
 
+class Sand(Tile):
+    def __init__(self):
+        super().__init__(t.SAND, img=INV + "sand.png")
+        self.add_drop(i.SAND, 1)
+        self.map_color = (255, 224, 140)
+
+
+class Glass(Tile):
+    def __init__(self):
+        super().__init__(t.GLASS, img=INV + "glass.png")
+        self.map_color = (200, 200, 200)
+
+
 class Boulder1(Tile):
     def __init__(self):
         super().__init__(t.BOULDER1, img=INV + "boulder_1.png")
@@ -140,11 +153,16 @@ class WorkTable(CraftingStation):
                 [[i.FOREST, 1], [i.DIRT, 50], [i.CAT, 1]],
                 [[i.MOUNTAIN, 1], [i.STONE, 10], [i.SNOW, 15]],
                 [[i.VALLEY, 1], [i.STONE, 50], [i.ZOMBIE, 1]],
+                [[i.DESERT, 1], [i.SAND, 50], [i.GLASS, 15]],
                 [[i.BASIC_SWORD, 1], [i.WOOD, 10], [i.STONE, 20]],
                 [[i.CRUSHER, 1], [i.STONE, 15], [i.SHINY_STONE_1, 10]],
                 [[i.CHEST, 1], [i.WOOD, 15], [i.STONE, 5]],
                 [[i.WORLD_BUILDER, 1], [i.STONE, 25], [i.OBSIDIAN, 5]],
-                [[i.SNOW_BALL, 1]]]
+                [[i.SNOW_BALL, 1]],
+                [[i.MAGIC_BALL, 1], [i.GLASS, 10]],
+                [[i.REINFORCED_MAGIC_BALL, 1], [i.MAGIC_BALL, 2], [i.IRON_BAR, 5]],
+                [[i.SHINY_MAGIC_BALL, 1], [i.REINFORCED_MAGIC_BALL, 2], [i.GOLD_BAR, 10]],
+                [[i.GIANT_MAGIC_BALL, 1], [i.SHINY_MAGIC_BALL, 2], [i.OBSIDIAN, 5]]]
 
 
 class Forge(CraftingStation):
@@ -158,7 +176,8 @@ class Forge(CraftingStation):
 
     def get_recipes(self):
         return [[[i.IRON_BAR, 1], [i.IRON_ORE, 2]],
-                [[i.GOLD_BAR, 1], [i.GOLD_ORE, 2]]]
+                [[i.GOLD_BAR, 1], [i.GOLD_ORE, 2]],
+                [[i.GLASS, 1], [i.SAND, 1]]]
 
 
 # Spawners
