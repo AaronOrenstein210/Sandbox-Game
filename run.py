@@ -1,6 +1,5 @@
 # Created on 21 October 2019
 
-import threading
 import pygame as pg
 from traceback import print_exc
 import os
@@ -24,42 +23,17 @@ game_vars.init()
 
 clock = pg.time.Clock()
 
-playing = True
-
-
-def draw_loop():
-    global playing
-    while playing:
-        try:
-            game_vars.draw()
-        except:
-            print("Draw Loop Crashed", print_exc())
-            playing = False
-
-        pg.display.flip()
-        clock.tick(60)
-
-
-# Set up and start draw loop in a separate thread
-thread1 = threading.Thread(target=draw_loop)
-thread1.start()
-
-# Run the game loop
-while playing:
+while True:
     result = False
     try:
         result = game_vars.tick()
     except:
-        print("Game Loop Crashed", print_exc())
+        print("Crashed", print_exc())
 
     if not result:
-        playing = False
+        game_vars.close_world()
+        pg.quit()
+        exit(0)
+
+    pg.display.flip()
     clock.tick(60)
-
-# Once the game loop finishes, wait for the draw loop
-thread1.join()
-
-# Save and close the world
-game_vars.close_world()
-pg.quit()
-exit(0)

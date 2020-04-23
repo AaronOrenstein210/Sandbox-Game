@@ -67,8 +67,6 @@ class World:
                 self.save_progress = 0
                 self.next_save = 30
                 game_vars.player.write()
-
-    def draw_tick(self, dt):
         # Update minimap
         pos = game_vars.player_pos(True)
         left, top = max(int(pos[0] - 10), 0), max(int(pos[1] - 10), 0)
@@ -91,7 +89,8 @@ class World:
             if xmin <= x <= xmax:
                 for y in self.animations[x].keys():
                     if ymin <= y <= ymax:
-                        img = game_vars.tiles[self.blocks[y][x]].get_block_img(c.get_from_dict(x, y, self.block_data))
+                        img = game_vars.tiles[self.blocks[y][x]].get_block_img(
+                            c.get_from_dict(x, y, self.block_data))
                         img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
                         pg.draw.rect(self.surface, SRCALPHA, img_rect)
                         self.surface.blit(img, img_rect)
@@ -101,6 +100,9 @@ class World:
         self.file = world_file
         self.f_obj = open(self.file.full_file, 'a+')
         self.f_obj.close()
+        # Reset auto save
+        self.save_progress = 0
+        self.next_save = 30
 
     def new_world(self, dim):
         self.dim = dim
