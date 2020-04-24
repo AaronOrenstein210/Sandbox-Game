@@ -87,8 +87,8 @@ class Mountain(Biome):
                 dy += 1
 
     def get_ore_type(self, h_frac):
-        chances_i = {tiles.SHINY_STONE_1: 70, tiles.SHINY_STONE_2: 30}
-        chances_f = {tiles.SHINY_STONE_1: 40, tiles.SHINY_STONE_2: 60}
+        chances_i = {tiles.SHINY_STONE_1: 45, tiles.SHINY_STONE_2: 25, tiles.GEODE: 30}
+        chances_f = {tiles.SHINY_STONE_1: 20, tiles.SHINY_STONE_2: 25, tiles.GEODE: 55}
         return random_ore(h_frac, .66, 1, chances_i, chances_f)
 
 

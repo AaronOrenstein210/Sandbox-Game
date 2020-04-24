@@ -41,6 +41,9 @@ class Item:
         self.left_click = True
         self.right_click = False
 
+        # Magic value of item for sacrificing
+        self.magic_value = 0
+
         if isfile(img) and (img.endswith(".png") or img.endswith(".jpg")):
             s = pg.image.load(img)
             self.inv_img = scale_to_fit(s, INV_IMG_W, INV_IMG_W)
@@ -135,6 +138,8 @@ class Item:
             desc = desc[idx + 1:]
         text.append(desc)
         # Add any item characteristics
+        if self.magic_value != 0:
+            text.append("Magic Value: {}".format(self.magic_value))
         if self.placeable:
             text.append("Can be placed")
         return text

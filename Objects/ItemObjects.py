@@ -234,7 +234,46 @@ class Obsidian(Item):
         return "Obtained from the nether regions of the world"
 
 
+class Geode(Item):
+    def __init__(self):
+        super().__init__(i.GEODE, img=INV + "geode.png", name="Geode")
+
+    def get_description(self, data):
+        return "So many pretty colors, maybe we should try crushing it"
+
+
+class Jade(Item):
+    def __init__(self):
+        super().__init__(i.JADE, img=INV + "jade.png", name="Jade")
+        self.magic_value = 1
+
+
+class Pearl(Item):
+    def __init__(self):
+        super().__init__(i.PEARL, img=INV + "pearl.png", name="Pearl")
+        self.magic_value = 1
+
+
+class Amethyst(Item):
+    def __init__(self):
+        super().__init__(i.AMETHYST, img=INV + "amethyst.png", name="Amethyst")
+        self.magic_value = 2
+
+
+class Sapphire(Item):
+    def __init__(self):
+        super().__init__(i.SAPPHIRE, img=INV + "sapphire.png", name="Sapphire")
+        self.magic_value = 3
+
+
+class Opal(Item):
+    def __init__(self):
+        super().__init__(i.OPAL, img=INV + "opal.png", name="Opal")
+        self.magic_value = 3
+
+
 # Other Items
+
 class MagicBall(MagicContainer):
     def __init__(self):
         super().__init__(i.MAGIC_BALL, capacity=100, img=INV + "magic_ball.png", name="Magic Ball")

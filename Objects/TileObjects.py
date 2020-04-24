@@ -3,6 +3,7 @@
 from sys import byteorder
 from random import choice
 from pygame.locals import *
+import Objects
 from Objects.TileTypes import *
 from Objects.DroppedItem import DroppedItem
 from Objects.ItemTypes import Upgradable
@@ -121,6 +122,13 @@ class ShinyStone3(Tile):
         self.add_drop(i.SHINY_STONE_3, 1)
         self.map_color = (125, 125, 125)
         self.hardness = 3
+
+
+class Geode(Tile):
+    def __init__(self):
+        super().__init__(t.GEODE, img=INV + "geode_rock.png")
+        self.add_drop(i.GEODE, 1)
+        self.hardness = 2
 
 
 class DragonEgg(Tile):
@@ -473,8 +481,6 @@ class Crusher(FunctionalTile):
                 game_vars.player.inventory.toggle()
 
     class UI(ActiveUI):
-        ITEMS = [i.SHINY_STONE_1, i.SHINY_STONE_2, i.SHINY_STONE_3]
-
         def __init__(self, pos, data, max_stack):
             self.max_stack = max_stack
             # Generate text
@@ -487,7 +493,7 @@ class Crusher(FunctionalTile):
             s = pg.Surface((w, c.INV_W * 2))
             s.blit(text, self.text_rect)
             # This is where we will take/add items
-            self.inv = Inventory((1, 1), whitelist=self.ITEMS, max_stack=9)
+            self.inv = Inventory((1, 1), whitelist=Objects.CRUSH_DROPS.keys(), max_stack=9)
             self.inv.rect = pg.Rect((w - c.INV_W) // 2, 0, c.INV_W, c.INV_W)
             self.inv.load(data)
 
@@ -514,16 +520,15 @@ class Crusher(FunctionalTile):
                     for e in events:
                         if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT and \
                                 self.text_rect.collidepoint(*pos) and self.inv.inv_amnts[0][0] != 0:
-                            from Objects import CRUSH_DROPS
                             items = {}
                             item = self.inv.inv_items[0][0]
                             # Go through each item and get a random drop
                             while self.inv.inv_amnts[0][0] > 0:
-                                idx, amnt = CRUSH_DROPS[item](randint(1, 100))
+                                idx = Objects.CRUSH_DROPS[item].random()
                                 if idx in items.keys():
-                                    items[idx] += amnt
+                                    items[idx] += 1
                                 else:
-                                    items[idx] = amnt
+                                    items[idx] = 1
                                 self.inv.inv_amnts[0][0] -= 1
                             # Drop the results
                             block_pos = [self.block_pos[0] * BLOCK_W, self.block_pos[1] * BLOCK_W]
@@ -535,6 +540,7 @@ class Crusher(FunctionalTile):
                                     game_vars.drop_item(DroppedItem(idx, transfer), choice([True, False]), block_pos)
                                     amnt -= transfer
                             self.save()
+                            self.inv.set_amnt_at(0, 0, 0)
 
 
 class UpgradeStation(FunctionalTile):
