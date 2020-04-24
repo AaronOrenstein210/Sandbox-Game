@@ -58,7 +58,7 @@ class CraftingUI(ActiveUI):
                self.selected != []
 
     def update_blocks(self):
-        prev = self.recipes.copy()
+        prev = self.can_craft.copy()
 
         crafters = game_vars.world.crafters
         # Get all crafting blocks in the area and load their recipes
@@ -122,7 +122,7 @@ class CraftingUI(ActiveUI):
 
         self.scroll = min(self.scroll, self.max_scroll)
 
-        return self.recipes != prev
+        return self.can_craft != prev
 
     def update_ui(self, indexes):
         # Trim scroll if necessary
