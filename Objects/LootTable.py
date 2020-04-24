@@ -4,6 +4,7 @@
 import random
 
 
+# TODO: Item amounts
 class LootTable:
     # Takes in (item, amnt) arguments
     def __init__(self, *items):

@@ -262,7 +262,7 @@ class Player:
         text_rect = text.get_rect()
         text_rect.right = rect.w
         display.blit(text, text_rect)
-        # TODO: Defense
+        # TODO: Stats
 
         # Get minimap
         self.map.set_center([p / BLOCK_W for p in self.rect.center])
@@ -494,7 +494,6 @@ class Player:
         return False
 
     # Get current damage
-    # TODO: weapon stats
     @property
     def damage(self):
         return self.stats.get_stat("damage")
