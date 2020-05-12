@@ -23,7 +23,7 @@ from World.Selector import WorldSelector
 class Air(LightTile):
     def __init__(self):
         super().__init__(t.AIR, radius=2.5)
-        self.emits_light = False
+        self.barrier = False
 
 
 class Dirt(Tile):
@@ -144,7 +144,13 @@ class DragonEgg(Tile):
         return False
 
 
-# End
+class Portal(Tile):
+    def __init__(self):
+        super().__init__(t.PORTAL, dim=[2, 3])
+        self.barrier = False
+        self.hardness = -1
+        self.map_color = (150, 0, 150)
+        self.set_animation(Animation(INV + "portal/", [d * BLOCK_W for d in self.dim], .15))
 
 
 # Crafting Stations

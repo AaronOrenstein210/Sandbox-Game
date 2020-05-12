@@ -12,9 +12,12 @@ from Tools import constants as c
 from Tools.tile_ids import AIR
 from UI.Operations import CompleteTask, LoadWorld, SaveWorld
 
-# Object lists
+# Object dictionaries
 items, tiles = {}, {}
 biomes, structures = {}, {}
+# All non-solid tiles
+non_solid = []
+# Current animations
 animations = []
 # Game objects, each of these gets set ONCE
 world = handler = player = None
@@ -36,12 +39,17 @@ def init():
     from World import WorldGenParts
 
     # Compile a list of items, tiles, biomes, and structures
-    items.clear(), tiles.clear(), biomes.clear(), structures.clear()
+    items.clear(), tiles.clear(), biomes.clear(), structures.clear(), non_solid.clear()
     for module in [ItemObjects, TileObjects, WorldGenParts]:
         for name, obj in getmembers(module):
             if isclass(obj) and module.__name__ in str(obj):
                 # The constructor automatically adds the item to the list
-                obj()
+                if module == TileObjects:
+                    tile = obj()
+                    if not tile.barrier:
+                        non_solid.append(tile.idx)
+                else:
+                    obj()
 
     # Load world and player and initialize entity handler
     from NPCs.EntityHandler import EntityHandler
@@ -349,6 +357,17 @@ def adjacent(x, y, w, h, tile, only):
     return only
 
 
+# Checks if any blocks in the given chunk are solid
+def any_solid(x1, x2, y1, y2):
+    unique_tiles = []
+    for y in range(y1, y2):
+        for x in range(x1, x2):
+            tile = get_block_at(x, y)
+            if tile not in unique_tiles:
+                unique_tiles.append(tile)
+    return any(t not in non_solid for t in unique_tiles)
+
+
 # Handles movement, checking for collisions with blocks
 def check_collisions(pos, block_dim, d):
     abs_d = [abs(val) for val in d]
@@ -357,7 +376,7 @@ def check_collisions(pos, block_dim, d):
     while max(abs_d) > BLOCK_W:
         perc = BLOCK_W / max(abs_d)
         d_ = [d[0] * perc, d[1] * perc]
-        check_collisions(pos, block_dim, d_)
+        check_collisions(pos, block_dim, d_.copy())
         d = [d[0] - d_[0], d[1] - d_[1]]
         abs_d = [abs(val) for val in d]
 
@@ -391,17 +410,18 @@ def check_collisions(pos, block_dim, d):
         idx = 1 - d.index(0)
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            x = next_block[0 if d[0] < 0 else 2]
+            solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
-        collide = collide.tolist()
-        # All blocks are air, just do the move
-        if collide.count(AIR) == len(collide):
-            pos[idx] += d[idx]
+            y = next_block[1 if d[1] < 0 else 3]
+            solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
         # >= 1 block is solid, truncate movement
-        else:
+        if solid:
             pos[idx] += to_next[idx]
+        # All blocks are non_solid, just do the move
+        else:
+            pos[idx] += d[idx]
     elif d.count(0) == 0:
         perc = [to_next[0] / d[0], to_next[1] / d[1]]
         # Index of shortest time to next block
@@ -412,34 +432,36 @@ def check_collisions(pos, block_dim, d):
         # When the idx direction hits the next block, idx2 has not changed blocks
         if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = blocks[current_block[1]:current_block[3] + 1, next_block[0 if d[0] < 0 else 2]]
+            x = next_block[0 if d[0] < 0 else 2]
+            solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = blocks[next_block[1 if d[1] < 0 else 3], current_block[0]:current_block[2] + 1]
-        collide = collide.tolist()
-        # All blocks are air, just do the move
-        if collide.count(AIR) == len(collide):
-            pos[idx] += d[idx]
-        else:
-            # Just move to next block and cuttoff delta
+            y = next_block[1 if d[1] < 0 else 3]
+            solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
+        # Just move to next block and cuttoff delta
+        if solid:
             pos[idx] += to_next[idx]
             delta = to_next[idx]
+        # All blocks are air, just do the move
+        else:
+            pos[idx] += d[idx]
 
         # Calculate bounds in the direction of idx when the direction of idx2 hits the next block
         current_val = [int((pos[idx] + delta) / BLOCK_W),
                        math.ceil((pos[idx] + px_dim[idx] + delta) / BLOCK_W) - 1]
-        if idx2 == 0:
+        if idx == 0:
             # From lowest row to highest row, at the next column over
-            collide = blocks[current_val[0]:current_val[1] + 1, next_block[0 if d[0] < 0 else 2]]
+            x = next_block[0 if d[0] < 0 else 2]
+            solid = any_solid(x, x + 1, current_val[0], current_val[1] + 1)
         else:
             # From the lowest column to the highest column, at the next row over
-            collide = blocks[next_block[1 if d[1] < 0 else 3], current_val[0]:current_val[1] + 1]
-        collide = collide.tolist()
+            y = next_block[1 if d[1] < 0 else 3]
+            solid = any_solid(current_val[0], current_val[1] + 1, y, y + 1)
         # All blocks are air, just do the move
-        if collide.count(AIR) == len(collide):
-            pos[idx2] += d[idx2]
-        else:
+        if solid:
             pos[idx2] += to_next[idx2]
+        else:
+            pos[idx2] += d[idx2]
 
 
 # Checks if we are touching blocks on the left or right
@@ -456,8 +478,7 @@ def touching_blocks_x(pos, dim, left):
         # Otherwise check if there is a solid block
         else:
             y_range = (int(pos[1] / BLOCK_W), math.ceil((pos[1] + h) / BLOCK_W))
-            collide = world.blocks[y_range[0]:y_range[1], next_x].tolist()
-            return collide.count(AIR) < len(collide)
+            return any_solid(next_x, next_x + 1, y_range[0], y_range[1])
     return False
 
 
@@ -477,8 +498,7 @@ def touching_blocks_y(pos, dim, top):
         # Otherwise check if there is a solid block
         else:
             x_range = (int(pos[0] / BLOCK_W), math.ceil((pos[0] + w) / BLOCK_W))
-            collide = world.blocks[next_y, x_range[0]:x_range[1]].tolist()
-            return collide.count(AIR) < len(collide)
+            return any_solid(x_range[0], x_range[1], next_y, next_y + 1)
     return False
 
 
@@ -487,7 +507,7 @@ def in_block(pos, dim):
     block_pos = [pos[0] / BLOCK_W, pos[1] / BLOCK_W]
     left, top = int(block_pos[0]), int(block_pos[1])
     right, bottom = math.ceil(block_pos[0] + dim[0]), math.ceil(block_pos[1] + dim[1])
-    return not (world.blocks[top:bottom, left:right] == AIR).all()
+    return not (world.blocks[top:bottom, left:right]).any()
 
 
 # Functions that change the world
@@ -501,10 +521,8 @@ def close_world():
 def load_world(world_file):
     from World.World import World
     global world
-    if world:
-        world.change_file(world_file)
-    else:
-        world = World(world_file)
+    del world
+    world = World(world_file)
     # Load the world
     if not LoadWorld(world).run_now():
         pg.quit()

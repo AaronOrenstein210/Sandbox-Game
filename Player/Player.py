@@ -524,7 +524,8 @@ class Player:
         self.set_pos((spawn[0] * BLOCK_W, spawn[1] * BLOCK_W))
         for x in range(spawn[0], ceil(spawn[0] + self.dim[0])):
             for y in range(spawn[1], ceil(spawn[1] + self.dim[1])):
-                self.break_block(x, y)
+                if game_vars.get_block_at(x, y) not in game_vars.non_solid:
+                    self.break_block(x, y)
 
     def respawn(self):
         self.stats.hp = self.stats.get_stat("hp")

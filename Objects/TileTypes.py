@@ -39,6 +39,8 @@ class Tile:
         self.anim_idx = -1
         # Emits light
         self.emits_light = False
+        # Obstructs player movement
+        self.barrier = True
 
         # Minimap color, does not need to be unique
         self.map_color = (64, 64, 255)
@@ -108,7 +110,7 @@ class Tile:
     # Hits the block with given power, returns if the block is broken or not
     def hit(self, x, y, power):
         # Check if we even do damage to the block
-        if power < self.hardness:
+        if self.hardness == -1 or power < self.hardness:
             return False
         # Get current damage if available
         dmg = c.get_from_dict(x, y, self.damage)
@@ -127,6 +129,7 @@ class Tile:
 class CraftingStation(Tile):
     def __init__(self, idx, **kwargs):
         super().__init__(idx, **kwargs)
+        self.barrier = False
         self.crafting = True
         self.recipes = self.get_recipes()
         i = 0
@@ -170,6 +173,7 @@ class CraftingStation(Tile):
 class FunctionalTile(Tile):
     def __init__(self, idx, **kwargs):
         super().__init__(idx, **kwargs)
+        self.barrier = False
         self.clickable = True
         self.has_ui = True
         self.has_data = True

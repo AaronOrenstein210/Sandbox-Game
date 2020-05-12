@@ -95,17 +95,8 @@ class World:
                         pg.draw.rect(self.surface, SRCALPHA, img_rect)
                         self.surface.blit(img, img_rect)
 
-    def change_file(self, world_file):
-        # File variables
-        self.file = world_file
-        self.f_obj = open(self.file.full_file, 'a+')
-        self.f_obj.close()
-        # Reset auto save
-        self.save_progress = 0
-        self.next_save = 30
-
     def new_world(self, dim):
-        self.dim = dim
+        self.dim = list(dim)
         self.num_blocks = dim[0] * dim[1]
         self.blocks = np.full((dim[1], dim[0]), AIR, dtype=np.int16)
         self.map = pg.Surface(dim)
@@ -447,3 +438,45 @@ class World:
                     light.blit(light_s, (r.x - (left * c.BLOCK_W), r.y - (top * c.BLOCK_W)),
                                special_flags=BLEND_RGBA_SUB)
         pg.display.get_surface().blit(light, (0, 0), area=((off_x, off_y), rect.size))
+
+
+class IdleWorld(World):
+    def __init__(self, worldfile):
+        super().__init__(worldfile)
+
+    # Draws the entire world and map
+    def draw_world(self, progress):
+        if progress == 0:
+            # Calculate pixel dimensions
+            dim = (c.BLOCK_W * self.blocks.shape[1], c.BLOCK_W * self.blocks.shape[0])
+            self.surface = pg.Surface(dim, SRCALPHA)
+            self.map = pg.Surface(self.dim)
+            self.map.fill(game_vars.tiles[AIR].map_color)
+            self.light = pg.Surface(self.dim, SRCALPHA)
+        map_arr = pg.surfarray.pixels2d(self.map)
+        one_percent_h = math.ceil(self.dim[1] / 100)
+        light_arr = pg.surfarray.pixels_alpha(self.light)
+        # Load world
+        y = int(progress * self.dim[1] + .5 / self.dim[1])
+        for y in range(y, min(y + one_percent_h, self.dim[1])):
+            # Loop through row
+            for x, val in enumerate(self.blocks[y]):
+                if val != AIR:
+                    light_arr[x][y] = 255
+                    if val >= 0:
+                        self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
+                        tile = game_vars.tiles[val]
+                        color_int = self.map.map_rgb(tile.map_color)
+                        map_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[color_int] * tile.dim[1]] * tile.dim[
+                            0]
+        return (y + 1) / self.dim[1]
+
+    # Save word
+    def save_world(self, progress):
+        if progress == 0:
+            # Save world information, automatically opens the file
+            self.save_info(False)
+        progress = self.save_blocks(progress, 1)
+        if progress == 1:
+            self.f_obj.close()
+        return progress

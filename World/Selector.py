@@ -8,7 +8,7 @@ from Tools.constants import MIN_W, MIN_H
 from Tools import constants as c
 from Tools import game_vars
 from UI.Operations import YesNo
-from World.World import World
+from World.World import World, IdleWorld
 from World.WorldGenerator import generate_world
 from Player.Player import create_new_player
 
@@ -325,6 +325,8 @@ class MainSelector(Selector):
                             # Generate a new world
                             new = World(c.WorldFile(self.file.name, name="Forest"))
                             new.can_delete = False
+                            generate_world(new)
+                            new = IdleWorld(c.WorldFile(self.file.name, name="Idle World"))
                             generate_world(new)
                             del new
                             self.file = c.UniverseFolder()
