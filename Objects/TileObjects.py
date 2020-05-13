@@ -24,6 +24,7 @@ class Air(LightTile):
     def __init__(self):
         super().__init__(t.AIR, radius=2.5)
         self.barrier = False
+        self.image.fill(SRCALPHA)
 
 
 class Dirt(Tile):

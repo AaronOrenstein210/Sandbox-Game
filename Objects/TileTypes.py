@@ -9,7 +9,7 @@ from Tools.constants import BLOCK_W, scale_to_fit, update_dict
 from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
 from Objects import INV
-from Objects.ItemTypes import Block
+from Objects.ItemTypes import Placeable
 
 
 class Tile:
@@ -41,6 +41,8 @@ class Tile:
         self.emits_light = False
         # Obstructs player movement
         self.barrier = True
+        # Updates every tick
+        self.updates = False
 
         # Minimap color, does not need to be unique
         self.map_color = (64, 64, 255)
@@ -64,6 +66,9 @@ class Tile:
 
         # Add tile to list
         game_vars.tiles[self.idx] = self
+
+    def tick(self, x, y, dt, data):
+        pass
 
     def set_animation(self, animation):
         self.anim_idx = len(game_vars.animations)
@@ -190,7 +195,7 @@ class SpawnTile(Tile):
         self.spawner = True
         self.map_color = (0, 0, 200) if self.rarity == 0 else (128, 0, 255) if self.rarity == 1 else (255, 0, 0)
         if item_id != -1:
-            Block(item_id, idx, name=self.entity.name + " Spawner", img=img)
+            Placeable(item_id, idx, name=self.entity.name + " Spawner", img=img)
 
     def spawn(self, pos, conditions):
         conditions.check_area(pos, 5 * self.rarity)
@@ -233,6 +238,13 @@ class LightTile(Tile):
                 self.light_s.set_at((x, y), color_)
                 # self.light_s[x][y] = 255 - 255 * (r / self.light_r) ** 2
                 theta += dtheta
+
+
+class Block:
+    def __init__(self, pos, idx, data):
+        self.x, self.y = pos
+        self.idx = idx
+        self.data = data
 
 
 def get_spawn_spaces(center, r, walking):

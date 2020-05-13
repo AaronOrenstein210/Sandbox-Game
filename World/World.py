@@ -8,6 +8,7 @@ from pygame.locals import *
 from Tools.tile_ids import AIR
 from Tools import constants as c
 from Tools import game_vars
+from World.Chunk import ChunkManager
 
 WORLD = 0
 
@@ -15,7 +16,6 @@ WORLD = 0
 class World:
     def __init__(self, world_file):
         # Visual variables
-        self.surface = None
         self.map = None
         self.light = None
         # World type
@@ -31,12 +31,10 @@ class World:
         self.num_blocks = 0
         # 2D array of world blocks
         self.blocks = None
-        # Special blocks, whose positions need to be stored
-        self.spawners = {}
-        self.animations = {}
+        # Special blocks whose positions need to be stored
         self.block_data = {}
+        self.spawners = {}
         self.crafters = {}
-        self.lights = {}
         # File variables
         self.file = world_file
         self.f_obj = open(self.file.full_file, 'ab+')
@@ -44,6 +42,8 @@ class World:
         # Auto save variables
         self.next_save = 30
         self.save_progress = 0
+
+        self.manager = ChunkManager(self)
 
     @property
     def surface_h(self):
@@ -76,24 +76,8 @@ class World:
             map_color = game_vars.tiles[game_vars.get_block_at(left + x, top + y)].map_color
             section[x][y] = self.map.map_rgb(map_color)
         del section
-        # Update every animation
-        for a in game_vars.animations:
-            a.update(dt)
-        from Tools.constants import BLOCK_W
-        rect = self.get_screen_rect(game_vars.player_pos())
-        xmin, xmax = rect.left // BLOCK_W, rect.right // BLOCK_W
-        ymin, ymax = rect.top // BLOCK_W, rect.bottom // BLOCK_W
-        # Multiblocks whose topleft is off screen won't update
-        # Go through all x/y and check if x+w is on screen (same for y)
-        for x in self.animations.keys():
-            if xmin <= x <= xmax:
-                for y in self.animations[x].keys():
-                    if ymin <= y <= ymax:
-                        img = game_vars.tiles[self.blocks[y][x]].get_block_img(
-                            c.get_from_dict(x, y, self.block_data))
-                        img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
-                        pg.draw.rect(self.surface, SRCALPHA, img_rect)
-                        self.surface.blit(img, img_rect)
+
+        self.manager.tick(dt)
 
     def new_world(self, dim):
         self.dim = list(dim)
@@ -177,8 +161,6 @@ class World:
     def draw_world(self, progress):
         if progress == 0:
             # Calculate pixel dimensions
-            dim = (c.BLOCK_W * self.blocks.shape[1], c.BLOCK_W * self.blocks.shape[0])
-            self.surface = pg.Surface(dim, SRCALPHA)
             self.map = pg.Surface(self.dim)
             self.map.fill(game_vars.tiles[AIR].map_color)
             self.light = pg.Surface(self.dim, SRCALPHA)
@@ -198,7 +180,6 @@ class World:
                 if val != AIR:
                     light_arr[x][y] = 255
                     if val >= 0:
-                        self.surface.blit(game_vars.tiles[val].image, (x * c.BLOCK_W, y * c.BLOCK_W))
                         if explored:
                             tile = game_vars.tiles[val]
                             color_int = self.map.map_rgb(tile.map_color)
@@ -216,9 +197,8 @@ class World:
     def load_world(self, progress):
         if progress == 0:
             # Reset world data
-            self.spawners.clear()
             self.block_data.clear()
-            self.animations.clear()
+            self.spawners.clear()
             # Load world info, automatically opens the file
             self.load_info(False)
             self.blocks = np.full((self.dim[1], self.dim[0]), AIR, dtype=np.int16)
@@ -229,6 +209,8 @@ class World:
             result = self.draw_world(progress - 1) / 2 + .5
             if result == 1:
                 self.f_obj.close()
+                self.manager.setup()
+                self.manager.load_all()
             return result
 
     # Saves world information
@@ -335,12 +317,12 @@ class World:
         w, h = tile.dim
         self.blocks[y:y + h, x:x + w] = [[-(x * 100 + y) for x in range(w)] for y in range(h)]
         self.blocks[y][x] = block
-        self.surface.blit(game_vars.tiles[block].image, (x * c.BLOCK_W, y * c.BLOCK_W))
         pg.draw.rect(self.map, tile.map_color, (x, y, *tile.dim))
         light_arr = pg.surfarray.pixels_alpha(self.light)
         light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[255] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.add_block(x, y, block)
+        self.manager.block_change(x, y)
 
     def destroy_block(self, x, y):
         x, y = game_vars.get_topleft(x, y)
@@ -349,36 +331,27 @@ class World:
         w, h = tile.dim
         self.blocks[y:y + h, x:x + w] = [[AIR] * w] * h
         # Redraw block
-        block_rect = Rect(x * c.BLOCK_W, y * c.BLOCK_W, c.BLOCK_W * w, c.BLOCK_W * h)
-        self.surface.fill(SRCALPHA, block_rect)
         pg.draw.rect(self.map, (64, 64, 255), (x, y, *tile.dim))
         light_arr = pg.surfarray.pixels_alpha(self.light)
         light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[0] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.remove_block(x, y, tile.idx)
+        self.manager.block_change(x, y)
 
     # Update dictionaries
     def add_block(self, x, y, idx):
         tile = game_vars.tiles[idx]
-        if tile.spawner:
-            c.update_dict(x, y, idx, self.spawners)
         if tile.crafting:
             c.update_dict(x, y, idx, self.crafters)
-        if tile.emits_light:
-            c.update_dict(x, y, idx, self.lights)
-        if tile.anim_idx != -1:
-            c.update_dict(x, y, tile.anim_idx, self.animations)
+        if tile.spawner:
+            c.update_dict(x, y, idx, self.spawners)
 
     def remove_block(self, x, y, idx):
         tile = game_vars.tiles[idx]
-        if tile.spawner:
-            c.remove_from_dict(x, y, self.spawners)
         if tile.crafting:
             c.remove_from_dict(x, y, self.crafters)
-        if tile.emits_light:
-            c.remove_from_dict(x, y, self.lights)
-        if tile.anim_idx != -1:
-            c.remove_from_dict(x, y, self.animations)
+        if tile.spawner:
+            c.remove_from_dict(x, y, self.spawners)
 
     def get_screen_rect(self, player_pos):
         dim = pg.display.get_surface().get_size()
@@ -394,11 +367,6 @@ class World:
                     topleft[i] = ub
         rect.topleft = topleft
         return rect
-
-    # Draws blocks
-    def draw_blocks(self, rect):
-        # Draw sky and blocks
-        pg.display.get_surface().blit(self.surface, (0, 0), area=rect)
 
     # Draws light
     def draw_light(self, rect):

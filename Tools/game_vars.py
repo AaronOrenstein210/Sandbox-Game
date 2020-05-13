@@ -80,6 +80,10 @@ def tick():
             player.on_resize()
             events.remove(e)
 
+    # Update every animation
+    for a in animations:
+        a.update(dt)
+
     # Update world
     world.tick(dt)
 
@@ -109,7 +113,7 @@ def draw():
         player.draw_map()
     else:
         # Draw background - sky and blocks
-        world.draw_blocks(rect)
+        world.manager.draw(rect)
         # Draw enemies, items, and projectiles
         handler.draw_display(rect)
         # Draw pre-ui player visuals

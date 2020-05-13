@@ -181,7 +181,7 @@ class Item:
         pg.display.get_surface().blit(s, rect)
 
 
-class Block(Item):
+class Placeable(Item):
     def __init__(self, idx, block_id, **kwargs):
         super().__init__(idx, **kwargs)
         self.block_id = block_id

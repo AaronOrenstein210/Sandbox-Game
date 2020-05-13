@@ -1,6 +1,5 @@
 # Created on 3 December 2019
 
-from sys import byteorder
 from pygame.locals import *
 from Objects import INV
 from Objects.ItemTypes import *
@@ -296,42 +295,42 @@ class GiantMagicBall(MagicContainer):
 
 
 # Blocks
-class Dirt(Block):
+class Dirt(Placeable):
     def __init__(self):
         super().__init__(i.DIRT, t.DIRT, name="Dirt", img=INV + "dirt.png")
 
 
-class Stone(Block):
+class Stone(Placeable):
     def __init__(self):
         super().__init__(i.STONE, t.STONE, name="Stone", img=INV + "stone.png")
 
 
-class Snow(Block):
+class Snow(Placeable):
     def __init__(self):
         super().__init__(i.SNOW, t.SNOW, name="Snow", img=INV + "snow.png")
 
 
-class Wood(Block):
+class Wood(Placeable):
     def __init__(self):
         super().__init__(i.WOOD, t.WOOD, name="Wood", img=INV + "wood_item.png")
 
 
-class Leaves(Block):
+class Leaves(Placeable):
     def __init__(self):
         super().__init__(i.LEAVES, t.LEAVES, name="Leaves", img=INV + "leaves.png")
 
 
-class Sand(Block):
+class Sand(Placeable):
     def __init__(self):
         super().__init__(i.SAND, t.SAND, name="Sand", img=INV + "sand.png")
 
 
-class Glass(Block):
+class Glass(Placeable):
     def __init__(self):
         super().__init__(i.GLASS, t.GLASS, name="Glass", img=INV + "glass.png")
 
 
-class ShinyStone1(Block):
+class ShinyStone1(Placeable):
     def __init__(self):
         super().__init__(i.SHINY_STONE_1, t.SHINY_STONE_1, name="Shiny Stone: Tier 1",
                          img=INV + "shiny_stone_1.png")
@@ -340,7 +339,7 @@ class ShinyStone1(Block):
         return "You can kind of see something shiny inside"
 
 
-class ShinyStone2(Block):
+class ShinyStone2(Placeable):
     def __init__(self):
         super().__init__(i.SHINY_STONE_2, t.SHINY_STONE_2, name="Shiny Stone: Tier 2",
                          img=INV + "shiny_stone_2.png")
@@ -349,7 +348,7 @@ class ShinyStone2(Block):
         return "Ooh, this rock is pretty"
 
 
-class ShinyStone3(Block):
+class ShinyStone3(Placeable):
     def __init__(self):
         super().__init__(i.SHINY_STONE_3, t.SHINY_STONE_3, name="Shiny Stone: Tier 3",
                          img=INV + "shiny_stone_3.png")
@@ -358,7 +357,7 @@ class ShinyStone3(Block):
         return "The glow of untold riches within tempts your greed"
 
 
-class DragonEgg(Block):
+class DragonEgg(Placeable):
     def __init__(self):
         super().__init__(i.DRAGON_EGG, t.DRAGON_EGG, name="Dragon Egg", img=INV + "dragon_egg.png")
 
@@ -366,7 +365,7 @@ class DragonEgg(Block):
         return "There's definitely something alive in here"
 
 
-class WorkTable(Block):
+class WorkTable(Placeable):
     def __init__(self):
         super().__init__(i.WORK_TABLE, t.WORK_TABLE, name="Work Table", img=INV + "work_table.png")
 
@@ -374,7 +373,7 @@ class WorkTable(Block):
         return "Now you can make pretty furniture!"
 
 
-class Forge(Block):
+class Forge(Placeable):
     def __init__(self):
         super().__init__(i.FORGE, t.FORGE, img=INV + "forge/forge_0.png")
 
@@ -382,7 +381,7 @@ class Forge(Block):
         return "I should really make a sweaty debuff for players near a forge"
 
 
-class DimensionHopper(Block):
+class DimensionHopper(Placeable):
     def __init__(self):
         super().__init__(i.DIMENSION_HOPPER, t.DIMENSION_HOPPER, name="Dimension Hopper",
                          img=INV + "dimension_hopper.png")
@@ -391,7 +390,7 @@ class DimensionHopper(Block):
         return "A mysterious portal that calls to your adventurous spirit"
 
 
-class Chest(Block):
+class Chest(Placeable):
     def __init__(self):
         super().__init__(i.CHEST, t.CHEST, name="Chest", img=INV + "chest.png")
 
@@ -399,7 +398,7 @@ class Chest(Block):
         return "Challenge idea: this block is only unlocked after beating the final boss"
 
 
-class WorldBuilder(Block):
+class WorldBuilder(Placeable):
     def __init__(self):
         super().__init__(i.WORLD_BUILDER, t.WORLD_BUILDER, name="World Builder",
                          img=INV + "world_builder/world_builder_0.png")
@@ -409,7 +408,7 @@ class WorldBuilder(Block):
                "Legend says that the presence of certain biome combinations will allow rare creatures to spawn"
 
 
-class Crusher(Block):
+class Crusher(Placeable):
     def __init__(self):
         super().__init__(i.CRUSHER, t.CRUSHER, name="Crusher", img=INV + "crusher/crusher_0.png")
 
@@ -417,7 +416,7 @@ class Crusher(Block):
         return "This machine looks powerful enough to crush those shiny stones that you found"
 
 
-class UpgradeStation(Block):
+class UpgradeStation(Placeable):
     def __init__(self):
         super().__init__(i.UPGRADE_STATION, t.UPGRADE_STATION, name="Upgrade Station", img=INV + "upgrade_station.png")
 
