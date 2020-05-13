@@ -271,7 +271,47 @@ class Opal(Item):
         self.magic_value = 3
 
 
+class MagicWand(Item):
+    def __init__(self):
+        super().__init__(i.MAGIC_WAND, img=INV + "magic_wand.png", name="Magic Wand")
+        self.right_click = True
+
+    def on_left_click(self):
+        pos = game_vars.get_topleft(*game_vars.global_mouse_pos(blocks=True))
+        item_id = game_vars.get_block_at(*pos)
+        if item_id == t.PORTAL:
+            data = game_vars.get_block_data(pos)
+            if data:
+                # TODO: ingame message system
+                print("Magic Stored:", int.from_bytes(data, byteorder))
+
+    def on_right_click(self):
+        # Check if we clicked on a mage
+        pos = game_vars.global_mouse_pos(blocks=False)
+        # TODO: Check for clicking on mage
+        for entity in game_vars.handler.entities:
+            pass
+        # Get the clicked on tile
+        pos = game_vars.get_topleft(pos[0] // BLOCK_W, pos[1] // BLOCK_W)
+        tile_id = game_vars.get_block_at(*pos)
+        # Check if we clicked on a pedestal
+        item_data = game_vars.get_current_item_data()
+        # TODO: Check for clicking on pedestal
+        if item_data and tile_id == t.PEDESTAL:
+            pass
+        # Check if we clicked on a portal
+        if tile_id == t.PORTAL:
+            game_vars.tiles[t.PORTAL].summon(pos)
+
+    def get_description(self, data):
+        return "Portals: Left click to display current magic amount\n" + \
+               "         Right click to summon a mage, consuming magic\n" + \
+               "Mages: Right click on a mage to select\n" + \
+               "Right click again on a pedestal to assign that mage to the pedestal"
+
+
 # Other Items
+
 
 class MagicBall(MagicContainer):
     def __init__(self):

@@ -172,6 +172,7 @@ def get_block_at(x, y):
     if 0 <= x < world.dim[0] and 0 <= y < world.dim[1]:
         x, y = get_topleft(x, y)
         return world.blocks[y, x]
+    print("get_block_at(): Coords out of bounds: {}, {}".format(x, y))
     return 0
 
 
@@ -184,7 +185,8 @@ def get_topleft(x, y):
             x -= idx // 100
             y -= idx % 100
         return x, y
-    print("get_topleft(): Coords out of bounds: {}, {}".format(x, y))
+    else:
+        print("get_topleft(): Coords out of bounds: {}, {}".format(x, y))
     return 0, 0
 
 

@@ -150,9 +150,31 @@ class Portal(Tile):
     def __init__(self):
         super().__init__(t.PORTAL, dim=[2, 3])
         self.barrier = False
+        self.updates = self.has_data = True
         self.hardness = -1
         self.map_color = (150, 0, 150)
         self.set_animation(Animation(INV + "portal/", [d * BLOCK_W for d in self.dim], .15))
+
+    def summon(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data:
+            magic = int.from_bytes(data[:8], byteorder)
+            # TODO: Summon mage dude
+
+    def on_place(self, pos):
+        game_vars.write_block_data(pos, bytearray(8))
+
+    def tick(self, x, y, dt, data):
+        magic = 0
+        rect = pg.Rect(x * BLOCK_W, y * BLOCK_W, self.dim[0] * BLOCK_W, self.dim[1] * BLOCK_W)
+        items = game_vars.handler.items
+        for item in items:
+            if item.item.magic_value > 0 and item.rect.colliderect(rect):
+                magic += item.item.magic_value
+                items.remove(item)
+        if magic > 0:
+            current_magic = int.from_bytes(data[:8], byteorder)
+            game_vars.write_block_data((x, y), (current_magic + magic).to_bytes(8, byteorder))
 
 
 # Crafting Stations
@@ -178,7 +200,9 @@ class WorkTable(CraftingStation):
                 [[i.MAGIC_BALL, 1], [i.GLASS, 10]],
                 [[i.REINFORCED_MAGIC_BALL, 1], [i.MAGIC_BALL, 2], [i.IRON_BAR, 5]],
                 [[i.SHINY_MAGIC_BALL, 1], [i.REINFORCED_MAGIC_BALL, 2], [i.GOLD_BAR, 10]],
-                [[i.GIANT_MAGIC_BALL, 1], [i.SHINY_MAGIC_BALL, 2], [i.OBSIDIAN, 5]]]
+                [[i.GIANT_MAGIC_BALL, 1], [i.SHINY_MAGIC_BALL, 2], [i.OBSIDIAN, 5]],
+                # TODO: Groups of items (e.g. any gem)
+                [[i.MAGIC_WAND, 1], [i.WOOD, 5], [i.OPAL, 2]]]
 
 
 class Forge(CraftingStation):

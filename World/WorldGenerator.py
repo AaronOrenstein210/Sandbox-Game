@@ -2,8 +2,8 @@
 # Generates the world
 
 from random import uniform, choice
-from Tools import item_ids as items, tile_ids as tiles
-from Tools import game_vars
+from Tools import item_ids as items, tile_ids as tiles, game_vars
+from Tools.constants import update_dict
 from World.World import World, IdleWorld
 from UI.Operations import SaveWorld
 
@@ -21,6 +21,7 @@ def generate_world(world, modifiers=()):
         world.blocks[50:, :] = tiles.GLASS
         # Add the portal
         world.blocks[47:50, 49:51] = [tiles.PORTAL, -100], [-1, -101], [-2, -202]
+        update_dict(49, 47, bytearray(8), world.block_data)
         # Set spawn
         world.spawn = [49, 47]
     elif isinstance(world, World):
