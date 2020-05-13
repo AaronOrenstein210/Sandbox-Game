@@ -28,7 +28,7 @@ class Chunk:
         for y in range(self.y, min(self.y + CHUNK_W, blocks.shape[0])):
             for x in range(self.x, min(self.x + CHUNK_W, blocks.shape[1])):
                 val = blocks[y][x]
-                # - ID signifies a multiblock
+                # negative ID signifies a multiblock
                 if val < 0:
                     # Find topleft of multiblock using global coords
                     x_, y_ = game_vars.get_topleft(x, y)
@@ -110,9 +110,9 @@ class ChunkManager:
     def setup(self):
         pos = self.world.spawn
         left = int(max(0, pos[0] - CHUNK_W * 3 // 2) / CHUNK_W)
-        right = int(min(self.world.dim[0], pos[0] + CHUNK_W * 3 // 2) / CHUNK_W)
+        right = int(min(self.world.dim[0] - 1, pos[0] + CHUNK_W * 3 // 2) / CHUNK_W)
         top = int(max(0, pos[1] - CHUNK_W * 3 // 2) / CHUNK_W)
-        bot = int(min(self.world.dim[1], pos[1] + CHUNK_W * 3 // 2) / CHUNK_W)
+        bot = int(min(self.world.dim[1] - 1, pos[1] + CHUNK_W * 3 // 2) / CHUNK_W)
         self.chunks = [[Chunk(x * CHUNK_W, y * CHUNK_W) for x in range(left, right + 1)] for y in range(top, bot + 1)]
 
     def load_all(self):
@@ -144,7 +144,8 @@ class ChunkManager:
                 for row in self.chunks:
                     row[-i].unload()
                     del row[-i]
-            elif dx[i] <= CHUNK_W * 3 // 2 and (rect.x >= 0 if i == 0 else rect.right <= self.world.dim[0] - CHUNK_W):
+            elif dx[i] <= CHUNK_W * 3 // 2 and (
+                    rect.x >= CHUNK_W if i == 0 else rect.right <= self.world.dim[0] - CHUNK_W):
                 x = self.chunks[0][-i].x + (-CHUNK_W if i == 0 else CHUNK_W)
                 for row in self.chunks:
                     new = Chunk(x, row[0].y, blocks=self.world.blocks)
@@ -158,7 +159,8 @@ class ChunkManager:
                 for chunk in self.chunks[-i]:
                     chunk.unload()
                 del self.chunks[-i]
-            elif dy[i] <= CHUNK_W * 3 // 2 and (rect.y >= 0 if i == 0 else rect.bottom <= self.world.dim[1] - CHUNK_W):
+            elif dy[i] <= CHUNK_W * 3 // 2 and (
+                    rect.y >= CHUNK_W if i == 0 else rect.bottom <= self.world.dim[1] - CHUNK_W):
                 y = self.chunks[0][-i].y + (-CHUNK_W if i == 0 else CHUNK_W)
                 new_row = [Chunk(c.x, y, blocks=self.world.blocks) for c in self.chunks[0]]
                 if i == 0:
@@ -197,7 +199,7 @@ class ChunkManager:
             screen_x += w
 
     def print(self):
-        print()
+        print("Chunks:")
         for row in self.chunks:
             for chunk in row:
                 print("({}, {})".format(chunk.x, chunk.y), end=" ")
