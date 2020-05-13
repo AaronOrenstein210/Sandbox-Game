@@ -13,72 +13,89 @@ CHUNK_W_PX = CHUNK_W * BLOCK_W
 class Chunk:
     def __init__(self, left, top, blocks=None):
         self.x, self.y = left, top
-        self.blocks = self.surface = None
+        self.surface = None
         # Special blocks whose positions need to be stored
-        self.updates = []
-        self.animations = []
-        self.lights = []
+        # Stored as (x,y):tile_id pairs
+        self.updates = {}
+        self.animations = {}
+        self.lights = {}
 
         if blocks is not None:
             self.load(blocks)
 
     def load(self, blocks):
-        self.blocks = blocks[self.y:self.y + CHUNK_W, self.x:self.x + CHUNK_W]
-        self.surface = pg.Surface((CHUNK_W * BLOCK_W, CHUNK_W * BLOCK_W))
-        for y, row in enumerate(self.blocks):
-            for x, val in enumerate(row):
+        self.surface = pg.Surface((CHUNK_W_PX, CHUNK_W_PX), SRCALPHA)
+        for y in range(self.y, min(self.y + CHUNK_W, blocks.shape[0])):
+            for x in range(self.x, min(self.x + CHUNK_W, blocks.shape[1])):
+                val = blocks[y][x]
+                # - ID signifies a multiblock
+                if val < 0:
+                    # Find topleft of multiblock using global coords
+                    x_, y_ = game_vars.get_topleft(x, y)
+                    val = blocks[y_][x_]
+                    # Make x and y relative to the chunk's topleft corner
+                    x_ -= self.x
+                    y_ -= self.y
+                else:
+                    # Make x and y relative to the chunk's topleft corner
+                    x_ = x - self.x
+                    y_ = y - self.y
                 if val > 0:
                     tile = game_vars.tiles[val]
                     # TODO: Air light
-                    self.surface.blit(tile.image, (x * BLOCK_W, y * BLOCK_W))
+                    self.surface.blit(tile.image, (x_ * BLOCK_W, y_ * BLOCK_W))
                     if tile.updates:
-                        self.updates.append((x, y))
+                        self.updates[(x_, y_)] = val
                     if tile.anim_idx != -1:
-                        self.animations.append((x, y))
+                        self.animations[(x_, y_)] = val
                     if tile.emits_light:
-                        self.lights.append((x, y))
-                # TODO: multiblock updates
+                        self.lights[(x_, y_)] = val
         # TODO: Block light
+        pg.draw.rect(self.surface, (0, 0, 0), (0, 0, CHUNK_W_PX, CHUNK_W_PX), 2)
 
     def unload(self):
-        del self.blocks, self.surface
+        del self.surface
         self.updates.clear()
         self.animations.clear()
         self.lights.clear()
 
     # Called when a block in the chunk is changed
-    def block_change(self, x, y):
+    def block_change(self, x, y, tile_id, place):
         coords = (x - self.x, y - self.y)
-        tile = game_vars.tiles[game_vars.get_block_at(x, y)]
-        if coords in self.updates and not tile.updates:
-            self.updates.remove(coords)
-        elif tile.updates:
-            self.updates.append(coords)
-        if coords in self.animations and tile.anim_idx == -1:
-            self.animations.remove(coords)
-        elif tile.anim_idx != -1:
-            self.animations.append(coords)
-        if coords in self.lights and not tile.emits_light:
-            self.lights.remove(coords)
-        elif tile.emits_light:
-            self.lights.append(coords)
+        tile = game_vars.tiles[tile_id]
+        if tile.updates:
+            if place:
+                self.updates[coords] = tile_id
+            else:
+                self.updates.pop(coords)
+        if tile.anim_idx != -1:
+            if place:
+                self.animations[coords] = tile_id
+            else:
+                self.animations.pop(coords)
+        if tile.emits_light:
+            if place:
+                self.lights[coords] = tile_id
+            else:
+                self.lights.pop(coords)
+
         rect = pg.Rect(coords[0] * BLOCK_W, coords[1] * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
-        self.surface.fill(SRCALPHA, rect)
-        self.surface.blit(tile.image, rect)
+        pg.draw.rect(self.surface, SRCALPHA, rect)
+        if place:
+            self.surface.blit(tile.image, rect)
 
     def tick(self, dt):
         from Tools.constants import BLOCK_W
-        # TODO: Multiblocks whose topleft is off screen won't update
-        # Go through all x/y and check if x+w is on screen (same for y)
-        for (x, y) in self.animations:
-            img = game_vars.tiles[self.blocks[y][x]].get_block_img(game_vars.get_block_data((self.x + x, self.y + y)))
+        # Go through all animations and redraw
+        for (x, y), tile_id in self.animations.items():
+            img = game_vars.tiles[tile_id].get_block_img(game_vars.get_block_data((self.x + x, self.y + y)))
             img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
             pg.draw.rect(self.surface, SRCALPHA, img_rect)
             self.surface.blit(img, img_rect)
 
         # Do block ticks
-        for (x, y) in self.updates:
-            game_vars.tiles[self.blocks[y][x]].tick(x + self.x, y + self.y, dt, game_vars.get_block_data((x, y)))
+        for (x, y), tile_id in self.updates.items():
+            game_vars.tiles[tile_id].tick(x + self.x, y + self.y, dt, game_vars.get_block_data((x, y)))
 
 
 class ChunkManager:
@@ -97,7 +114,6 @@ class ChunkManager:
         top = int(max(0, pos[1] - CHUNK_W * 3 // 2) / CHUNK_W)
         bot = int(min(self.world.dim[1], pos[1] + CHUNK_W * 3 // 2) / CHUNK_W)
         self.chunks = [[Chunk(x * CHUNK_W, y * CHUNK_W) for x in range(left, right + 1)] for y in range(top, bot + 1)]
-        self.print()
 
     def load_all(self):
         for row in self.chunks:
@@ -105,11 +121,16 @@ class ChunkManager:
                 chunk.unload()
                 chunk.load(self.world.blocks)
 
-    def block_change(self, x, y):
+    def block_change(self, x, y, tile_id, place):
         rect = self.get_rect()
-        if rect.left <= x < rect.right and rect.top <= y < rect.bottom:
-            x_, y_ = int((x - rect.x) / CHUNK_W), int((y - rect.y) / CHUNK_W)
-            self.chunks[y_][x_].block_change(x, y)
+        tile = game_vars.tiles[tile_id]
+        tile_rect = pg.Rect((x, y), tile.dim)
+        if rect.colliderect(tile_rect):
+            left, top = int((tile_rect.x - rect.x) / CHUNK_W), int((tile_rect.y - rect.y) / CHUNK_W)
+            right, bot = int((tile_rect.right - rect.x) / CHUNK_W), int((tile_rect.bottom - rect.y) / CHUNK_W)
+            for y_ in range(top, bot + 1):
+                for x_ in range(left, right + 1):
+                    self.chunks[y_][x_].block_change(x, y, tile_id, place)
 
     def tick(self, dt):
         # Check chunk loading/unloading
@@ -156,9 +177,9 @@ class ChunkManager:
                              chunk_rect.h * BLOCK_W)
         # In chunks
         left = max(0, int((rect.x - chunk_rect.x) / CHUNK_W_PX))
-        right = min(len(self.chunks[0]), int((rect.right - chunk_rect.x) / CHUNK_W_PX))
+        right = min(len(self.chunks[0]) - 1, int((rect.right - chunk_rect.x) / CHUNK_W_PX))
         top = max(0, int((rect.top - chunk_rect.y) / CHUNK_W_PX))
-        bot = min(len(self.chunks), int((rect.bottom - chunk_rect.y) / CHUNK_W_PX))
+        bot = min(len(self.chunks) - 1, int((rect.bottom - chunk_rect.y) / CHUNK_W_PX))
         d = pg.display.get_surface()
         screen_x = 0
         for i, x in enumerate(range(left, right + 1)):

@@ -224,6 +224,7 @@ class PlayerInventory(Inventory):
             if self.selected_amnt == 0:
                 self.selected_item = -1
                 self.selected_data = None
+                self.on_change_held()
         # Using an item from our hot bar
         else:
             # Reduce its amount and check if we have any left
@@ -231,6 +232,7 @@ class PlayerInventory(Inventory):
             if self.inv_amnts[0][self.hot_bar_item] == 0:
                 self.inv_items[0][self.hot_bar_item] = -1
                 self.inv_data[(self.hot_bar_item, 0)] = None
+                self.on_change_held()
             self.update_item(0, self.hot_bar_item)
 
     # Pressed a certain key

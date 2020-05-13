@@ -322,11 +322,12 @@ class World:
         light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[255] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.add_block(x, y, block)
-        self.manager.block_change(x, y)
+        self.manager.block_change(x, y, block, True)
 
     def destroy_block(self, x, y):
         x, y = game_vars.get_topleft(x, y)
-        tile = game_vars.tiles[self.blocks[y][x]]
+        tile_id = self.blocks[y][x]
+        tile = game_vars.tiles[tile_id]
         # Destroy all parts
         w, h = tile.dim
         self.blocks[y:y + h, x:x + w] = [[AIR] * w] * h
@@ -336,7 +337,7 @@ class World:
         light_arr[x:x + tile.dim[0], y:y + tile.dim[1]] = [[0] * tile.dim[1]] * tile.dim[0]
         # Update data
         self.remove_block(x, y, tile.idx)
-        self.manager.block_change(x, y)
+        self.manager.block_change(x, y, tile_id, False)
 
     # Update dictionaries
     def add_block(self, x, y, idx):

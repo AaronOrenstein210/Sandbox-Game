@@ -205,7 +205,7 @@ def write_block_data(pos, data):
 def break_block(x, y):
     if 0 <= x < world.dim[0] and 0 <= y < world.dim[1]:
         x, y = get_topleft(x, y)
-        block = world.blocks[y, x]
+        block = world.blocks[y][x]
         if block != AIR:
             tile = tiles[block]
             if tile.on_break((x, y)):
