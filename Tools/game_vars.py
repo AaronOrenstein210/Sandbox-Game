@@ -145,6 +145,10 @@ def draw():
     pg.display.get_surface().blit(text, text_rect)
 
 
+def player_inventory():
+    return player.inventory
+
+
 # Functions that affect the world object
 # Current universe name
 def universe():
@@ -214,11 +218,10 @@ def break_block(x, y):
                 world.destroy_block(x, y)
                 block_rect = pg.Rect(x * BLOCK_W, y * BLOCK_W, BLOCK_W * tile.dim[0], BLOCK_W * tile.dim[1])
                 drops = tile.get_drops()
+                from Objects.DroppedItem import DroppedItem
                 for drop in drops:
-                    if drop[1] > 0:
-                        # Drop an item
-                        from Objects.DroppedItem import DroppedItem
-                        drop_item(DroppedItem(*drop), None, pos_=block_rect.center)
+                    # Drop an item
+                    drop_item(DroppedItem(drop), None, pos_=block_rect.center)
                 return True
     return False
 
@@ -281,16 +284,6 @@ def player_topleft(in_blocks=False):
         return player.pos
     else:
         return [p / BLOCK_W for p in player.pos]
-
-
-# Sets the item data for the current held item
-def set_current_item_data(data):
-    player.inventory.set_item_data(data)
-
-
-# Gets the item data for the current held item
-def get_current_item_data():
-    return player.inventory.get_held_data()
 
 
 # Functions that check the world blocks
@@ -365,109 +358,101 @@ def adjacent(x, y, w, h, tile, only):
 
 # Checks if any blocks in the given chunk are solid
 def any_solid(x1, x2, y1, y2):
-    unique_tiles = []
-    for y in range(y1, y2):
-        for x in range(x1, x2):
-            tile = get_block_at(x, y)
-            if tile not in unique_tiles:
-                unique_tiles.append(tile)
-    return any(t not in non_solid for t in unique_tiles)
+    return any(get_block_at(x, y) not in non_solid for x in range(x1, x2) for y in range(y1, y2))
 
 
 # Handles movement, checking for collisions with blocks
 def check_collisions(pos, block_dim, d):
-    abs_d = [abs(val) for val in d]
     px_dim = (BLOCK_W * block_dim[0], BLOCK_W * block_dim[1])
     # Break up displacement into smaller parts
-    while max(abs_d) > BLOCK_W:
-        perc = BLOCK_W / max(abs_d)
+    while any(val != 0 for val in d):
+        perc = min(BLOCK_W / max(abs(val) for val in d), 1)
         d_ = [d[0] * perc, d[1] * perc]
-        check_collisions(pos, block_dim, d_.copy())
         d = [d[0] - d_[0], d[1] - d_[1]]
-        abs_d = [abs(val) for val in d]
 
-    # Calculate current and next block (left, top, right, bottom)
-    current_block = [0, 0, 0, 0]
-    next_block = [0, 0, 0, 0]
-    to_next = [0, 0]
-    blocks = world.blocks
-    for i in range(2):
-        # Get current and next block
-        current_block[i] = int(pos[i] / BLOCK_W)
-        current_block[i + 2] = math.ceil((pos[i] + px_dim[i]) / BLOCK_W) - 1
-        next_block[i] = int((pos[i] + d[i]) / BLOCK_W)
-        next_block[i + 2] = math.ceil((pos[i] + px_dim[i] + d[i]) / BLOCK_W) - 1
-        # If we don't move blocks or we hit the world boundary, just do the movement
-        if pos[i] + d[i] < 0:
-            pos[i] = 0
-            d[i] = 0
-        elif next_block[i + 2] >= blocks.shape[1 - i]:
-            pos[i] = (blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
-            d[i] = 0
-        elif current_block[i if d[i] < 0 else i + 2] == next_block[i if d[i] < 0 else i + 2]:
-            pos[i] += d[i]
-            d[i] = 0
-        else:
-            # End pos - begin pos, accounting for using right or bottom sides
-            to_next[i] = (next_block[i + (0 if d[i] < 0 else 2)] * BLOCK_W) - pos[i] - (
-                -BLOCK_W if d[i] < 0 else px_dim[i])
+        # Calculate current and next block (left, top, right, bottom)
+        current_block = [0, 0, 0, 0]
+        next_block = [0, 0]
+        to_next = [0, 0]
+        blocks = world.blocks
+        for i in range(2):
+            # Get current and next block
+            current_block[i] = int(pos[i] / BLOCK_W)
+            current_block[i + 2] = math.ceil((pos[i] + px_dim[i]) / BLOCK_W) - 1
+            if d_[i] < 0:
+                next_block[i] = int((pos[i] + d_[i]) / BLOCK_W)
+            else:
+                next_block[i] = math.ceil((pos[i] + px_dim[i] + d_[i]) / BLOCK_W) - 1
+            # We didn't move a block in that direction
+            if current_block[i if d_[i] < 0 else i + 2] == next_block[i]:
+                pos[i] += d_[i]
+                d_[i] = 0
+            # If our next block is past the world boundary, just move to the world boundary
+            elif next_block[i] < 0:
+                pos[i] = 0
+                d_[i] = 0
+            elif next_block[i] >= blocks.shape[1 - i]:
+                pos[i] = (blocks.shape[1 - i] * BLOCK_W) - px_dim[i]
+                d_[i] = 0
+            # Otherwise move up to the next block
+            else:
+                # End pos - begin pos, accounting for using right or bottom sides
+                to_next[i] = (next_block[i] * BLOCK_W) - pos[i] - (
+                    -BLOCK_W if d_[i] < 0 else px_dim[i])
 
-    if d.count(0) == 1:
-        idx = 1 - d.index(0)
-        if idx == 0:
-            # From lowest row to highest row, at the next column over
-            x = next_block[0 if d[0] < 0 else 2]
-            solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
-        else:
-            # From the lowest column to the highest column, at the next row over
-            y = next_block[1 if d[1] < 0 else 3]
-            solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
-        # >= 1 block is solid, truncate movement
-        if solid:
-            pos[idx] += to_next[idx]
-        # All blocks are non_solid, just do the move
-        else:
-            pos[idx] += d[idx]
-    elif d.count(0) == 0:
-        perc = [to_next[0] / d[0], to_next[1] / d[1]]
-        # Index of shortest time to next block
-        idx = perc.index(min(perc))
-        # Index of longest time to next block
-        idx2 = 1 - idx
-        delta = d[idx] * max(perc)
-        # When the idx direction hits the next block, idx2 has not changed blocks
-        if idx == 0:
-            # From lowest row to highest row, at the next column over
-            x = next_block[0 if d[0] < 0 else 2]
-            solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
-        else:
-            # From the lowest column to the highest column, at the next row over
-            y = next_block[1 if d[1] < 0 else 3]
-            solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
-        # Just move to next block and cuttoff delta
-        if solid:
-            pos[idx] += to_next[idx]
-            delta = to_next[idx]
-        # All blocks are air, just do the move
-        else:
-            pos[idx] += d[idx]
+        if d_.count(0) == 1:
+            idx = 1 - d_.index(0)
+            if idx == 0:
+                # From lowest row to highest row, at the next column over
+                x = next_block[0]
+                solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
+            else:
+                # From the lowest column to the highest column, at the next row over
+                y = next_block[1]
+                solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
+            # >= 1 block is solid, truncate movement
+            if solid:
+                pos[idx] += to_next[idx]
+            # All blocks are non_solid, just do the move
+            else:
+                pos[idx] += d_[idx]
+        elif d_.count(0) == 0:
+            # Index of shortest time to next block
+            perc = [to_next[0] / d_[0], to_next[1] / d_[1]]
+            idx = perc.index(min(perc))
+            # Index of longest time to next block
+            idx2 = 1 - idx
+            # When the idx direction hits the next block, idx2 has not changed blocks
+            if idx == 0:
+                # From lowest row to highest row, at the next column over
+                x = next_block[0]
+                solid = any_solid(x, x + 1, current_block[1], current_block[3] + 1)
+            else:
+                # From the lowest column to the highest column, at the next row over
+                y = next_block[1]
+                solid = any_solid(current_block[0], current_block[2] + 1, y, y + 1)
+            # Just move to next block and truncate delta
+            if solid:
+                pos[idx] += to_next[idx]
+            # All blocks are non-solid, do the move
+            else:
+                pos[idx] += d_[idx]
 
-        # Calculate bounds in the direction of idx when the direction of idx2 hits the next block
-        current_val = [int((pos[idx] + delta) / BLOCK_W),
-                       math.ceil((pos[idx] + px_dim[idx] + delta) / BLOCK_W) - 1]
-        if idx == 0:
-            # From lowest row to highest row, at the next column over
-            x = next_block[0 if d[0] < 0 else 2]
-            solid = any_solid(x, x + 1, current_val[0], current_val[1] + 1)
-        else:
-            # From the lowest column to the highest column, at the next row over
-            y = next_block[1 if d[1] < 0 else 3]
-            solid = any_solid(current_val[0], current_val[1] + 1, y, y + 1)
-        # All blocks are air, just do the move
-        if solid:
-            pos[idx2] += to_next[idx2]
-        else:
-            pos[idx2] += d[idx2]
+            # Calculate our new position along the axis we just moved
+            current_pos = [int(pos[idx] / BLOCK_W), math.ceil((pos[idx] + px_dim[idx]) / BLOCK_W) - 1]
+            if idx2 == 0:
+                # From lowest row to highest row, at the next column over
+                x = next_block[0]
+                solid = any_solid(x, x + 1, current_pos[0], current_pos[1] + 1)
+            else:
+                # From the lowest column to the highest column, at the next row over
+                y = next_block[1]
+                solid = any_solid(current_pos[0], current_pos[1] + 1, y, y + 1)
+            # All blocks are air, just do the move
+            if solid:
+                pos[idx2] += to_next[idx2]
+            else:
+                pos[idx2] += d_[idx2]
 
 
 # Checks if we are touching blocks on the left or right
