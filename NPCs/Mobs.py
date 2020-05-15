@@ -5,9 +5,10 @@ from NPCs.Entity import *
 from NPCs.conditions import *
 from Objects import MOB, PROJ
 from Objects.Animation import OscillateAnimation
+from Objects.ItemTypes import ItemInfo
 from Player.Stats import Stats, ENEMY_STATS, DEF_MOB
 from Tools import game_vars
-from Tools import item_ids as items
+from Tools import item_ids as items, tile_ids as tiles
 from Tools.constants import BLOCK_W, scale_to_fit
 
 
@@ -37,7 +38,8 @@ class Birdie(Entity):
 class Zombie(Entity):
     def __init__(self):
         super().__init__(name="Zombie", w=1.5, aggressive=True, img=MOB + "zombie.png",
-                         rarity=2, stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=50, damage=40, defense=5, max_speedx=5))
+                         rarity=2,
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=50, damage=40, defense=5))
 
     def ai(self):
         follow_player(self)
@@ -50,7 +52,8 @@ class DoomBunny(Entity):
     def __init__(self):
         super().__init__(name="Doom Bunny", w=1, aggressive=True, img=MOB + "doom_bunny.png",
                          rarity=3,
-                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=5, damage=100, defense=1, jump_speed=15))
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=5, damage=100, defense=1, jump_speed=15,
+                                     maxspeedx=7))
 
     def ai(self):
         jump(self, abs(game_vars.player_pos()[0] - self.rect.centerx) // BLOCK_W <= 10)
@@ -72,10 +75,159 @@ class Helicopter(Entity):
         return True
 
     def get_drops(self):
-        drops = [[items.LEAVES, randint(1, 5)]]
+        drops = [ItemInfo(items.LEAVES, randint(1, 5))]
         if randint(1, 10) <= 7:
-            drops.append([items.WOOD, randint(1, 5)])
+            drops.append(ItemInfo(items.WOOD, randint(1, 5)))
         return drops
+
+
+class Mage(Entity):
+    MAX_DX = 5 * BLOCK_W
+
+    def __init__(self, element=MagicContainer.NONE, level=1):
+        element_name = MagicContainer.ELEMENT_NAMES[element]
+        super().__init__(name="%s Mage" % element_name, w=1.5, img="%s%s_mage.png" % (MOB, element_name),
+                         stats=Stats(ENEMY_STATS, defaults=DEF_MOB, hp=100, max_speedx=1))
+        self.element = element
+        self.level = level
+        self.magic = 0
+        self.target = (-1, -1)
+        self.transfer_cooldown = 0
+
+    @property
+    def magic_bytes(self):
+        return math.ceil(math.log2(self.capacity) / 8)
+
+    @property
+    def capacity(self):
+        return int(100 * 2.5 ** (self.level - 1))
+
+    @property
+    def production(self):
+        return 3 ** (self.level - 1)
+
+    @property
+    def bound(self):
+        return self.target != (-1, -1)
+
+    def set_target(self, pos):
+        self.target = pos
+
+    def ai(self):
+        self.time -= game_vars.dt
+        # Check if we are standing on the ground
+        if self.collisions[1] == 1:
+            too_far = self.bound and not self.drag and abs(
+                self.rect.centerx - self.target[0] * BLOCK_W) >= self.MAX_DX
+            # Check if we are ready to start/stop moving
+            if self.time <= 0 or too_far:
+                # We were stopped
+                if self.drag:
+                    if self.bound:
+                        self.a[0] = math.copysign(self.stats.get_stat("acceleration"),
+                                                  self.target[0] * BLOCK_W - self.rect.centerx)
+                    else:
+                        self.a[0] = self.stats.get_stat("acceleration") * random_sign()
+                    self.drag = False
+                    max_t = self.MAX_DX / self.stats.get_stat("max_speedx")
+                    self.time = uniform(max_t / 3, max_t * .9)
+                # We were moving
+                else:
+                    self.a[0] = 0
+                    self.drag = True
+                    self.time = uniform(1, 3)
+            # Check if we need to jump
+            if self.collisions[0] != 0:
+                self.v[1] = -self.stats.get_stat("jump_speed")
+                self.time = uniform(1, 3)
+        # Increment magic
+        self.magic = min(self.capacity, self.magic + self.production * game_vars.dt)
+        if self.magic >= 5 and self.bound and self.transfer_cooldown <= 0:
+            x, y = game_vars.get_topleft(*self.target)
+            tile_id = game_vars.get_block_at(x, y)
+            if tile_id != tiles.PEDESTAL:
+                self.target = (-1, -1)
+            else:
+                tile = game_vars.tiles[tile_id]
+                transfer = min(self.production, self.magic, tile.get_space(x, y))
+                if transfer > 0:
+                    game_vars.shoot_projectile(self.P1(transfer, self.rect.center, (x, y)))
+                    self.transfer_cooldown = 1
+        elif self.transfer_cooldown > 0:
+            self.transfer_cooldown -= game_vars.dt
+
+    # Format(#bytes): num_bytes(1) element(1) level(1) magic(magic_bytes) is_bound(1) bound_coords(2+2)
+    def write(self):
+        data = self.element.to_bytes(1, byteorder) + self.level.to_bytes(1, byteorder)
+        data += int(self.magic).to_bytes(self.magic_bytes, byteorder)
+        data += self.bound.to_bytes(1, byteorder)
+        if self.bound:
+            for p in self.target:
+                data += p.to_bytes(2, byteorder)
+        data = len(data).to_bytes(1, byteorder) + data
+        return data
+
+    class P1(Projectile):
+        HIT_RAD = BLOCK_W / 2
+
+        def __init__(self, magic, pos, target_block):
+            super().__init__(pos, [t * BLOCK_W for t in target_block], img=PROJ + "fire_ball.png", w=.5, gravity=False,
+                             damage=0, speed=3)
+            self.hits_blocks = False
+            self.type = NEUTRAL
+            self.target = target_block
+            self.magic = magic
+
+        # Check if we hit our target
+        def move(self):
+            if super().move():
+                return True
+            x, y = game_vars.get_topleft(*self.target)
+            tile_id = game_vars.get_block_at(x, y)
+            if tile_id != tiles.PEDESTAL:
+                return True
+            else:
+                tile = game_vars.tiles[tile_id]
+                rect = pg.Rect((x * BLOCK_W, y * BLOCK_W), [i * BLOCK_W for i in tile.dim])
+                if abs(self.rect.centerx - rect.centerx) < self.HIT_RAD and abs(
+                        self.rect.centery - rect.centery) < self.HIT_RAD:
+                    tile.add_magic(x, y, self.magic)
+                    return True
+            return False
+
+
+def load_mage(data):
+    if not data or len(data) < 2:
+        print("Missing mage element and level")
+        return Mage()
+    element = int.from_bytes(data[:1], byteorder)
+    level = int.from_bytes(data[1:2], byteorder)
+    data = data[2:]
+
+    # Initialize object
+    mage = Mage(element, level)
+
+    if len(data) < mage.magic_bytes:
+        print("Missing mage magic amount")
+        return mage
+    mage.magic = int.from_bytes(data[:mage.magic_bytes], byteorder)
+    data = data[mage.magic_bytes:]
+
+    if len(data) < 1:
+        print("Missing if the mage is bound")
+    else:
+        is_bound = bool.from_bytes(data[:1], byteorder)
+        data = data[1:]
+        if is_bound:
+            if len(data) < 4:
+                print("Missing mage target")
+            else:
+                mage.target = (int.from_bytes(data[:2], byteorder), int.from_bytes(data[2:4], byteorder))
+                # TODO: Find open space
+                mage.pos = (mage.target[0] * BLOCK_W + uniform(-mage.MAX_DX, mage.MAX_DX),
+                            (mage.target[1] - mage.dim[1]) * BLOCK_W)
+
+    return mage
 
 
 class Dragon(Boss):
@@ -135,7 +287,7 @@ class Dragon(Boss):
         # Update animation
         if self.stage == 0 or self.stage == 2:
             i = self.rising_anim.idx
-            self.rising_anim.update()
+            self.rising_anim.update(game_vars.dt)
             if i != self.rising_anim.idx:
                 self.set_image(self.rising_anim.get_frame())
 
@@ -148,16 +300,17 @@ class Dragon(Boss):
         self.stage = 1
 
     def get_drops(self):
-        drops = [[items.SHINY_STONE_1, randint(5, 15)],
-                 [items.SHINY_STONE_2, randint(5, 10)]]
+        drops = [ItemInfo(items.SHINY_STONE_1, randint(5, 15)),
+                 ItemInfo(items.SHINY_STONE_2, randint(5, 10))]
         if randint(0, 5) == 1:
             drops.append([items.SHINY_STONE_3, randint(1, 5)])
         return drops
 
     class FireBall(Projectile):
         def __init__(self, pos, target):
-            super().__init__(pos, target, w=1.25, img=PROJ + "fire_ball.png", speed=15, damage=8)
-            self.hurts_mobs = self.gravity = self.hits_blocks = False
+            super().__init__(pos, target, w=1.25, img=PROJ + "fire_ball.png", speed=15, damage=8, gravity=False)
+            self.hurts_mobs = self.hits_blocks = False
+            self.type = MOB
 
 
 class MainBoss(Boss):
@@ -246,3 +399,4 @@ class MainBoss(Boss):
             self.hits_blocks = False
             self.num_hits = -1
             self.duration = 3
+            self.type = MOB

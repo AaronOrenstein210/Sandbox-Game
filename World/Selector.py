@@ -204,6 +204,23 @@ class MainSelector(Selector):
 
         self.load_files()
 
+    def create_new(self):
+        if self.mode == PLAYER:
+            create_new_player(self.file)
+            self.file = c.PlayerFile()
+        elif self.mode == UNIVERSE:
+            mkdir(self.file.full_file)
+            # Generate a new world
+            new = World(c.WorldFile(self.file.name, name="Forest"))
+            new.can_delete = False
+            generate_world(new)
+            new = IdleWorld(c.WorldFile(self.file.name, name="Idle World"))
+            generate_world(new)
+            del new
+            self.file = c.UniverseFolder()
+        self.draw_text()
+        self.load_files()
+
     # Load all saved players and worlds
     def load_files(self):
         self.files.clear()
@@ -294,7 +311,7 @@ class MainSelector(Selector):
                         pos = [pos[0] - self.rects["Scroll"].x, pos[1] - self.rects["Scroll"].y]
                         idx = (pos[1] - self.scroll) // ITEM_H
                         if idx < len(self.files) and pos[0] >= ITEM_W - BUTTON_W:
-                            # Top button if play button
+                            # Top button is play button
                             if (pos[1] - self.scroll) % ITEM_H < BUTTON_W:
                                 if self.mode == PLAYER:
                                     from Player.Player import Player
@@ -317,24 +334,13 @@ class MainSelector(Selector):
                 elif self.rects["New"].collidepoint(*pos) and self.file.valid:
                     pos = [pos[0] - self.rects["New"].x, pos[1] - self.rects["New"].y]
                     if self.rects["Create"].collidepoint(*pos):
-                        if self.mode == PLAYER:
-                            create_new_player(self.file)
-                            self.file = c.PlayerFile()
-                        elif self.mode == UNIVERSE:
-                            mkdir(self.file.full_file)
-                            # Generate a new world
-                            new = World(c.WorldFile(self.file.name, name="Forest"))
-                            new.can_delete = False
-                            generate_world(new)
-                            new = IdleWorld(c.WorldFile(self.file.name, name="Idle World"))
-                            generate_world(new)
-                            del new
-                            self.file = c.UniverseFolder()
-                        self.draw_text()
-                        self.load_files()
+                        self.create_new()
             # Key press
             elif e.type == KEYDOWN:
-                self.file.type_char(e)
+                if e.key == K_RETURN:
+                    self.create_new()
+                else:
+                    self.file.type_char(e)
                 self.draw_text()
 
 

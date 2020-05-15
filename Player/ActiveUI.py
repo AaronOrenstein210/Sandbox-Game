@@ -68,17 +68,6 @@ class ActiveUI:
         d = pg.display.get_surface()
         if self.ui:
             d.blit(self.ui, self.rect)
-        for inv in self.get_inventories():
-            r = inv.rect.move(*self.rect.topleft)
-            d.blit(inv.surface, r)
-        self.draw_inventories()
-
-    # Handles mouse hovering over item in inventory
-    def draw_inventories(self):
         pos = pg.mouse.get_pos()
-        if self.rect.collidepoint(*pos):
-            ui_pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
-            for inv in self.get_inventories():
-                if inv.rect.collidepoint(*ui_pos):
-                    inv_pos = [ui_pos[0] - inv.rect.x, ui_pos[1] - inv.rect.y]
-                    inv.draw_hover_item(inv_pos)
+        for inv in self.get_inventories():
+            inv.draw(pos, parent_pos=self.rect.topleft)

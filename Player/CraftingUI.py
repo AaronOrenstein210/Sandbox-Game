@@ -77,7 +77,7 @@ class CraftingUI(ActiveUI):
         self.recipes.sort(key=lambda arr: arr[0][0])
         # Check which items we can craft
         self.can_craft.clear(), self.cant_craft.clear()
-        resources = self.player.inventory.get_all_items()
+        resources = self.player.inventory.get_materials()
         for j, r in enumerate(self.recipes):
             r = r[1:]
             i = 0

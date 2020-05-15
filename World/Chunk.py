@@ -17,12 +17,13 @@ class Chunk:
         # Special blocks whose positions need to be stored
         # Stored as (x,y):tile_id pairs
         self.updates = {}
-        self.animations = {}
+        self.img_updates = {}
         self.lights = {}
 
         if blocks is not None:
             self.load(blocks)
 
+    # TODO: Do a tick based on last recorded time
     def load(self, blocks):
         self.surface = pg.Surface((CHUNK_W_PX, CHUNK_W_PX), SRCALPHA)
         for y in range(self.y, min(self.y + CHUNK_W, blocks.shape[0])):
@@ -46,8 +47,8 @@ class Chunk:
                     self.surface.blit(tile.image, (x_ * BLOCK_W, y_ * BLOCK_W))
                     if tile.updates:
                         self.updates[(x_, y_)] = val
-                    if tile.anim_idx != -1:
-                        self.animations[(x_, y_)] = val
+                    if tile.img_updates:
+                        self.img_updates[(x_, y_)] = val
                     if tile.emits_light:
                         self.lights[(x_, y_)] = val
         # TODO: Block light
@@ -56,7 +57,7 @@ class Chunk:
     def unload(self):
         del self.surface
         self.updates.clear()
-        self.animations.clear()
+        self.img_updates.clear()
         self.lights.clear()
 
     # Called when a block in the chunk is changed
@@ -68,11 +69,11 @@ class Chunk:
                 self.updates[coords] = tile_id
             else:
                 self.updates.pop(coords)
-        if tile.anim_idx != -1:
+        if tile.img_updates:
             if place:
-                self.animations[coords] = tile_id
+                self.img_updates[coords] = tile_id
             else:
-                self.animations.pop(coords)
+                self.img_updates.pop(coords)
         if tile.emits_light:
             if place:
                 self.lights[coords] = tile_id
@@ -86,18 +87,19 @@ class Chunk:
 
     def tick(self, dt):
         from Tools.constants import BLOCK_W
-        # Go through all animations and redraw
-        for (x, y), tile_id in self.animations.items():
-            img = game_vars.tiles[tile_id].get_block_img(game_vars.get_block_data((self.x + x, self.y + y)))
+        # Go through all img_updates and redraw
+        for (x, y), tile_id in self.img_updates.items():
+            img = game_vars.tiles[tile_id].get_block_img((self.x + x, self.y + y))
             img_rect = img.get_rect(topleft=(x * BLOCK_W, y * BLOCK_W))
             pg.draw.rect(self.surface, SRCALPHA, img_rect)
             self.surface.blit(img, img_rect)
 
         # Do block ticks
         for (x, y), tile_id in self.updates.items():
-            game_vars.tiles[tile_id].tick(x + self.x, y + self.y, dt, game_vars.get_block_data((x, y)))
+            game_vars.tiles[tile_id].tick(x + self.x, y + self.y, dt)
 
 
+# TODO: When leaving world, load all chunks to update them one more time
 class ChunkManager:
     def __init__(self, world):
         self.world = world
@@ -124,7 +126,7 @@ class ChunkManager:
     def block_change(self, x, y, tile_id, place):
         rect = self.get_rect()
         tile = game_vars.tiles[tile_id]
-        tile_rect = pg.Rect((x, y), tile.dim)
+        tile_rect = pg.Rect(x, y, tile.dim[0] - 1, tile.dim[1] - 1)
         if rect.colliderect(tile_rect):
             left, top = int((tile_rect.x - rect.x) / CHUNK_W), int((tile_rect.y - rect.y) / CHUNK_W)
             right, bot = int((tile_rect.right - rect.x) / CHUNK_W), int((tile_rect.bottom - rect.y) / CHUNK_W)

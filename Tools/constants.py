@@ -39,9 +39,9 @@ DAY_START = 60 * 6
 NIGHT_START = 60 * 18
 
 # Damage types
-MELEE, RANGED, MAGIC, THROWING, SUMMONING = 0, 1, 2, 3, 4
+MELEE, RANGED, MAGIC, THROWING, SUMMONING = range(5)
 # Ai types
-RANDOM, FOLLOW, FLY = 0, 1, 2
+RANDOM, FOLLOW, FLY = range(3)
 
 # Save paths
 PLR = "save/player/"
@@ -259,12 +259,9 @@ class PlayerFile:
                 if event.key == pg.K_SPACE:
                     self.name += " "
                 else:
-                    char = pg.key.name(event.key)
-                    if char.isalpha():
-                        if pg.key.get_mods() & pg.KMOD_SHIFT:
-                            self.name += char.upper()
-                        else:
-                            self.name += char
+                    char = event.unicode
+                    if char.isalpha() and len(char) == 1:
+                        self.name += char
                     elif char.isnumeric():
                         self.name += char
 

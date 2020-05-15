@@ -2,7 +2,7 @@
 # Contains variable data that multiple objects need
 
 # BE WARY OF IMPORT LOOPS!!!
-from sys import exit
+from sys import exit, byteorder
 from time import time
 import pygame as pg
 import math
@@ -164,11 +164,11 @@ def world_dim():
 def global_mouse_pos(blocks=False):
     pos = pg.mouse.get_pos()
     screen_c = c.screen_center
-    world_c = player.rect.center
+    world_c = world.get_screen_rect(player.rect.center).center
     if blocks:
-        return [(pos[i] + world_c[i] - screen_c[i]) // BLOCK_W for i in range(2)]
+        return [(pos[i] - screen_c[i] + world_c[i]) // BLOCK_W for i in range(2)]
     else:
-        return [pos[i] + world_c[i] - screen_c[i] for i in range(2)]
+        return [pos[i] - screen_c[i] + world_c[i] for i in range(2)]
 
 
 # Get block at position
@@ -250,17 +250,15 @@ def drop_item(drop, left, pos_=None):
 
 
 # Spawns an enemy
-def spawn_entity(entity, pos):
-    entity.set_pos(*pos)
-    handler.entities.append(entity)
+def spawn_entity(entity, pos=None):
+    if pos:
+        entity.set_pos(*pos)
+    handler.add_entity(entity)
 
 
 # Shoots a projectile
 def shoot_projectile(projectile):
-    if projectile.hurts_mobs:
-        handler.player_projectiles.append(projectile)
-    else:
-        handler.mob_projectiles.append(projectile)
+    handler.projectiles[projectile.type].append(projectile)
 
 
 # Adds a damage text box
@@ -510,16 +508,26 @@ def close_world():
 
 # Loads a new world
 def load_world(world_file):
-    from World.World import World
+    from World import World
+
+    # Reset entity handler
+    handler.reset()
+
+    # Get world type
+    with open(world_file.full_file, "rb") as file:
+        world_type = int.from_bytes(file.read(2)[1:2], byteorder)
+
+    # Load world
     global world
     del world
-    world = World(world_file)
+    if world_type == World.WORLD:
+        world = World.World(world_file)
+    elif world_type == World.IDLE:
+        world = World.IdleWorld(world_file)
     # Load the world
     if not LoadWorld(world).run_now():
         pg.quit()
         exit(0)
-    # Reset entity handler
-    handler.reset()
     # Set up player map
     player.set_map_source(world.map)
     # Spawn the player

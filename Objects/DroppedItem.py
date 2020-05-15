@@ -10,16 +10,11 @@ X_SPEED = 15
 
 
 class DroppedItem:
-    def __init__(self, item_id, amnt, data=None):
-        self.idx = item_id
-        self.item = game_vars.items[item_id]
-        # If the item has data but we got none, get default item data
-        if self.item.has_data and data is None:
-            self.data = self.item.new()
-        else:
-            self.data = data
+    def __init__(self, item_info):
+        self.info = item_info
+        self.item = game_vars.items[item_info.item_id]
         self.max_stack = self.item.max_stack
-        self.amnt = amnt
+
         self.rect = pg.Rect((0, 0), self.item.image.get_size())
         # Used to check for collisions with blocks
         self.ratio = (self.rect.w / BLOCK_W, self.rect.h / BLOCK_W)

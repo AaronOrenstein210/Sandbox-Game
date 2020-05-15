@@ -9,7 +9,7 @@ from Tools.constants import BLOCK_W, scale_to_fit, update_dict
 from Tools import game_vars, constants as c
 from Tools.tile_ids import AIR
 from Objects import INV
-from Objects.ItemTypes import Placeable
+from Objects.ItemTypes import Placeable, ItemInfo
 
 
 class Tile:
@@ -35,8 +35,8 @@ class Tile:
         self.on_surface = False
         # Player can craft at this item
         self.crafting = False
-        # Has an animation
-        self.anim_idx = -1
+        # Image updates every tick
+        self.img_updates = False
         # Emits light
         self.emits_light = False
         # Obstructs player movement
@@ -58,6 +58,9 @@ class Tile:
         # Recipes for crafting blocks
         self.recipes = []
 
+        # Store index of animation here
+        self.anim_idx = -1
+
         # Light magnitude and radius
         self.light_mag = 0
         self.light_r = 0
@@ -67,17 +70,19 @@ class Tile:
         # Add tile to list
         game_vars.tiles[self.idx] = self
 
-    def tick(self, x, y, dt, data):
+    def tick(self, x, y, dt):
         pass
 
     def set_animation(self, animation):
+        self.img_updates = True
         self.anim_idx = len(game_vars.animations)
         game_vars.animations.append(animation)
         self.image = animation.get_frame()
 
-    # Return block image
-    def get_block_img(self, data):
-        if self.anim_idx != -1:
+    # Return block image, default updates an animation if present
+    def get_block_img(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data and self.anim_idx != -1:
             self.image = game_vars.animations[self.anim_idx].get_frame()
         return self.image
 
@@ -90,7 +95,9 @@ class Tile:
     def get_drops(self):
         drops = []
         for drop in self.drops:
-            drops.append([drop[0], randint(drop[1], drop[2])])
+            amnt = randint(drop[1], drop[2])
+            if amnt > 0:
+                drops.append(ItemInfo(drop[0], amnt))
         return drops
 
     # Called when block is broken, return True if successful,
@@ -109,8 +116,9 @@ class Tile:
         else:
             return not game_vars.adjacent(*pos, *self.dim, AIR, True)
 
+    # Returns if the block was activated or not
     def activate(self, pos):
-        pass
+        return False
 
     # Hits the block with given power, returns if the block is broken or not
     def hit(self, x, y, power):

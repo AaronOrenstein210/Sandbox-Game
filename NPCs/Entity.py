@@ -2,6 +2,7 @@
 # Defines functions and variables for the Entity class
 
 from os.path import isfile
+from sys import byteorder
 import math
 from random import randint, uniform
 import pygame as pg
@@ -9,6 +10,7 @@ from Tools.constants import BLOCK_W, SPRITE_W, scale_to_fit, random_sign, get_an
 from Tools import game_vars
 from Player.Stats import Stats, ENEMY_STATS
 from Objects.DroppedItem import DroppedItem
+from Objects.ItemTypes import MagicContainer
 
 
 # AI functions, takes an entity object as its input
@@ -19,12 +21,14 @@ def random_movement(entity):
         # Check if we are ready to start/stop moving
         if entity.time <= 0:
             # We were stopped
-            if entity.a[0] == 0:
+            if entity.drag:
                 entity.a[0] = entity.stats.get_stat("acceleration") * random_sign()
+                entity.drag = False
                 entity.time = uniform(2.5, 5)
             # We were moving
             else:
                 entity.a[0] = 0
+                entity.drag = True
                 entity.time = uniform(1, 3)
         # Check if we need to jump
         if entity.collisions[0] != 0:
@@ -35,7 +39,8 @@ def random_movement(entity):
 def follow_player(entity):
     # Check if we are standing on the ground
     if entity.collisions[1]:
-        entity.a[0] = math.copysign(entity.stats.get_stat("acceleration"), game_vars.player_pos()[0] - entity.rect.centerx)
+        entity.a[0] = math.copysign(entity.stats.get_stat("acceleration"),
+                                    game_vars.player_pos()[0] - entity.rect.centerx)
         # Check if we need to jump
         if entity.collisions[0] != 0:
             entity.v[1] = -entity.stats.get_stat("jump_speed")
@@ -102,10 +107,13 @@ class Entity:
         # Is a boss
         self.boss = False
 
+        # Is there drag
+        self.drag = False
+
         # Movement variables
         self.pos = [0., 0.]
         self.v = [0., 0.]
-        self.a = [0, 20]
+        self.a = [0., 20.]
         # Direction of image
         self.direction = math.copysign(1, self.v[0])
         self.time = 0
@@ -143,16 +151,22 @@ class Entity:
         d = [0, 0]
         dt = game_vars.dt
         for i in range(2):
-            d[i] = (self.v[i] + self.a[i] * dt / 2) * dt * BLOCK_W
             if not self.zero_gravity:
+                d[i] = (self.v[i] + self.a[i] * dt / 2) * dt * BLOCK_W
                 # Calculate velocity
                 self.v[i] += self.a[i] * dt
                 spd = self.stats.get_stat("max_speed" + ("x" if i == 0 else "y"))
                 if abs(self.v[i]) > spd:
                     self.v[i] = math.copysign(spd, self.v[i])
+            else:
+                d[i] = self.v[i] * dt * BLOCK_W
         if self.direction * self.v[0] < 0:
             self.img = pg.transform.flip(self.img, True, False)
             self.direction *= -1
+
+        # Try to add a drag force
+        if self.drag and self.v[0] != 0:
+            self.a[0] = -8 * self.v[0]
 
         self.collisions = [0, 0]
         # Update position
@@ -207,8 +221,8 @@ class Entity:
         if self.stats.hp < 0:
             # Get random drops and drop them
             items = self.get_drops()
-            for (item, amnt) in items:
-                game_vars.drop_item(DroppedItem(item, amnt), randint(0, 1) == 0, pos_=self.rect.center)
+            for item in items:
+                game_vars.drop_item(DroppedItem(item), randint(0, 1) == 0, pos_=self.rect.center)
             return True
         return False
 
@@ -225,9 +239,15 @@ class Boss(Entity):
         self.boss = True
 
 
+# Projectile types
+MOB, PLAYER, NEUTRAL = range(3)
+
+
 class Projectile:
-    def __init__(self, pos, target, w=1, img="", speed=1, damage=1, gravity=True):
+    def __init__(self, pos, target, w=1, img="", speed=5, damage=1, gravity=True):
         angle = get_angle(pos, target)
+
+        self.type = PLAYER
 
         self.pos = list(pos)
         self.max_speed = speed
@@ -251,8 +271,6 @@ class Projectile:
         self.hits_blocks = True
         # Bounces when hitting the ground
         self.bounce = False
-        # Hurts player or hurts mobs
-        self.hurts_mobs = True
 
         self.direction = -1
 

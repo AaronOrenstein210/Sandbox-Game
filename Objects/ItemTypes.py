@@ -11,6 +11,103 @@ from Tools.tile_ids import AIR
 from Player.Stats import Stats, TOOL_STATS, WEAPON_STATS
 
 
+class ItemInfo:
+    def __init__(self, item, amnt, data=None):
+        self.item_id = item
+        self.amnt = amnt
+        self.data = data
+        if self.is_item:
+            item = game_vars.items[item]
+            # If the item has data but we got none, get default item data
+            if item.has_data and data is None:
+                self.data = item.new()
+
+    @property
+    def is_item(self):
+        return self.amnt > 0 and self.item_id in game_vars.items.keys()
+
+    @property
+    def max_stack(self):
+        if self.is_item:
+            return game_vars.items[self.item_id].max_stack
+        else:
+            print("max_stack(): Invalid item id: {}".format(self.item_id))
+            return 0
+
+    @property
+    def num_bytes(self):
+        return 4 + (2 + len(self.data) if self.is_item and self.data is not None else 0)
+
+    def __eq__(self, other):
+        return isinstance(other, ItemInfo) and \
+               self.item_id == other.item_id and self.amnt == other.amnt and self.data == other.data
+
+    def print(self):
+        print(self.item_id, self.amnt, self.data)
+
+    # Format what(#bytes): item(2) amnt(2) [length(2) data(length)]
+    def write(self):
+        if not self.is_item:
+            return bytearray(4)
+        else:
+            data = self.item_id.to_bytes(2, byteorder) + self.amnt.to_bytes(2, byteorder)
+            # Check if this item saves extra data
+            if game_vars.items[self.item_id].has_data:
+                # If it exists, save it
+                if self.data:
+                    data += len(self.data).to_bytes(2, byteorder)
+                    data += self.data
+                # Otherwise, indicate that the data has length 0
+                else:
+                    data += bytearray(2)
+            return data
+
+    def same_as(self, other):
+        return self.item_id == other.item_id and self.data == other.data and self.amnt > 0
+
+    def set_vals(self, item=-1, amnt=0, data=None):
+        self.item_id = item
+        self.amnt = amnt
+        self.data = data
+
+    def set_info(self, item_info):
+        self.item_id = item_info.item_id
+        self.amnt = item_info.amnt
+        self.data = item_info.data
+
+    def copy(self):
+        return ItemInfo(self.item_id, self.amnt, data=self.data)
+
+
+def load_info(data):
+    if len(data) < 4:
+        print("Missing item/amount data")
+        return None
+    item_id, amnt = int.from_bytes(data[:2], byteorder), int.from_bytes(data[2:4], byteorder)
+    data = data[4:]
+    item = ItemInfo(item_id, amnt)
+    if item.is_item and game_vars.items[item_id].has_data:
+        if len(data) < 2:
+            print("Missing length of item data")
+        length = int.from_bytes(data[:2], byteorder)
+        if len(data) < length + 2:
+            print("Missing item data")
+        item.data = data[2:length + 2]
+    return item
+
+
+def load_id_amnt(data):
+    if len(data) < 4:
+        print("Missing item/amount data")
+        return None
+    item_id, amnt = int.from_bytes(data[:2], byteorder), int.from_bytes(data[2:4], byteorder)
+    if item_id not in game_vars.items.keys():
+        amnt = 0
+    if amnt == 0:
+        item_id = -1
+    return item_id, amnt
+
+
 class Item:
     def __init__(self, idx, img="", name=""):
         self.idx, self.name = idx, name
@@ -260,12 +357,14 @@ class Armor(Upgradable):
         super().__init__(idx, upgrade_tree, **kwargs)
 
 
+# TODO: Throw magic containers into portal to consume magic
 class MagicContainer(Item):
     NONE, FIRE, WATER, EARTH = range(4)
     ELEMENT_NAMES = {NONE: "Unbound", FIRE: "Fire", WATER: "Water", EARTH: "Earth"}
 
     def __init__(self, idx, capacity=100, **kwargs):
         super().__init__(idx, **kwargs)
+        self.has_data = True
         self.capacity = capacity
         self.int_bytes = math.ceil(math.log2(capacity) / 8)
 

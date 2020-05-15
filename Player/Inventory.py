@@ -2,11 +2,10 @@
 # Defines functions and variables for handling items
 
 from sys import byteorder
-from numpy import full, int16
 from math import ceil
 import pygame as pg
 from pygame.locals import *
-from Objects.DroppedItem import DroppedItem
+from Objects.ItemTypes import ItemInfo
 from Tools.constants import INV_W, INV_IMG_W
 from Tools import constants as c
 from Tools import game_vars
@@ -23,25 +22,28 @@ class Inventory:
         self.surface = pg.Surface((INV_W * self.dim[0], INV_W * self.dim[1]), SRCALPHA)
         self.surface.fill(BKGROUND)
         # Contains all items in the inventory
-        self.inv_items = full((self.dim[1], self.dim[0]), -1, dtype=int16)
-        self.inv_amnts = full((self.dim[1], self.dim[0]), 0, dtype=int16)
-        # Stores (col,row):bytes pairs
-        self.inv_data = {}
+        self.inv_items = [[ItemInfo(-1, 0) for i in range(dim[0])] for j in range(dim[1])]
+        # Inventory slots that need to be updated
+        self.updates = []
         # How long we've been right clicking
         self.holding_r = 0
 
     @property
     def num_bytes(self):
-        return 4 * self.dim[0] * self.dim[1] + sum(len(data) for data in self.inv_data.values())
+        return sum(i.num_bytes for row in self.inv_items for i in row)
 
     # Returns wait time after right clicking as a function of time spent right clicking
     @property
     def wait_time(self):
         return max(.75 / (self.holding_r + 1), .01)
 
+    @property
+    def empty(self):
+        return not any(i.is_item for row in self.inv_items for i in row)
+
     # Loads the inventory and returns leftover data
     def load(self, data):
-        if len(data) < self.dim[0] * self.dim[1]:
+        if not data or len(data) < self.dim[0] * self.dim[1]:
             print("Missing item/amount data")
             return
         # Load items
@@ -52,100 +54,39 @@ class Inventory:
                     print("Missing data at row {} / {}, col {} / {}".format(y, self.dim[1], x, self.dim[0]))
                     error = True
                     break
-                val = int.from_bytes(data[2:4], byteorder)
+                item = ItemInfo(-1, 0)
+                self.inv_items[y][x] = item
+                item.item_id = int.from_bytes(data[:2], byteorder)
                 # Item defaults to nothing if it doesn't exist
-                if val not in game_vars.items.keys():
-                    self.inv_amnts[y][x] = 0
-                    self.inv_items[y][x] = -1
+                if item.item_id not in game_vars.items.keys():
+                    item.amnt = 0
                 else:
-                    self.inv_amnts[y][x] = int.from_bytes(data[:2], byteorder)
-                    if self.inv_amnts[y][x] == 0:
-                        self.inv_items[y][x] = -1
-                    else:
-                        self.inv_items[y][x] = val
+                    item.amnt = int.from_bytes(data[2:4], byteorder)
+                    if item.is_item:
                         # Check for item data
-                        if game_vars.items[val].has_data:
-                            data = data[4:]
+                        if game_vars.items[item.item_id].has_data:
                             # Get length of data
-                            if len(data) < 2:
+                            if len(data) < 6:
                                 print("Missing bytes for item data as row {}, col {}".format(y, x))
                                 error = True
                                 break
-                            length = int.from_bytes(data[:2], byteorder)
+                            length = int.from_bytes(data[4:6], byteorder)
                             # Get data
-                            if len(data) < length + 2:
+                            if len(data) < length + 6:
                                 print("Missing bytes for item data as row {}, col {}".format(y, x))
                                 error = True
                                 break
-                            self.inv_data[(x, y)] = data[2:length + 2]
+                            item.data = data[6:length + 6]
                             data = data[length + 2:]
-                            # Continue because we already took off 4 bytes
-                            continue
                 data = data[4:]
             if error:
                 break
         self.draw_inventory()
         return data
 
-    # Format what(#bytes): amnt(2) item(2) [length(2) data(length)] ...
+    # Format what(#bytes): item(2) amnt(2) [length(2) data(length)] ...
     def write(self):
-        data = bytearray()
-        for y, (row1, row2) in enumerate(zip(self.inv_amnts, self.inv_items)):
-            for x, (amnt, item) in enumerate(zip(row1, row2)):
-                amnt, item = int(amnt), int(item)
-                if item == -1 or amnt <= 0:
-                    data += bytearray(4)
-                else:
-                    data += amnt.to_bytes(2, byteorder)
-                    data += item.to_bytes(2, byteorder)
-                    # Check if this item saves extra data
-                    if game_vars.items[item].has_data:
-                        # Get the data
-                        item_data = self.inv_data[(x, y)]
-                        # If it exists, save it
-                        if item_data:
-                            data += len(item_data).to_bytes(2, byteorder)
-                            data += item_data
-                        # Otherwise, indicate that the data has length 0
-                        else:
-                            data += bytearray(2)
-        return data
-
-    # Functions to set inventory slot values
-    def set_at(self, row, col, item=-1, amnt=0, data=None):
-        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
-            if amnt <= 0 or item == -1:
-                amnt = 0
-                item = -1
-                data = None
-            self.inv_amnts[row][col] = amnt
-            self.inv_items[row][col] = item
-            self.inv_data[(col, row)] = data
-            self.update_item(row, col)
-
-    def set_item_at(self, row, col, item=-1):
-        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
-            self.inv_items[row][col] = item
-            if item == -1:
-                self.inv_amnts[row][col] = 0
-                self.inv_data[(col, row)] = None
-            self.update_item(row, col)
-
-    def set_amnt_at(self, row, col, amnt=0):
-        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
-            self.inv_amnts[row][col] = amnt
-            if amnt <= 0:
-                self.inv_items[row][col] = -1
-                self.inv_data[(col, row)] = None
-            self.update_item(row, col)
-
-    def set_data_at(self, row, col, data=None):
-        if 0 <= row < self.dim[1] and 0 <= col < self.dim[0]:
-            # If there is no item there, don't save the data
-            if self.inv_amnts[row][col] == 0:
-                self.inv_data[(col, row)] = None
-            else:
-                self.inv_data[(col, row)] = data
+        return b"".join(i.write() for row in self.inv_items for i in row)
 
     def draw_inventory(self):
         for y in range(self.dim[1]):
@@ -156,65 +97,82 @@ class Inventory:
                 pg.draw.rect(self.surface, SRCALPHA,
                              (x * INV_W, y * INV_W, INV_W, INV_W), (INV_W - INV_IMG_W) // 2)
 
-    def update_item(self, y, x):
-        rect = Rect(0, 0, INV_IMG_W, INV_IMG_W)
-        rect.center = ((x + .5) * INV_W, (y + .5) * INV_W)
-        pg.draw.rect(self.surface, BKGROUND, rect)
-        val = self.inv_items[y][x]
-        if val != -1:
-            img = game_vars.items[val].inv_img
-            img_rect = img.get_rect(center=rect.center)
-            self.surface.blit(img, img_rect)
-            text = c.inv_font.render(str(self.inv_amnts[y][x]), 1, (255, 255, 255))
-            text_rect = text.get_rect()
-            text_rect.bottomright = rect.bottomright
-            self.surface.blit(text, text_rect)
+    def draw(self, mouse_pos, parent_pos=(0, 0)):
+        self.update()
+        rect = self.rect.move(*parent_pos)
+        pg.display.get_surface().blit(self.surface, rect)
+        if rect.collidepoint(*mouse_pos):
+            pos = [mouse_pos[0] - rect.x, mouse_pos[1] - rect.y]
+            self.draw_hover_item(pos)
 
     # Draws the description for the item under the given position
     def draw_hover_item(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
-        # Make sure were are over  legitimate position
-        if 0 <= x < self.inv_items.shape[1] and 0 <= y < self.inv_items.shape[0]:
+        # Make sure were are over legitimate position
+        if 0 <= x < self.dim[0] and 0 <= y < self.dim[1]:
             # Make sure there is an item there
             item = self.inv_items[y][x]
-            if item != -1:
-                game_vars.items[item].draw_description(self.inv_data.get((x, y)))
+            if item.is_item:
+                game_vars.items[item.item_id].draw_description(item.data)
+
+    # Call this to get the item at (row,col) and indicate that this item must be updated
+    def get_item(self, row, col):
+        if 0 <= col < self.dim[0] and 0 <= row < self.dim[1]:
+            if (row, col) not in self.updates:
+                self.updates.append((row, col))
+            return self.inv_items[row][col]
+        print("get_item(): Invalid item coords: {}, {}".format(col, row))
+        return None
+
+    def update(self):
+        for (row, col) in self.updates:
+            self.update_item(row, col)
+            self.updates.remove((row, col))
+
+    def update_item(self, y, x):
+        rect = Rect(0, 0, INV_IMG_W, INV_IMG_W)
+        rect.center = ((x + .5) * INV_W, (y + .5) * INV_W)
+        pg.draw.rect(self.surface, BKGROUND, rect)
+        item = self.inv_items[y][x]
+        if item.is_item:
+            img = game_vars.items[item.item_id].inv_img
+            img_rect = img.get_rect(center=rect.center)
+            self.surface.blit(img, img_rect)
+            text = c.inv_font.render(str(item.amnt), 1, (255, 255, 255))
+            text_rect = text.get_rect()
+            text_rect.bottomright = rect.bottomright
+            self.surface.blit(text, text_rect)
 
     # Automatically moves item to the player inventory
     def auto_move_item(self, row, col):
         # Make sure there is an item
-        amnt = self.inv_amnts[row][col]
-        if amnt != 0:
-            item = self.inv_items[row][col]
-            data = self.inv_data.get((col, row))
+        item = self.get_item(row, col)
+        if item.is_item:
             # Try to get the player inventory to pick up the item
-            inv = game_vars.player.inventory
-            item_obj = DroppedItem(item, amnt, data=data)
-            inv.pick_up_item(item_obj)
-            # Set whatever is left
-            self.set_amnt_at(row, col, amnt=item_obj.amnt)
+            game_vars.player.inventory.pick_up_item(item)
+            # Since this is not the player inventory, try to update the current ui inventory
+            if game_vars.player.active_ui:
+                game_vars.player.active_ui.on_inv_pickup()
 
     # Check if there is room for the given item in inventory
     def room_for_item(self, item):
         # Make sure this item is in the whitelist
-        if len(self.whitelist) > 0 and item.idx not in self.whitelist:
+        if len(self.whitelist) > 0 and item.item_id not in self.whitelist:
             return []
         empty = []
         good = []
         item_amnt = item.amnt
+        max_stack = min(item.max_stack, self.max_stack)
         for y, row in enumerate(self.inv_items):
-            for x, val in enumerate(row):
-                max_stack = min(item.max_stack, self.max_stack)
-                amnt = self.inv_amnts[y][x]
-                data = self.inv_data.get((x, y))
-                if val == -1:
+            for x, inv_item in enumerate(row):
+                if not inv_item.is_item:
                     empty.append((x, y))
-                elif val == item.idx and amnt != max_stack and data == item.data:
-                    if amnt + item_amnt <= max_stack:
+                elif inv_item.same_as(item) and inv_item.amnt != max_stack:
+                    if inv_item.amnt + item_amnt <= max_stack:
                         return good + [(x, y)]
                     else:
                         good.append((x, y))
-                        item_amnt -= max_stack - amnt
+                        item_amnt -= max_stack - inv_item.amnt
         return good + empty[:1]
 
     # Try to pick up the given item, returns if we picked up any of it
@@ -222,21 +180,22 @@ class Inventory:
         max_stack = min(item.max_stack, self.max_stack)
         if space is None:
             space = self.room_for_item(item)
-        for x, y in space:
+        for (x, y) in space:
+            inv_item = self.get_item(y, x)
             # Add to existing item
-            if self.inv_items[y][x] != -1:
+            if inv_item.is_item:
                 # Fill up item to max value
-                if item.amnt + self.inv_amnts[y][x] > max_stack:
-                    item.amnt -= max_stack - self.inv_amnts[y][x]
-                    self.set_amnt_at(y, x, amnt=max_stack)
+                if item.amnt + inv_item.amnt > max_stack:
+                    item.amnt -= max_stack - inv_item.amnt
+                    inv_item.amnt = max_stack
                 # Add all of the item
                 else:
-                    self.set_amnt_at(y, x, amnt=item.amnt + self.inv_amnts[y][x])
+                    inv_item.amnt += item.amnt
                     item.amnt = 0
             # Add to empty slot
             else:
                 transfer = min(item.amnt, max_stack)
-                self.set_at(y, x, item=item.idx, amnt=transfer, data=item.data)
+                inv_item.set_vals(item=item.item_id, amnt=transfer, data=item.data)
                 item.amnt -= transfer
             self.on_pick_up(y, x)
             # Check if we are done
@@ -249,49 +208,64 @@ class Inventory:
     def on_pick_up(self, row, col):
         pass
 
+    # Get list of inventory contents, sorted by item id and duplicates combined
+    def get_materials(self):
+        results = []
+        for row in self.inv_items:
+            for item in row:
+                if item.is_item:
+                    # Special conditions
+                    if len(results) == 0 or results[-1][0] < item.item_id:
+                        results.append([item.item_id, item.amnt])
+                    # Place item into results
+                    else:
+                        i = 0
+                        while i < len(results) and results[i][0] < item.item_id:
+                            i += 1
+                        if results[i][0] == item.item_id:
+                            results[i][1] += item.amnt
+                        else:
+                            results.insert(i, [item.item_id, item.amnt])
+        return results
+
     def left_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
         if not pg.key.get_mods() & KMOD_SHIFT:
-            inv = game_vars.player.inventory
-            item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
-            data = self.inv_data.get((x, y))
-            # Stop if he are holding nothing and clicked on nothing
-            if inv.selected_amnt == 0 and amnt == 0:
+            p_item = game_vars.player.inventory.get_held_item()
+            item = self.get_item(y, x)
+            prev = item.copy()
+            # Stop if we are holding nothing and clicked on nothing
+            if not (p_item.is_item or item.is_item):
                 return
             # Pick up item
-            if inv.selected_amnt == 0:
+            if not p_item.is_item:
                 # Add item to selected item
-                inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
+                p_item.set_vals(item=item.item_id, amnt=item.amnt, data=item.data)
                 # Remove item from our inventory
-                self.set_at(y, x)
-            elif len(self.whitelist) == 0 or inv.selected_item in self.whitelist:
+                item.amnt = 0
+            elif len(self.whitelist) == 0 or p_item.item_id in self.whitelist:
                 # Add item to item or to empty slot
-                if (inv.selected_item == item and inv.selected_data == data) or amnt == 0:
-                    if amnt == 0:
-                        max_stack = self.max_stack
-                    else:
-                        max_stack = min(game_vars.items[item].max_stack, self.max_stack)
-                    amnt_ = min(max_stack, amnt + inv.selected_amnt)
-                    self.set_at(y, x, item=inv.selected_item, amnt=amnt_, data=inv.selected_data)
-                    inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt - (amnt_ - amnt))
+                if not item.is_item or (p_item.item_id == item.item_id and p_item.data == item.data):
+                    max_stack = min(item.max_stack, self.max_stack) if item.is_item else self.max_stack
+                    new_amnt = min(max_stack, item.amnt + p_item.amnt)
+                    p_item.amnt -= new_amnt - item.amnt
+                    item.set_vals(item=p_item.item_id, amnt=new_amnt, data=p_item.data)
                 # Swap out items
-                elif inv.selected_amnt <= self.max_stack:
-                    self.set_at(y, x, item=inv.selected_item, amnt=inv.selected_amnt, data=inv.selected_data)
-                    inv.set_at(-1, -1, item=item, amnt=amnt, data=data)
+                elif p_item.amnt <= self.max_stack:
+                    item.set_info(p_item)
+                    p_item.set_info(prev)
             # If the item changed, set use time
-            if self.inv_amnts[y][x] != amnt or self.inv_items[y][x] != item:
+            if item != prev:
                 game_vars.player.use_time = .3
         else:
             self.auto_move_item(y, x)
 
     def right_click(self, pos):
         x, y = int(pos[0] / INV_W), int(pos[1] / INV_W)
-        item, amnt = self.inv_items[y][x], self.inv_amnts[y][x]
-        data = self.inv_data.get((x, y))
-        inv = game_vars.player.inventory
+        item = self.get_item(y, x)
+        p_item = game_vars.player_inventory().get_held_item()
         # Make sure we can pickup the clicked item
-        same_item = inv.selected_item == item and inv.selected_data == data
-        if amnt > 0 and (inv.selected_amnt == 0 or same_item):
+        if item.is_item and (not p_item.is_item or item.same_as(p_item)):
             # If we haven't held down right, just add dt
             if self.holding_r == 0:
                 self.holding_r += game_vars.dt
@@ -301,23 +275,17 @@ class Inventory:
             wait_time = self.wait_time
             # Do click
             ideal_grab = ceil(game_vars.dt / wait_time)
-            max_grab = game_vars.items[item].max_stack - inv.selected_amnt
-            grab_amnt = min(ideal_grab, max_grab, amnt)
+            max_grab = item.max_stack - p_item.amnt
+            grab_amnt = min(ideal_grab, max_grab, item.amnt)
             if grab_amnt > 0:
                 # Update inventory
-                self.set_amnt_at(y, x, amnt=self.inv_amnts[y][x] - grab_amnt)
+                item.amnt -= grab_amnt
                 # Update selected item, first check if we need to set item data and type
-                if inv.selected_amnt == 0:
-                    inv.set_at(-1, -1, item=item, amnt=grab_amnt, data=data)
+                if p_item.is_item:
+                    p_item.amnt += grab_amnt
                 else:
-                    inv.set_amnt_at(-1, -1, amnt=inv.selected_amnt + grab_amnt)
+                    p_item.set_vals(item=item.item_id, amnt=grab_amnt, data=item.data)
                 game_vars.player.use_time = wait_time
-
-    def is_empty(self):
-        for amnt in self.inv_amnts.flatten():
-            if amnt != 0:
-                return False
-        return True
 
 
 def new_inventory(dim):

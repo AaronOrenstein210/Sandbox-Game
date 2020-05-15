@@ -83,7 +83,7 @@ class Waypoint(Item):
         self.has_data = True
 
     def on_left_click(self):
-        data = game_vars.get_current_item_data()
+        data = game_vars.player_inventory().get_current_item().data
         if data:
             pos = [int.from_bytes(data[2 * j:2 * (j + 1)], byteorder) * BLOCK_W for j in range(2)]
             game_vars.player.set_pos(pos)
@@ -92,7 +92,7 @@ class Waypoint(Item):
         pos = game_vars.player_topleft(True)
         data = int(pos[0]).to_bytes(2, byteorder)
         data += int(pos[1]).to_bytes(2, byteorder)
-        game_vars.set_current_item_data(data)
+        game_vars.player_inventory().get_current_item().data = data
 
     def get_description(self, data):
         if data:
@@ -286,21 +286,31 @@ class MagicWand(Item):
                 print("Magic Stored:", int.from_bytes(data, byteorder))
 
     def on_right_click(self):
+        item = game_vars.player_inventory().get_current_item()
+        if item.item_id != i.MAGIC_WAND:
+            return
+        entities = game_vars.handler.entities
         # Check if we clicked on a mage
         pos = game_vars.global_mouse_pos(blocks=False)
-        # TODO: Check for clicking on mage
-        for entity in game_vars.handler.entities:
-            pass
+        for key, entity in entities.items():
+            if isinstance(entity, Mobs.Mage) and entity.rect.collidepoint(pos):
+                print("Selected mage")
+                item.data = key.to_bytes(2, byteorder)
+                entity.target = (-1, -1)
+                return
         # Get the clicked on tile
-        pos = game_vars.get_topleft(pos[0] // BLOCK_W, pos[1] // BLOCK_W)
+        pos = game_vars.get_topleft(*game_vars.global_mouse_pos(blocks=True))
         tile_id = game_vars.get_block_at(*pos)
         # Check if we clicked on a pedestal
-        item_data = game_vars.get_current_item_data()
-        # TODO: Check for clicking on pedestal
-        if item_data and tile_id == t.PEDESTAL:
-            pass
+        if item.data and tile_id == t.PEDESTAL:
+            key = int.from_bytes(item.data[:2], byteorder)
+            if isinstance(entities.get(key), Mobs.Mage):
+                print("Bound mage")
+                entities[key].set_target(pos)
+                entities[key].set_pos(pos[0] * BLOCK_W, (pos[1] - entities[key].dim[1]) * BLOCK_W)
+            item.data = None
         # Check if we clicked on a portal
-        if tile_id == t.PORTAL:
+        elif tile_id == t.PORTAL:
             game_vars.tiles[t.PORTAL].summon(pos)
 
     def get_description(self, data):
@@ -459,6 +469,14 @@ class Crusher(Placeable):
 class UpgradeStation(Placeable):
     def __init__(self):
         super().__init__(i.UPGRADE_STATION, t.UPGRADE_STATION, name="Upgrade Station", img=INV + "upgrade_station.png")
+
+
+class Pedestal(Placeable):
+    def __init__(self):
+        super().__init__(i.PEDESTAL, t.PEDESTAL, name="Pedestal", img=INV + "pedestal.png")
+
+    def get_description(self, data):
+        return "Place a magic ball on a pedestal to begin channeling magic into it"
 
 
 # Weapons/Tools

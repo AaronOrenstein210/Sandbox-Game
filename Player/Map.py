@@ -45,7 +45,7 @@ class Map:
         off_x, off_y = int((left - b_left) * self.zoom), int((top - b_top) * self.zoom)
         map_rect = pg.Rect((b_left, b_top), b_dim)
         self.draw_sprite(s, map_rect, game_vars.player.sprite, game_vars.player_pos(in_blocks=True))
-        for entity in [e for e in game_vars.handler.entities if e.sprite]:
+        for entity in [e for e in game_vars.handler.entities.values() if e.sprite]:
             self.draw_sprite(s, map_rect, entity.sprite, entity.get_block_pos())
         pg.display.get_surface().blit(s, (rect.centerx - dim[0] // 2, rect.centery - dim[1] // 2),
                                       area=((off_x, off_y), dim))

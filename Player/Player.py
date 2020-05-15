@@ -207,13 +207,6 @@ class Player:
                     self.a[0] = -acc
                 elif keys[K_d] and not keys[K_a]:
                     self.a[0] = acc
-                else:
-                    if abs(self.v[0]) < 1:
-                        self.v[0] = self.a[0] = 0
-                    else:
-                        self.a[0] = copysign(acc, -self.v[0])
-                if self.a[0] * self.v[0] < 0:
-                    self.a[0] = copysign(acc * 10, self.a[0])
                 if keys[K_SPACE] and self.collisions[1] == 1:
                     self.v[1] = -self.stats.get_stat("jump_speed")
                 self.move()
@@ -226,9 +219,9 @@ class Player:
         display = pg.display.get_surface()
         # Draw shadow of placeable item if applicable
         if self.placement_range.collidepoint(*global_pos):
-            item = self.inventory.get_held_item()
-            if item != -1 and game_vars.items[item].placeable:
-                tile = game_vars.tiles[game_vars.items[item].block_id]
+            item = self.inventory.get_current_item()
+            if item.is_item and game_vars.items[item.item_id].placeable:
+                tile = game_vars.tiles[game_vars.items[item.item_id].block_id]
                 img = tile.image.copy().convert_alpha()
                 img.fill((255, 255, 255, 128), None, BLEND_RGBA_MULT)
                 # Find top left of current block in px
@@ -269,13 +262,13 @@ class Player:
         self.map.draw_map(pg.Rect(c.screen_w - c.MAP_W, text_rect.h, c.MAP_W, c.MAP_W))
 
         # Draw selected item under cursor if there is one
-        item, amnt = self.inventory.get_cursor_item()
-        if item != -1:
+        item = self.inventory.get_held_item()
+        if item.is_item:
             img_rect = pg.Rect(0, 0, c.INV_IMG_W, c.INV_IMG_W)
             img_rect.center = pos
-            img = game_vars.items[item].inv_img
+            img = game_vars.items[item.item_id].inv_img
             display.blit(img, img.get_rect(center=img_rect.center))
-            text = c.inv_font.render(str(amnt), 1, (255, 255, 255))
+            text = c.inv_font.render(str(item.amnt), 1, (255, 255, 255))
             display.blit(text, text.get_rect(bottomright=img_rect.bottomright))
 
         # Draw 'You Died' text
@@ -362,12 +355,16 @@ class Player:
         # For each direction
         for i in range(2):
             # Calculate displacement
-            d[i] = BLOCK_W * self.v[i] * game_vars.dt
+            d[i] = BLOCK_W * game_vars.dt * (self.v[i] + self.a[i] * game_vars.dt / 2)
             # Calculate velocity
             self.v[i] += self.a[i] * game_vars.dt
             spd = self.stats.get_stat("max_speed" + ("x" if i == 0 else "y"))
             if abs(self.v[i]) > spd:
                 self.v[i] = copysign(spd, self.v[i])
+
+        # Try to add a drag force, if something is manually setting force, this will have no effect
+        if self.v[0] != 0:
+            self.a[0] = -8 * self.v[0]
 
         prev_d, prev_pos = d.copy(), self.pos.copy()
         # Check for collisions and set new position
@@ -416,16 +413,16 @@ class Player:
     def left_click(self):
         pos = pg.mouse.get_pos()
         if not self.inventory.left_click(pos):
-            idx = self.inventory.get_held_item()
-            if idx != -1:
-                item = game_vars.items[idx]
+            item = self.inventory.get_current_item()
+            if item.is_item:
+                item_obj = game_vars.items[item.item_id]
                 self.used_left = game_vars.global_mouse_pos()[0] < self.rect.centerx
-                if item.left_click and (self.first_swing or item.auto_use):
+                if item_obj.left_click and (self.first_swing or item_obj.auto_use):
                     self.first_swing = False
                     # Use item
-                    item.on_left_click()
-                    self.item_used = item
-                    self.use_time = item.use_time
+                    item_obj.on_left_click()
+                    self.item_used = item_obj
+                    self.use_time = item_obj.use_time
             else:
                 self.break_block(*game_vars.global_mouse_pos(blocks=True))
                 self.use_time = .5
@@ -436,27 +433,31 @@ class Player:
         if not self.inventory.right_click(pos):
             block_x, block_y = game_vars.get_topleft(*[p // BLOCK_W for p in global_pos])
             tile = game_vars.tiles[game_vars.get_block_at(block_x, block_y)]
+            # First attempt to activate the tile
             # Make sure we didn't click the same block more than once
             if tile.clickable and self.placement_range.collidepoint(*global_pos) and \
-                    (self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
-                tile.activate((block_x, block_y))
-            elif self.inventory.selected_item != -1:
+                    (not tile.has_ui or self.active_ui is None or self.active_ui.block_pos != [block_x, block_y]):
+                if tile.activate((block_x, block_y)):
+                    return
+            # Then try to drop the cursor item
+            if self.inventory.selected_item.is_item:
                 # Check if we dropped an item
                 drop = self.inventory.drop_item()
                 if drop is not None:
                     # This determines if we clicked to the left or right of the player
                     left = global_pos[0] < self.rect.centerx
                     game_vars.drop_item(drop, left)
+            # If there is no cursor item, use the current hotbar item
             else:
-                item = self.inventory.get_held_item()
-                if item != -1:
-                    item = game_vars.items[item]
-                    if item.right_click and (self.first_swing or item.auto_use):
+                item = self.inventory.get_current_item()
+                if item.is_item:
+                    item_obj = game_vars.items[item.item_id]
+                    if item_obj.right_click and (self.first_swing or item_obj.auto_use):
                         self.first_swing = False
                         # Use item
-                        item.on_right_click()
-                        self.item_used = item
-                        self.use_time = item.use_time
+                        item_obj.on_right_click()
+                        self.item_used = item_obj
+                        self.use_time = item_obj.use_time
 
     def break_block(self, block_x, block_y):
         # Make sure we aren't hitting air
@@ -483,12 +484,12 @@ class Player:
 
     def pick_up(self, item):
         if self.collection_range.colliderect(item.rect):
-            space = self.inventory.room_for_item(item)
+            space = self.inventory.room_for_item(item.info)
             if len(space) != 0:
                 item.attract(self.rect.center)
                 if abs(self.rect.centerx - item.rect.centerx) <= 1 and \
                         abs(self.rect.centery - item.rect.centery) <= 1:
-                    return self.inventory.pick_up_item(item, space)
+                    return self.inventory.pick_up_item(item.info, space)
         else:
             item.pulled_in = False
         return False

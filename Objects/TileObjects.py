@@ -1,12 +1,12 @@
 # Created on 4 December 2019
 
 from sys import byteorder
-from random import choice
+from random import choice, uniform
 from pygame.locals import *
 import Objects
 from Objects.TileTypes import *
 from Objects.DroppedItem import DroppedItem
-from Objects.ItemTypes import Upgradable
+from Objects import ItemTypes
 from Objects.Animation import Animation
 from Objects import INV, PROJ
 from NPCs import Mobs as mobs
@@ -159,22 +159,50 @@ class Portal(Tile):
         data = game_vars.get_block_data(pos)
         if data:
             magic = int.from_bytes(data[:8], byteorder)
-            # TODO: Summon mage dude
+            # Must have at least 5 magic
+            if magic < 5:
+                return
+            # Every X5 for magic increases max level by 1
+            max_level = math.log(magic, 5)
+            chance = max(max_level % 1, .5)
+            max_level = int(max_level)
+            # Find chances for current level and up to two levels below
+            if max_level == 1:
+                chances = {1: 1}
+            elif max_level == 2:
+                chances = {2: chance, 1: 1 - chance}
+            else:
+                chances = {max_level: chance, max_level - 1: (1 - chance) * 2 / 3,
+                           max_level - 2: (1 - chance) / 3}
+            # Choose a random level
+            num = uniform(0, 1)
+            for lvl, chance in chances.items():
+                if num > chance:
+                    num -= chance
+                else:
+                    # Summon mage
+                    # element = choice(list(ItemTypes.MagicContainer.ELEMENT_NAMES.keys()))
+                    game_vars.spawn_entity(mobs.Mage(ItemTypes.MagicContainer.FIRE, lvl), [p * BLOCK_W for p in pos])
+                    break
+            magic = int(magic / 2)
+            game_vars.write_block_data(pos, magic.to_bytes(8, byteorder))
 
     def on_place(self, pos):
         game_vars.write_block_data(pos, bytearray(8))
 
-    def tick(self, x, y, dt, data):
+    def tick(self, x, y, dt):
         magic = 0
         rect = pg.Rect(x * BLOCK_W, y * BLOCK_W, self.dim[0] * BLOCK_W, self.dim[1] * BLOCK_W)
         items = game_vars.handler.items
         for item in items:
             if item.item.magic_value > 0 and item.rect.colliderect(rect):
-                magic += item.item.magic_value
+                magic += item.item.magic_value * item.info.amnt
                 items.remove(item)
         if magic > 0:
-            current_magic = int.from_bytes(data[:8], byteorder)
-            game_vars.write_block_data((x, y), (current_magic + magic).to_bytes(8, byteorder))
+            data = game_vars.get_block_data((x, y))
+            if data:
+                current_magic = int.from_bytes(data[:8], byteorder)
+                game_vars.write_block_data((x, y), (current_magic + magic).to_bytes(8, byteorder))
 
 
 # Crafting Stations
@@ -257,6 +285,7 @@ class BirdieSpawner(SpawnTile):
 class DimensionHopper(FunctionalTile):
     def __init__(self):
         super().__init__(t.DIMENSION_HOPPER, img=INV + "dimension_hopper.png")
+        self.barrier = True
         self.scroller = None
         self.add_drop(i.DIMENSION_HOPPER, 1)
         self.map_color = (0, 0, 0)
@@ -264,6 +293,7 @@ class DimensionHopper(FunctionalTile):
 
     def activate(self, pos):
         game_vars.player.set_active_ui(self.UI(pos))
+        return True
 
     class UI(ActiveUI):
         def __init__(self, pos):
@@ -299,6 +329,8 @@ class WorldBuilder(FunctionalTile):
         data = game_vars.get_block_data(pos)
         if data is not None:
             game_vars.player.set_active_ui(self.UI(pos, data))
+            return True
+        return False
 
     def on_place(self, pos):
         from Player.Inventory import new_inventory
@@ -406,16 +438,17 @@ class WorldBuilder(FunctionalTile):
                     pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                     # Clicked create
                     if self.create_rect.collidepoint(*pos):
-                        if not self.invs[self.BIOME].is_empty() and not self.invs[
-                            self.SIZE].is_empty() and self.name.valid:
+                        if not self.invs[self.BIOME].empty and not self.invs[
+                            self.SIZE].empty and self.name.valid:
                             for e in events:
                                 if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
                                     events.remove(e)
                                     new = World(self.name)
                                     new.can_delete = True
-                                    items = self.invs[self.BIOME].inv_items.flatten().tolist()
-                                    items += [self.invs[self.SIZE].inv_items[0][0]]
-                                    items += [i.BONUS_STRUCTURE] * self.invs[self.STRUCTURE].inv_amnts[0][0]
+                                    items = [j.item_id for row in self.invs[self.BIOME].inv_items for j in row if
+                                             j.is_item]
+                                    items += [self.invs[self.SIZE].inv_items[0][0].item_id]
+                                    items += [i.BONUS_STRUCTURE] * self.invs[self.STRUCTURE].inv_items[0][0].amnt
                                     WorldGenerator.generate_world(new, modifiers=items)
                                     del new
                                     from Player.Inventory import new_inventory
@@ -433,7 +466,7 @@ class Chest(FunctionalTile):
 
     def __init__(self):
         super().__init__(t.CHEST, img=INV + "chest.png", dim=(2, 2))
-        self.on_surface = True
+        self.on_surface = self.barrier = True
         self.add_drop(i.CHEST, 1)
         self.map_color = (200, 200, 0)
         self.hardness = 1
@@ -457,6 +490,8 @@ class Chest(FunctionalTile):
         data = game_vars.get_block_data(pos)
         if data is not None:
             game_vars.player.set_active_ui(self.UI(pos, data))
+            return True
+        return False
 
     class UI(ActiveUI):
         def __init__(self, pos, data):
@@ -495,13 +530,14 @@ class Crusher(FunctionalTile):
     def on_break(self, pos):
         data = game_vars.get_block_data(pos)
         if data is not None:
-            amnt = int.from_bytes(data[:2], byteorder)
-            if amnt != 0:
+            item = int.from_bytes(data[:2], byteorder)
+            if item in game_vars.items.keys():
                 # Drop contents
                 from random import choice
-                item = int.from_bytes(data[2:4], byteorder)
-                game_vars.drop_item(DroppedItem(item, amnt), choice([True, False]),
-                                    [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
+                amnt = int.from_bytes(data[2:4], byteorder)
+                if amnt > 0:
+                    game_vars.drop_item(DroppedItem(ItemInfo(item, amnt)), choice([True, False]),
+                                        [pos[0] * BLOCK_W, pos[1] * BLOCK_W])
         game_vars.write_block_data(pos, None)
         return True
 
@@ -511,6 +547,8 @@ class Crusher(FunctionalTile):
             game_vars.player.set_active_ui(self.UI(pos, data, 9))
             if not game_vars.player.inventory.open:
                 game_vars.player.inventory.toggle()
+            return True
+        return False
 
     class UI(ActiveUI):
         def __init__(self, pos, data, max_stack):
@@ -550,18 +588,19 @@ class Crusher(FunctionalTile):
                 if self.rect.collidepoint(*pos):
                     pos = [pos[0] - self.rect.x, pos[1] - self.rect.y]
                     for e in events:
+                        item = self.inv.get_item(0, 0)
                         if e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT and \
-                                self.text_rect.collidepoint(*pos) and self.inv.inv_amnts[0][0] != 0:
+                                self.text_rect.collidepoint(*pos) and item.is_item:
                             items = {}
                             item = self.inv.inv_items[0][0]
                             # Go through each item and get a random drop
-                            while self.inv.inv_amnts[0][0] > 0:
+                            while item.is_item:
                                 idx = Objects.CRUSH_DROPS[item].random()
                                 if idx in items.keys():
                                     items[idx] += 1
                                 else:
                                     items[idx] = 1
-                                self.inv.inv_amnts[0][0] -= 1
+                                item.amnt -= 1
                             # Drop the results
                             block_pos = [self.block_pos[0] * BLOCK_W, self.block_pos[1] * BLOCK_W]
                             for idx, amnt in zip(items.keys(), items.values()):
@@ -569,10 +608,10 @@ class Crusher(FunctionalTile):
                                 # Make sure we don't drop more than max stack
                                 while amnt > 0:
                                     transfer = min(max_stack, amnt)
-                                    game_vars.drop_item(DroppedItem(idx, transfer), choice([True, False]), block_pos)
+                                    game_vars.drop_item(DroppedItem(ItemInfo(idx, transfer)), choice([True, False]),
+                                                        block_pos)
                                     amnt -= transfer
                             self.save()
-                            self.inv.set_amnt_at(0, 0, 0)
 
 
 class UpgradeStation(FunctionalTile):
@@ -584,11 +623,11 @@ class UpgradeStation(FunctionalTile):
         self.hardness = 0
         self.set_animation(self.Anim(self.image))
 
-    def get_block_img(self, data):
-        if data and len(data) >= 4:
-            amnt = int.from_bytes(data[:2], byteorder)
-            if amnt != 0:
-                item = int.from_bytes(data[2:4], byteorder)
+    def get_block_img(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data and len(data) >= 2:
+            item, amnt = ItemTypes.load_id_amnt(data[:4])
+            if item in game_vars.items.keys():
                 return game_vars.animations[self.anim_idx].get_frame(img=game_vars.items[item].inv_img)
         return game_vars.animations[self.anim_idx].get_frame()
 
@@ -600,9 +639,9 @@ class UpgradeStation(FunctionalTile):
         if data:
             inv = Inventory((1, 1))
             inv.load(data)
-            item, amnt, data = inv.inv_items[0][0], inv.inv_amnts[0][0], inv.inv_data.get((0, 0))
-            if amnt != 0:
-                game_vars.drop_item(DroppedItem(item, amnt, data=data), c.random_sign(), [p * BLOCK_W for p in pos])
+            item = inv.get_item(0, 0)
+            if item.is_item:
+                game_vars.drop_item(DroppedItem(item), c.random_sign(), [p * BLOCK_W for p in pos])
         game_vars.write_block_data(pos, None)
         return True
 
@@ -612,6 +651,8 @@ class UpgradeStation(FunctionalTile):
             game_vars.player.set_active_ui(self.UI(pos, data))
             if not game_vars.player.inventory.open:
                 game_vars.player.inventory.toggle()
+            return True
+        return False
 
     class UI(ActiveUI):
         def __init__(self, pos, data):
@@ -620,7 +661,7 @@ class UpgradeStation(FunctionalTile):
             super().__init__(pg.Surface(rect.size), rect, pos=pos)
 
             # Set up inventory for item
-            whitelist = [item_id for item_id, item in game_vars.items.items() if isinstance(item, Upgradable)]
+            whitelist = [item_id for item_id, item in game_vars.items.items() if isinstance(item, ItemTypes.Upgradable)]
             self.inv = Inventory((1, 1), whitelist=whitelist, max_stack=1)
             self.inv.rect.move_ip((self.rect.w - c.INV_W) // 2, c.INV_W // 2)
             self.inv.load(data)
@@ -649,10 +690,11 @@ class UpgradeStation(FunctionalTile):
                         self.upgrade_tree.check_hover(pos)
 
         def save(self):
-            if not self.upgrade_tree or self.inv.inv_amnts[0][0] == 0:
-                self.inv.set_data_at(0, 0, data=None)
+            item = self.inv.get_item(0, 0)
+            if not self.upgrade_tree or not item.is_item:
+                item.data = None
             else:
-                self.inv.set_data_at(0, 0, data=self.upgrade_tree.write())
+                item.data = self.upgrade_tree.write()
             game_vars.write_block_data(self.block_pos, self.inv.write())
 
         def draw_tree(self):
@@ -661,12 +703,11 @@ class UpgradeStation(FunctionalTile):
                 self.ui.blit(self.tree_s, self.tree_r, area=((self.off_x, self.off_y), self.tree_r.size))
 
         def load_tree(self):
-            data = self.inv.inv_data.get((0, 0))
-            item = self.inv.inv_items[0][0]
-            if data and item != -1:
+            item = self.inv.get_item(0, 0)
+            if item.data and item.is_item:
                 # Draw upgrade tree and get surface dimensions
-                self.upgrade_tree = game_vars.items[item].upgrade_tree.new_tree()
-                self.upgrade_tree.load(data)
+                self.upgrade_tree = game_vars.items[item.item_id].upgrade_tree.new_tree()
+                self.upgrade_tree.load(item.data)
                 self.tree_s = self.upgrade_tree.get_surface()
                 s_dim = self.tree_s.get_size()
                 # Readjust rectangle
@@ -689,7 +730,7 @@ class UpgradeStation(FunctionalTile):
 
         def process_events(self, events, mouse, keys):
             # Get current item data to check if we changed the item
-            prev_data = self.inv.inv_data.get((0, 0))
+            prev_data = self.inv.inv_items[0][0].data
             # Drag upgrade screen
             if self.dragging:
                 if not mouse[BUTTON_LEFT - 1]:
@@ -703,7 +744,7 @@ class UpgradeStation(FunctionalTile):
             # Check inventories
             elif self.click_inventories(mouse):
                 # If we changed the item data, draw upgrade tree
-                if prev_data != self.inv.inv_data.get((0, 0)):
+                if prev_data != self.inv.inv_items[0][0].data:
                     self.load_tree()
                 self.save()
             # Handle other events
@@ -715,7 +756,8 @@ class UpgradeStation(FunctionalTile):
                     for e in events:
                         # Start dragging only if the player is holding nothing
                         if e.type == MOUSEBUTTONDOWN and e.button == BUTTON_LEFT:
-                            if self.tree_r.collidepoint(*pos) and game_vars.player.inventory.selected_amnt == 0:
+                            if self.tree_r.collidepoint(
+                                    *pos) and not game_vars.player_inventory().get_held_item().is_item:
                                 self.dragging = True
                         # Click the upgrade tree
                         elif e.type == MOUSEBUTTONUP and e.button == BUTTON_LEFT:
@@ -762,3 +804,93 @@ class UpgradeStation(FunctionalTile):
             result = self.background.copy()
             result.blit(img, img.get_rect(center=(self.x, self.y)))
             return result
+
+
+class Pedestal(Tile):
+    def __init__(self):
+        super().__init__(t.PEDESTAL, img=INV + "pedestal.png")
+        self.clickable = self.has_data = self.on_surface = self.img_updates = True
+        self.barrier = False
+        self.add_drop(i.PEDESTAL, 1)
+
+    # Returns space left in current magic ball, 0 if no item or invalid block
+    def get_space(self, x, y):
+        tile_id = game_vars.get_block_at(x, y)
+        if tile_id == t.PEDESTAL:
+            data = game_vars.get_block_data((x, y))
+            if data and len(data) > 2:
+                item = game_vars.items[int.from_bytes(data[:2], byteorder)]
+                if isinstance(item, ItemTypes.MagicContainer):
+                    current_amnt = int.from_bytes(data[3:item.int_bytes + 3], byteorder)
+                    return item.capacity - current_amnt
+        return 0
+
+    def add_magic(self, x, y, amnt):
+        data = game_vars.get_block_data((x, y))
+        if data and len(data) > 2:
+            item = game_vars.items[int.from_bytes(data[:2], byteorder)]
+            if isinstance(item, ItemTypes.MagicContainer):
+                current_amnt = int.from_bytes(data[3:item.int_bytes + 3], byteorder)
+                transfer = min(item.capacity - current_amnt, amnt)
+                amnt -= transfer
+                new_data = data[:3] + (current_amnt + transfer).to_bytes(item.int_bytes, byteorder)
+                game_vars.write_block_data((x, y), new_data)
+
+    def get_block_img(self, pos):
+        data = game_vars.get_block_data(pos)
+        if data and len(data) > 2:
+            item = game_vars.items[int.from_bytes(data[:2], byteorder)]
+            if isinstance(item, ItemTypes.MagicContainer):
+                final_img = self.image.copy()
+                # Draw magic ball
+                img_w = BLOCK_W * 3 // 4
+                img = c.scale_to_fit(item.image, img_w, img_w)
+                img_rect = img.get_rect(center=(BLOCK_W // 2, img_w // 2))
+                final_img.blit(img, img_rect)
+                element = int.from_bytes(data[2:3], byteorder)
+                current_amnt = int.from_bytes(data[3:], byteorder)
+                px_h = int(current_amnt * img_w / item.capacity)
+                px_arr = pg.surfarray.pixels2d(final_img)
+                for y in range(img_rect.bottom - px_h, img_rect.bottom):
+                    first = False
+                    for x in range(img_rect.left, img_rect.right):
+                        if first:
+                            if px_arr[x][y] == 0xff000000:
+                                break
+                            else:
+                                px_arr[x][y] = 0xff0000ff
+                        else:
+                            if px_arr[x][y] == 0xff000000:
+                                first = True
+                del px_arr
+                return final_img
+        return self.image
+
+    def on_break(self, pos):
+        data = game_vars.get_block_data(pos)
+        # There is an item in the pedestal
+        if data:
+            item = ItemInfo(int.from_bytes(data[:2], byteorder), 1, data=data[2:])
+            game_vars.drop_item(DroppedItem(item), c.random_sign(),
+                                [p * BLOCK_W + d * BLOCK_W // 2 for p, d in zip(pos, self.dim)])
+            game_vars.write_block_data(pos, None)
+        return True
+
+    def activate(self, pos):
+        item = game_vars.player_inventory().get_current_item()
+        data = game_vars.get_block_data(pos)
+        # There is an item in the pedestal
+        if data and (not item.is_item or item.item_id != i.MAGIC_WAND):
+            item = ItemInfo(int.from_bytes(data[:2], byteorder), 1, data=data[2:])
+            game_vars.drop_item(DroppedItem(item), c.random_sign(),
+                                [p * BLOCK_W + d * BLOCK_W // 2 for p, d in zip(pos, self.dim)])
+            game_vars.write_block_data(pos, None)
+            game_vars.player.use_time = .3
+            return True
+        # There is no item in the pedestal, Make sure we clicked with a magic container item
+        elif item.is_item and isinstance(game_vars.items[item.item_id], ItemTypes.MagicContainer):
+            game_vars.write_block_data(pos, item.item_id.to_bytes(2, byteorder) + item.data)
+            item.amnt -= 1
+            game_vars.player.use_time = .3
+            return True
+        return False

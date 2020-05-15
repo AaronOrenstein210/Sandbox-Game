@@ -8,9 +8,11 @@ from pygame.locals import *
 from Tools.tile_ids import AIR
 from Tools import constants as c
 from Tools import game_vars
+from NPCs.Mobs import Mage, load_mage
 from World.Chunk import ChunkManager
 
-WORLD = 0
+# World types
+WORLD, IDLE = range(2)
 
 
 class World:
@@ -214,8 +216,7 @@ class World:
             return result
 
     # Saves world information
-    # @param close_file: should we close the file when done
-    def save_info(self, close_file):
+    def save_info(self):
         # Open the file in write mode
         self.f_obj.close()
         self.f_obj = open(self.file.full_file, 'wb')
@@ -225,9 +226,6 @@ class World:
         self.f_obj.write(int(self.time).to_bytes(2, byteorder))
         for val in self.dim + self.spawn:
             self.f_obj.write(val.to_bytes(2, byteorder))
-        # Check if we should close the file
-        if close_file:
-            self.f_obj.close()
 
     # Save world blocks
     def save_blocks(self, progress, num_rows):
@@ -301,7 +299,7 @@ class World:
     def save_world(self, progress):
         if progress == 0:
             # Save world information, automatically opens the file
-            self.save_info(False)
+            self.save_info()
         progress *= 2
         if progress < 1:
             return self.save_blocks(progress, 1) / 2
@@ -412,6 +410,7 @@ class World:
 class IdleWorld(World):
     def __init__(self, worldfile):
         super().__init__(worldfile)
+        self.type = IDLE
 
     # Draws the entire world and map
     def draw_world(self, progress):
@@ -440,12 +439,32 @@ class IdleWorld(World):
                             0]
         return (y + 1) / self.dim[1]
 
-    # Save word
+    def load_info(self, close_file):
+        super().load_info(False)
+        num_mages = int.from_bytes(self.f_obj.read(1), byteorder)
+        spawn = [p * c.BLOCK_W for p in self.spawn]
+        for i in range(num_mages):
+            num_bytes = int.from_bytes(self.f_obj.read(1), byteorder)
+            mage = load_mage(self.f_obj.read(num_bytes))
+            game_vars.spawn_entity(mage, pos=mage.pos if mage.bound else spawn)
+
+        if close_file:
+            self.f_obj.close()
+
+    # Save world
     def save_world(self, progress):
         if progress == 0:
             # Save world information, automatically opens the file
-            self.save_info(False)
+            self.save_info()
         progress = self.save_blocks(progress, 1)
         if progress == 1:
             self.f_obj.close()
         return progress
+
+    # Save all mage entities
+    def save_info(self):
+        super().save_info()
+        mages = [e for e in game_vars.handler.entities.values() if isinstance(e, Mage)]
+        self.f_obj.write(len(mages).to_bytes(1, byteorder))
+        for mage in mages:
+            self.f_obj.write(mage.write())

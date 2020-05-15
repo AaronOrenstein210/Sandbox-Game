@@ -8,7 +8,7 @@ TOOL_STATS = WEAPON_STATS + ["power"]
 STATS = list(dict.fromkeys(TOOL_STATS + ENEMY_STATS).keys())
 
 DEF_PLAYER = {"hp": 100, "max_speedx": 8, "acceleration": 10, "jump_speed": 12, "max_speedy": 20}
-DEF_MOB = {"jump_speed": 12, "acceleration": 10, "max_speedy": 20, "max_speedx": 7}
+DEF_MOB = {"jump_speed": 12, "acceleration": 10, "max_speedy": 20, "max_speedx": 5}
 
 
 # TODO: Get rid of add stats?
